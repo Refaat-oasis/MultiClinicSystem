@@ -1,0 +1,95 @@
+# ============================================================================
+# .ignore - Search & Indexing Exclusions (ripgrep, fd, IDEs & Search Tools)
+# ============================================================================
+
+# Directory junctions & symlinks (prevent duplicate search results)
+backend/
+frontend/
+backend
+frontend
+
+# .NET Build Outputs & Assembly Binaries
+[Bb]in/
+[Oo]bj/
+*.dll
+*.pdb
+*.exe
+*.so
+*.dylib
+*.deps.json
+*.runtimeconfig.json
+*.tsbuildinfo
+
+# Node.js, Frontend Bundles & Package Managers
+node_modules/
+.pnpm-store/
+dist/
+dist-ssr/
+build/
+out/
+.vite/
+.npm/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Git, IDEs & Editor Configuration
+.git/
+.vs/
+.idea/
+*.user
+*.suo
+*.userprefs
+*.sln.docstates
+*.DotSettings.user
+
+# AI & Agent Working Directories & Transcripts
+.agents/
+.gemini/
+.claude/
+
+# Test Results, Coverage & Browser Automation Reports
+[Tt]est[Rr]esults/
+test-results/
+coverage/
+*.cobertura.xml
+*.coverage
+*.coveragexml
+TestResult.xml
+playwright-report/
+blob-report/
+playwright/.cache/
+
+# Logs, Crash Dumps & Diagnostics
+logs/
+*.log
+*.dmp
+*.crash
+*.stackdump
+
+# Secrets & Environment Files
+.env
+.env.*
+!.env.example
+secrets.json
+*.pfx
+*.key
+*.pem
+*.cert
+
+# Operating System & OneDrive Temporary Files
+*.tmp
+~$*
+*.~*
+*.lock
+*.crswap
+*.partial
+*.aria2
+Desktop.ini
+Thumbs.db
+ehthumbs.db
+ehthumbs_vista.db
+$RECYCLE.BIN/
+.DS_Store
+

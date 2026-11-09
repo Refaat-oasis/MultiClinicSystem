@@ -38,3 +38,4 @@ export const useAuthStore = create<AuthStore>((set) => ({
       user: state.user ? { ...state.user, clinicId } : null,
     })),
 }));
+

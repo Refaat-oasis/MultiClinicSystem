@@ -160,3 +160,4 @@ export const DeviceManagementScreen: React.FC<DeviceManagementScreenProps> = ({
     </div>
   );
 };
+
