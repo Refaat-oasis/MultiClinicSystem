@@ -1,0 +1,20 @@
+root = true
+
+[*]
+indent_style = space
+indent_size = 4
+end_of_line = crlf
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+[*.{json,yml,yaml,ts,tsx,js,jsx,css}]
+indent_size = 2
+
+[*.cs]
+dotnet_naming_rule.types_should_be_pascal_case.severity = warning
+dotnet_naming_rule.types_should_be_pascal_case.symbols = types
+dotnet_naming_symbols.types.applicable_kinds = class, struct, interface, enum, delegate
+
+csharp_style_namespace_declarations = file_scoped:warning
+csharp_prefer_braces = true:warning

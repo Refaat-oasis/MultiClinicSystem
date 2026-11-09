@@ -1,0 +1,104 @@
+## ============================================================================
+## ASP.NET Core 10 & .NET Solution Exclusions
+## ============================================================================
+[Bb]in/
+[Oo]bj/
+[Aa]ll[Ff]iles[Gg]enerated/
+[Gg]enerated_[Ff]iles/
+appsettings.Production.json
+appsettings.*.local.json
+secrets.json
+
+# Visual Studio & JetBrains Rider
+.vs/
+.idea/
+*.user
+*.userosscache
+*.suo
+*.userprefs
+*.sln.docstates
+*.DotSettings.user
+
+# VS Code (exclude workspace state, keep configuration templates)
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# MSBuild / EF Core Tooling
+*.publishproj
+*.azurePubxml
+efbundle*
+
+# Test Results & Code Coverage
+[Tt]est[Rr]esults/
+test-results/
+coverage/
+*.cobertura.xml
+*.coverage
+*.coveragexml
+TestResult.xml
+
+# Diagnostic Dumps & Logs
+*.log
+*.dmp
+*.crash
+logs/
+
+## ============================================================================
+## Node.js, Vite & Frontend Exclusions
+## ============================================================================
+node_modules/
+.pnpm-store/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Frontend Build Outputs
+dist/
+dist-ssr/
+build/
+out/
+.vite/
+
+# Playwright & E2E Testing
+playwright-report/
+blob-report/
+playwright/.cache/
+
+## ============================================================================
+## Microsoft OneDrive & Windows OS Sync Exclusions
+## ============================================================================
+# OneDrive temporary, sync, and swap artifacts
+*.tmp
+~$*
+*.~*
+*.lock
+*.crswap
+*.partial
+*.aria2
+
+# Windows System Files
+Desktop.ini
+Thumbs.db
+ehthumbs.db
+ehthumbs_vista.db
+$RECYCLE.BIN/
+
+## ============================================================================
+## Security, Secrets & Local Environment
+## ============================================================================
+.env
+.env.local
+.env.*.local
+*.pfx
+*.key
+*.pem
+*.cert
+
+# Directory junctions & agent working dirs
+frontend
+backend
+.agents/

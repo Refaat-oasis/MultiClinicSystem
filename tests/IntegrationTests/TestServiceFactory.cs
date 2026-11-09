@@ -1,0 +1,82 @@
+using System.Text;
+using BuildingBlocks.Application;
+using BuildingBlocks.Domain;
+using BuildingBlocks.Infrastructure;
+using Core.Application;
+using Core.Contracts;
+using Core.Domain;
+using Core.Infrastructure;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace IntegrationTests;
+
+/// <summary>
+/// Factory creating a configured service provider for integration tests against the real SQL database.
+/// </summary>
+public static class TestServiceFactory
+{
+    public static (IServiceProvider Provider, FakeEmailSender EmailSender) CreateServices(
+        ICurrentClinic currentClinic,
+        IClock? clock = null)
+    {
+        var services = new ServiceCollection();
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Security:VerificationSecret"] = "test-hmac-secret-32-chars-long-clinic-platform",
+                ["Security:JwtSecret"] = "test-jwt-secret-signing-key-minimum-32-chars-clinic",
+                ["Security:JwtIssuer"] = "ClinicPlatform",
+                ["Security:JwtAudience"] = "ClinicPlatformClients"
+            })
+            .Build();
+
+        services.AddLogging();
+        services.AddDataProtection();
+        services.AddSingleton<IConfiguration>(configuration);
+        services.AddSingleton(clock ?? new DateTimeProvider());
+        services.AddSingleton<IVerificationCodes>(_ => new VerificationCodes("test-hmac-secret-32-chars-long-clinic-platform"));
+        var emailSender = new FakeEmailSender();
+        services.AddSingleton<IEmailSender>(emailSender);
+        services.AddSingleton(emailSender);
+
+        services.AddSingleton(currentClinic);
+        services.AddSingleton<TenantSessionInterceptor>();
+
+        services.AddDbContext<CoreDbContext>((sp, options) =>
+        {
+            var interceptor = sp.GetRequiredService<TenantSessionInterceptor>();
+            options.UseSqlServer(SqlDatabaseFixture.ConnectionString)
+                   .AddInterceptors(interceptor);
+        });
+
+        services.AddIdentityCore<AppUser>(options =>
+        {
+            options.Password.RequireDigit = false;
+            options.Password.RequireLowercase = false;
+            options.Password.RequireUppercase = false;
+            options.Password.RequireNonAlphanumeric = false;
+            options.Password.RequiredLength = 8;
+            options.Lockout.MaxFailedAccessAttempts = 5;
+            options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
+            options.User.RequireUniqueEmail = true;
+        })
+        .AddRoles<AppRole>()
+        .AddEntityFrameworkStores<CoreDbContext>()
+        .AddDefaultTokenProviders();
+
+        services.AddScoped<IOutbox, OutboxService>();
+        services.AddScoped<OutboxService>();
+        services.AddScoped<IPasswordPolicy, PasswordPolicy>();
+        services.AddScoped<ITokenService, TokenService>();
+        services.AddScoped<IAuditService, AuditService>();
+        services.AddScoped<IAccountInvitations, AccountInvitations>();
+        services.AddScoped<IAuthService, AuthService>();
+
+        var provider = services.BuildServiceProvider();
+        return (provider, emailSender);
+    }
+}

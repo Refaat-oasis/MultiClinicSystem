@@ -1,0 +1,140 @@
+:root {
+  /* Light Theme - Clean Medical Liquid Glass */
+  --color-bg-canvas: #f8fafc;
+  --color-text-primary: #0f172a;
+  --color-text-secondary: #475569;
+  --color-text-muted: #94a3b8;
+  --color-accent-teal: #0d9488;
+  --color-accent-teal-hover: #0f766e;
+  --color-accent-glow: rgba(13, 148, 136, 0.25);
+  
+  --glass-surface: rgba(255, 255, 255, 0.72);
+  --glass-surface-prominent: rgba(255, 255, 255, 0.88);
+  --glass-border: rgba(255, 255, 255, 0.6);
+  --glass-specular: inset 0 1px 1px 0 rgba(255, 255, 255, 0.8);
+  --glass-shadow: 0 10px 30px -5px rgba(15, 23, 42, 0.07), 0 4px 6px -2px rgba(15, 23, 42, 0.04);
+  --glass-blur: blur(24px) saturate(190%);
+}
+
+[data-theme="dark"] {
+  /* Dark Theme - Deep Slate & Oceanic Glass */
+  --color-bg-canvas: #090d16;
+  --color-text-primary: #f8fafc;
+  --color-text-secondary: #cbd5e1;
+  --color-text-muted: #64748b;
+  --color-accent-teal: #14b8a6;
+  --color-accent-teal-hover: #2dd4bf;
+  --color-accent-glow: rgba(20, 184, 166, 0.3);
+
+  --glass-surface: rgba(15, 23, 42, 0.68);
+  --glass-surface-prominent: rgba(15, 23, 42, 0.85);
+  --glass-border: rgba(255, 255, 255, 0.12);
+  --glass-specular: inset 0 1px 1px 0 rgba(255, 255, 255, 0.2);
+  --glass-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.5), 0 0 1px 1px rgba(255, 255, 255, 0.05);
+  --glass-blur: blur(28px) saturate(200%);
+}
+
+/* Glass Card */
+.glass-card {
+  background: var(--glass-surface);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow), var(--glass-specular);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glass-card:hover {
+  box-shadow: var(--glass-shadow), var(--glass-specular), 0 0 20px var(--color-accent-glow);
+}
+
+/* Glass Button */
+.glass-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding-block: 0.625rem;
+  padding-inline: 1.25rem;
+  border-radius: 0.75rem;
+  font-weight: 500;
+  font-size: 0.9375rem;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-surface);
+  color: var(--color-text-primary);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-shadow), var(--glass-specular);
+  cursor: pointer;
+  outline: none;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glass-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  background: var(--glass-surface-prominent);
+  box-shadow: var(--glass-shadow), var(--glass-specular), 0 0 15px var(--color-accent-glow);
+}
+
+.glass-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.glass-button:focus-visible {
+  ring: 2px solid var(--color-accent-teal);
+  outline: 2px solid var(--color-accent-teal);
+  outline-offset: 2px;
+}
+
+.glass-button-prominent {
+  background: var(--color-accent-teal);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 4px 14px var(--color-accent-glow), inset 0 1px 1px rgba(255, 255, 255, 0.4);
+}
+
+.glass-button-prominent:hover:not(:disabled) {
+  background: var(--color-accent-teal-hover);
+  box-shadow: 0 6px 20px var(--color-accent-glow), inset 0 1px 1px rgba(255, 255, 255, 0.5);
+}
+
+/* 6-Digit LTR Code Input */
+.code-input-container {
+  display: flex;
+  direction: ltr !important; /* Always LTR for digit ordering */
+  justify-content: center;
+  gap: 0.75rem;
+  margin-block: 1rem;
+}
+
+.code-digit-box {
+  width: 3.25rem;
+  height: 4rem;
+  font-size: 1.75rem;
+  font-weight: 600;
+  font-family: monospace;
+  text-align: center;
+  border-radius: 0.75rem;
+  border: 1.5px solid var(--glass-border);
+  background: var(--glass-surface);
+  color: var(--color-text-primary);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-shadow), var(--glass-specular);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+  outline: none;
+}
+
+.code-digit-box:focus {
+  border-color: var(--color-accent-teal);
+  box-shadow: 0 0 0 3px var(--color-accent-glow), var(--glass-specular);
+  transform: scale(1.04);
+}
+
+.glass-input:focus {
+  border-color: var(--color-accent-teal) !important;
+  box-shadow: 0 0 0 3px var(--color-accent-glow), var(--glass-specular) !important;
+}
+
