@@ -11,6 +11,7 @@ import {
   Phase11PortalBookingScreen,
   Phase12InventoryScreen,
   Phase13TimeEngineScreen,
+  Phase14FinanceReportsScreen,
   type AppointmentItem,
   type QueueEntryItem,
   type WaitingListItem,
@@ -23,6 +24,7 @@ import {
   type ClinicPortalBookingInspectData,
   type ClinicInventoryInspectData,
   type ClinicTimeEngineInspectData,
+  type ClinicFinanceReportsInspectData,
 } from '@clinic/feature-core';
 
 interface InspectClinicScheduleSnapshot {
@@ -131,6 +133,13 @@ export const InspectClinicShell: React.FC<InspectClinicShellProps> = ({ clinicId
   const { data: timeEngineSnapshot } = useQuery<ClinicTimeEngineInspectData>({
     queryKey: ['platform-inspect-time-engine', clinicId],
     queryFn: () => apiClient.get<ClinicTimeEngineInspectData>(`/platform/clinics/${clinicId}/inspect/time-engine`),
+    enabled: Boolean(clinicId),
+    retry: false,
+  });
+
+  const { data: financeReportsSnapshot } = useQuery<ClinicFinanceReportsInspectData>({
+    queryKey: ['platform-inspect-finance-reports', clinicId],
+    queryFn: () => apiClient.get<ClinicFinanceReportsInspectData>(`/platform/clinics/${clinicId}/inspect/finance-reports`),
     enabled: Boolean(clinicId),
     retry: false,
   });
@@ -263,6 +272,13 @@ export const InspectClinicShell: React.FC<InspectClinicShellProps> = ({ clinicId
           clinicId={clinicId}
           readOnlyInspectMode={true}
           initialInspectSnapshot={timeEngineSnapshot}
+        />
+      )}
+      {clinicId && financeReportsSnapshot && (
+        <Phase14FinanceReportsScreen
+          clinicId={clinicId}
+          readOnlyInspectMode={true}
+          initialInspectSnapshot={financeReportsSnapshot}
         />
       )}
     </div>

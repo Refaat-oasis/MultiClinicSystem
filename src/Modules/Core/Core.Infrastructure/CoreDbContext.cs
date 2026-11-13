@@ -93,6 +93,14 @@ public sealed class CoreDbContext : IdentityDbContext<AppUser, AppRole, Guid>
     public DbSet<CategoryTimeStat> CategoryTimeStats => Set<CategoryTimeStat>();
     public DbSet<DoctorTimeEngineSetting> DoctorTimeEngineSettings => Set<DoctorTimeEngineSetting>();
     public DbSet<ClinicTimeEngineSetting> ClinicTimeEngineSettings => Set<ClinicTimeEngineSetting>();
+    public DbSet<FixedCost> FixedCosts => Set<FixedCost>();
+    public DbSet<Employee> Employees => Set<Employee>();
+    public DbSet<PayrollRun> PayrollRuns => Set<PayrollRun>();
+    public DbSet<PayrollLine> PayrollLines => Set<PayrollLine>();
+    public DbSet<PayrollAdjustment> PayrollAdjustments => Set<PayrollAdjustment>();
+    public DbSet<ReportExportLog> ReportExportLogs => Set<ReportExportLog>();
+    public DbSet<ScheduledReportConfig> ScheduledReportConfigs => Set<ScheduledReportConfig>();
+    public DbSet<ImportBatchLog> ImportBatchLogs => Set<ImportBatchLog>();
 
     public CoreDbContext(DbContextOptions<CoreDbContext> options, ICurrentClinic currentClinic)
         : base(options)
@@ -1345,6 +1353,146 @@ public sealed class CoreDbContext : IdentityDbContext<AppUser, AppRole, Guid>
             b.HasIndex(x => x.ClinicId).IsUnique();
             b.HasQueryFilter(x => _currentClinic.IsPlatformAdmin || x.ClinicId == _currentClinic.ClinicId);
         });
+
+        // FixedCosts tenant table (finance schema)
+        builder.Entity<FixedCost>(b =>
+        {
+            b.ToTable("FixedCosts", "finance");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.Category).HasConversion<string>().HasMaxLength(32).IsRequired();
+            b.Property(x => x.Recurrence).HasConversion<string>().HasMaxLength(32).IsRequired();
+            b.Property(x => x.PaidFromMethod).HasConversion<string>().HasMaxLength(32).IsRequired();
+            b.Property(x => x.TitleAr).HasMaxLength(200).IsRequired();
+            b.Property(x => x.TitleEn).HasMaxLength(200).IsRequired();
+            b.Property(x => x.Amount).HasPrecision(18, 2);
+            b.Property(x => x.Currency).HasMaxLength(8).IsRequired();
+            b.Property(x => x.Notes).HasMaxLength(500);
+            b.Property(x => x.VoidedBy).HasMaxLength(128);
+            b.Property(x => x.VoidReason).HasMaxLength(500);
+            b.Property(x => x.RowVersion).IsRowVersion();
+            b.HasIndex(x => new { x.ClinicId, x.IsActive, x.EffectiveFromDate });
+            b.HasQueryFilter(x => _currentClinic.IsPlatformAdmin || x.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // Employees tenant table (finance schema; fixed salary, no doctor commission)
+        builder.Entity<Employee>(b =>
+        {
+            b.ToTable("Employees", "finance");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.FullName).HasMaxLength(200).IsRequired();
+            b.Property(x => x.RoleTitle).HasMaxLength(100).IsRequired();
+            b.Property(x => x.Phone).HasMaxLength(40);
+            b.Property(x => x.BaseSalaryAmount).HasPrecision(18, 2);
+            b.Property(x => x.Currency).HasMaxLength(8).IsRequired();
+            b.Property(x => x.PaidFromMethod).HasConversion<string>().HasMaxLength(32).IsRequired();
+            b.Property(x => x.VoidedBy).HasMaxLength(128);
+            b.Property(x => x.VoidReason).HasMaxLength(500);
+            b.Property(x => x.RowVersion).IsRowVersion();
+            b.HasIndex(x => new { x.ClinicId, x.IsActive });
+            b.HasQueryFilter(x => _currentClinic.IsPlatformAdmin || x.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // PayrollRuns tenant table (finance schema)
+        builder.Entity<PayrollRun>(b =>
+        {
+            b.ToTable("PayrollRuns", "finance");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.Status).HasConversion<string>().HasMaxLength(32).IsRequired();
+            b.Property(x => x.PaidFromMethod).HasConversion<string>().HasMaxLength(32).IsRequired();
+            b.Property(x => x.TotalBaseSalary).HasPrecision(18, 2);
+            b.Property(x => x.TotalBonuses).HasPrecision(18, 2);
+            b.Property(x => x.TotalDeductions).HasPrecision(18, 2);
+            b.Property(x => x.TotalAdvances).HasPrecision(18, 2);
+            b.Property(x => x.TotalNetPay).HasPrecision(18, 2);
+            b.Property(x => x.Currency).HasMaxLength(8).IsRequired();
+            b.Property(x => x.CreatedByUserId).HasMaxLength(128).IsRequired();
+            b.Property(x => x.FinalizedByUserId).HasMaxLength(128);
+            b.Property(x => x.Notes).HasMaxLength(500);
+            b.Property(x => x.VoidedBy).HasMaxLength(128);
+            b.Property(x => x.VoidReason).HasMaxLength(500);
+            b.Property(x => x.RowVersion).IsRowVersion();
+            b.HasIndex(x => new { x.ClinicId, x.PeriodYear, x.PeriodMonth });
+            b.HasQueryFilter(x => _currentClinic.IsPlatformAdmin || x.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // PayrollLines tenant table (finance schema)
+        builder.Entity<PayrollLine>(b =>
+        {
+            b.ToTable("PayrollLines", "finance");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.EmployeeNameSnapshot).HasMaxLength(200).IsRequired();
+            b.Property(x => x.BaseSalaryAmount).HasPrecision(18, 2);
+            b.Property(x => x.BonusTotalAmount).HasPrecision(18, 2);
+            b.Property(x => x.DeductionTotalAmount).HasPrecision(18, 2);
+            b.Property(x => x.AdvanceTotalAmount).HasPrecision(18, 2);
+            b.Property(x => x.NetPayAmount).HasPrecision(18, 2);
+            b.Property(x => x.Currency).HasMaxLength(8).IsRequired();
+            b.Property(x => x.VoidedBy).HasMaxLength(128);
+            b.Property(x => x.VoidReason).HasMaxLength(500);
+            b.Property(x => x.RowVersion).IsRowVersion();
+            b.HasIndex(x => new { x.ClinicId, x.PayrollRunId });
+            b.HasQueryFilter(x => _currentClinic.IsPlatformAdmin || x.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // PayrollAdjustments tenant table (finance schema)
+        builder.Entity<PayrollAdjustment>(b =>
+        {
+            b.ToTable("PayrollAdjustments", "finance");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.AdjustmentType).HasConversion<string>().HasMaxLength(32).IsRequired();
+            b.Property(x => x.Amount).HasPrecision(18, 2);
+            b.Property(x => x.Currency).HasMaxLength(8).IsRequired();
+            b.Property(x => x.Reason).HasMaxLength(300).IsRequired();
+            b.Property(x => x.RecordedByUserId).HasMaxLength(128).IsRequired();
+            b.Property(x => x.VoidedBy).HasMaxLength(128);
+            b.Property(x => x.VoidReason).HasMaxLength(500);
+            b.Property(x => x.RowVersion).IsRowVersion();
+            b.HasIndex(x => new { x.ClinicId, x.PeriodYear, x.PeriodMonth, x.EmployeeId });
+            b.HasQueryFilter(x => _currentClinic.IsPlatformAdmin || x.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // ReportExportLogs tenant table (reports schema)
+        builder.Entity<ReportExportLog>(b =>
+        {
+            b.ToTable("ReportExportLogs", "reports");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.ReportKind).HasConversion<string>().HasMaxLength(48).IsRequired();
+            b.Property(x => x.Format).HasConversion<string>().HasMaxLength(16).IsRequired();
+            b.Property(x => x.FileName).HasMaxLength(260).IsRequired();
+            b.Property(x => x.ActorUserId).HasMaxLength(128).IsRequired();
+            b.Property(x => x.RowVersion).IsRowVersion();
+            b.HasIndex(x => new { x.ClinicId, x.ExportedAtUtc });
+            b.HasQueryFilter(x => _currentClinic.IsPlatformAdmin || x.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // ScheduledReportConfigs tenant table (reports schema)
+        builder.Entity<ScheduledReportConfig>(b =>
+        {
+            b.ToTable("ScheduledReportConfigs", "reports");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.ReportKind).HasConversion<string>().HasMaxLength(48).IsRequired();
+            b.Property(x => x.Format).HasConversion<string>().HasMaxLength(16).IsRequired();
+            b.Property(x => x.Frequency).HasMaxLength(32).IsRequired();
+            b.Property(x => x.CreatedByUserId).HasMaxLength(128).IsRequired();
+            b.Property(x => x.VoidedBy).HasMaxLength(128);
+            b.Property(x => x.VoidReason).HasMaxLength(500);
+            b.Property(x => x.RowVersion).IsRowVersion();
+            b.HasIndex(x => new { x.ClinicId, x.IsEnabled });
+            b.HasQueryFilter(x => _currentClinic.IsPlatformAdmin || x.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // ImportBatchLogs tenant table (import schema)
+        builder.Entity<ImportBatchLog>(b =>
+        {
+            b.ToTable("ImportBatchLogs", "import");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.TargetKind).HasConversion<string>().HasMaxLength(32).IsRequired();
+            b.Property(x => x.FileName).HasMaxLength(260).IsRequired();
+            b.Property(x => x.ActorUserId).HasMaxLength(128).IsRequired();
+            b.Property(x => x.RowVersion).IsRowVersion();
+            b.HasIndex(x => new { x.ClinicId, x.ExecutedAtUtc });
+            b.HasQueryFilter(x => _currentClinic.IsPlatformAdmin || x.ClinicId == _currentClinic.ClinicId);
+        });
     }
 
     /// <summary>
@@ -1511,7 +1659,23 @@ public sealed class CoreDbContext : IdentityDbContext<AppUser, AppRole, Guid>
                 ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON time_engine.DoctorTimeEngineSettings,
                 ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON time_engine.DoctorTimeEngineSettings,
                 ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON time_engine.ClinicTimeEngineSettings,
-                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON time_engine.ClinicTimeEngineSettings
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON time_engine.ClinicTimeEngineSettings,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON finance.FixedCosts,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON finance.FixedCosts,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON finance.Employees,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON finance.Employees,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON finance.PayrollRuns,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON finance.PayrollRuns,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON finance.PayrollLines,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON finance.PayrollLines,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON finance.PayrollAdjustments,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON finance.PayrollAdjustments,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON reports.ReportExportLogs,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON reports.ReportExportLogs,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON reports.ScheduledReportConfigs,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON reports.ScheduledReportConfigs,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON import.ImportBatchLogs,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON import.ImportBatchLogs
                 WITH (STATE = ON);
             ');
         ";

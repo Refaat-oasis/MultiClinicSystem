@@ -516,3 +516,27 @@ Status: 0 Errors, Clean Build
 - [x] Per-doctor time-engine toggle disables learned overrides immediately on bookings (`EndUtc == null`) and `free-slots`, reverting to category defaults.
 - [x] Disabling `time-engine` returns `403 MODULE_DISABLED` cleanly without disrupting clinical visits or staff scheduling.
 - [x] Phases 0 to 13 cumulative gates, SQL Server RLS/architecture sweeps, and frontend test/lint/build pass 100% green.
+
+
+---
+
+## Phase 14: Finance Extensions, Reports & Excel Import (Completed) (DONE)
+- **Branch**: `phase-14/finance-reports-excel-import`
+- **Completed Tasks**:
+  - **Domain & Unit Tests (`Core.Domain`, `UnitTests`)**: Added fixed cost recurrence enums/entities (`FixedCost`, `FixedCostRecurrence`, `FixedCostCategory`), employee payroll entities/adjustments (`Employee`, `PayrollAdjustment`, `PayrollAdjustmentType`, `PayrollRun`, `PayrollRunStatus`, `PayrollLine` — strictly without doctor commission), reporting & import log entities (`ReportExportLog`, `ScheduledReportConfig`, `ImportBatchLog`), deterministic `FinanceCalculator` (including February recurrence clamping), and 4 unit tests in `Phase14FinanceReportsTests`.
+  - **Application & Infrastructure (`Core.Application`, `Core.Infrastructure`)**: Added `IFinanceExtendedService`, `IReportsService`, `IExcelImportService`, `ClinicTenantScopeHelper` (Dapper tenant/platform `sp_set_session_context` scoping), `FinanceExtendedService`, `ReportsDapperQueries` (Dapper + SQL Server ledger/expense/payroll reconciliation), `ReportsExcelGenerator` (`ClosedXML 0.105.1`), `ReportsPdfGenerator` (deterministic zero-commercial-license PDF 1.4 exporter per `docs/DECISIONS.md`), `ReportsService`, and `ExcelImportService` (module-aware targets, dry-run validation preview, atomic batch commit). Configured `finance`, `reports`, and `import` schema tables with EF global query filters and SQL Server RLS `FILTER`/`BLOCK` predicates in `CoreDbContext`; registered 8 live dashboard widgets and 3 dashboard routes in `ModuleCatalogService` and `DashboardService`.
+  - **API & Inspect (`Platform.Api`)**: Added `FinanceController`, `ReportsController`, `ExcelImportController`, `PlatformReportsController` (allowlisted in `AdminHostSweepTests`), and `PlatformClinicsController.InspectFinanceReports`, single-type DTOs/ViewModels & `FinanceReportsViewModelMapper`, `Phase14FinanceReportsTests` (integration), and `Phase14Gate`.
+  - **Frontend (`web/`)**: Added `Phase14FinanceReportsScreen.tsx` + `Phase14FinanceReportsScreen.test.tsx` (fixed costs, employee payroll adjustments/finalization, income-vs-expenses & doctor reports with Excel/PDF export triggers, Excel dry-run import wizard, dashboard widget summary, and Super Admin `readOnlyInspectMode`), mounted in `web/apps/clinic/src/App.tsx` (`financeReports` tab) and `web/apps/admin/src/InspectClinicShell.tsx`.
+- **Verification Output Summary**:
+  - `dotnet test tests/UnitTests/UnitTests.csproj --no-restore`: `Passed! - Failed: 0, Passed: 166, Skipped: 0, Total: 166`
+  - `dotnet test tests/ArchitectureTests/ArchitectureTests.csproj --no-restore`: `Passed! - Failed: 0, Passed: 15, Skipped: 0, Total: 15`
+  - `dotnet test tests/IntegrationTests/IntegrationTests.csproj --no-restore`: `Passed! - Failed: 0, Passed: 34, Skipped: 0, Total: 34`
+  - `dotnet test tests/Gates/Gates.csproj --no-restore` (Phases 0–14 cumulative): `Passed! - Failed: 0, Passed: 27, Skipped: 0, Total: 27`
+  - Frontend `npm --prefix web test; npm --prefix web run lint; npm --prefix web run build`: `58/58` Vitest tests passed (`admin-app`: 7, `clinic-app`: 5, `api-client`: 3, `ui`: 3, `feature-core`: 40), `tsc --noEmit` 0 errors across all 5 workspaces, Vite production builds succeeded for both apps.
+
+### Phase 14 Exit Checklist
+- [x] Fixed cost recurrence (`Monthly` Feb-clamping, `Weekly`, `Daily`, `OneTime`), void-only deletion, and payroll adjustments/finalization work cleanly without doctor commission.
+- [x] Dapper reports (`income-vs-expenses`, `doctors`, `sessions-by-category`, `payment-methods`, Super Admin cross-clinic) match ledgers, expenses, fixed costs, and payroll to the cent.
+- [x] ClosedXML `.xlsx` and deterministic `.pdf` exports reconcile 1:1 with on-screen report numbers.
+- [x] Excel import enforces dry-run validation (0 rows saved on error), module-aware targets (`excel-import`), and atomic `OperationId`-idempotent commits.
+- [x] Phases 0 to 14 cumulative gates, SQL Server RLS/architecture sweeps, and frontend test/lint/build pass 100% green.

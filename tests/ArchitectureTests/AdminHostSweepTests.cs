@@ -15,7 +15,8 @@ public sealed class AdminHostSweepTests
         nameof(PlatformAuthController),
         nameof(PlatformOwnersController),
         nameof(PlatformClinicsController),
-        nameof(PlatformMonitoringController)
+        nameof(PlatformMonitoringController),
+        nameof(PlatformReportsController)
     };
 
     private static readonly HashSet<string> ApprovedAnonymousPlatformActions = new()

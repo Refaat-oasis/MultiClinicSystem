@@ -400,13 +400,18 @@ public sealed class ModuleCatalogService : IModuleCatalogService
                 ],
                 MenuItems:
                 [
-                    new("finance.cashbook", "finance", "المالية والخزينة", "Finance & Close Day", "/finance", "finance.read", 180)
+                    new("finance.cashbook", "finance", "المالية والخزينة", "Finance & Close Day", "/finance", "finance.read", 180),
+                    new("finance.dashboard", "finance", "لوحة المالية", "Finance Dashboard", "/finance/dashboard", "finance.read", 181)
                 ],
                 SettingsSections: Array.Empty<SettingsSectionResult>(),
                 DashboardWidgets:
                 [
                     new("finance.cash-summary", "finance", "finance.read", "Clinic", "رصيد الخزينة", "Cash Summary"),
-                    new("finance.closing-status", "finance", "finance.read", "Clinic", "حالة إغلاق اليوم", "Daily Closing Status")
+                    new("finance.closing-status", "finance", "finance.read", "Clinic", "حالة إغلاق اليوم", "Daily Closing Status"),
+                    new("finance.income-vs-expenses", "finance", "finance.read", "Clinic", "الدخل مقابل المصروفات", "Income vs Expenses"),
+                    new("finance.supplier-balances", "finance", "finance.read", "Clinic", "أرصدة الموردين", "Supplier Balances"),
+                    new("finance.fixed-costs-due", "finance", "finance.read", "Clinic", "التكاليف الثابتة المستحقة", "Fixed Costs Due"),
+                    new("finance.payroll-summary", "finance", "finance.read", "Clinic", "ملخص الرواتب", "Payroll Summary")
                 ]),
 
             new ModuleManifestEntry(
@@ -507,10 +512,15 @@ public sealed class ModuleCatalogService : IModuleCatalogService
                 ],
                 MenuItems:
                 [
-                    new("reports.center", "reports", "التقارير", "Reports", "/reports", "reports.read", 220)
+                    new("reports.center", "reports", "التقارير", "Reports", "/reports", "reports.read", 220),
+                    new("reports.dashboard", "reports", "لوحة التقارير", "Reports Dashboard", "/reports/dashboard", "reports.read", 221)
                 ],
                 SettingsSections: Array.Empty<SettingsSectionResult>(),
-                DashboardWidgets: Array.Empty<DashboardWidgetDefinitionResult>()),
+                DashboardWidgets:
+                [
+                    new("reports.exports-run", "reports", "reports.read", "Clinic", "التقارير المصدرة", "Exports Run"),
+                    new("reports.scheduled-reports", "reports", "reports.read", "Clinic", "التقارير المجدولة", "Scheduled Reports")
+                ]),
 
             new ModuleManifestEntry(
                 ModuleKey: "excel-import",
@@ -525,10 +535,15 @@ public sealed class ModuleCatalogService : IModuleCatalogService
                 ],
                 MenuItems:
                 [
-                    new("excel-import.wizard", "excel-import", "استيراد البيانات", "Excel Import", "/import", "excel_import.execute", 230)
+                    new("excel-import.wizard", "excel-import", "استيراد البيانات", "Excel Import", "/import", "excel_import.execute", 230),
+                    new("excel-import.dashboard", "excel-import", "لوحة الاستيراد", "Excel Import Dashboard", "/excel-import/dashboard", "excel_import.execute", 231)
                 ],
                 SettingsSections: Array.Empty<SettingsSectionResult>(),
-                DashboardWidgets: Array.Empty<DashboardWidgetDefinitionResult>()),
+                DashboardWidgets:
+                [
+                    new("excel-import.history", "excel-import", "excel_import.execute", "Clinic", "سجل الاستيراد", "Import History"),
+                    new("excel-import.rejected-rows", "excel-import", "excel_import.execute", "Clinic", "الصفوف المرفوضة", "Rejected Import Rows")
+                ]),
 
             new ModuleManifestEntry(
                 ModuleKey: "portal",

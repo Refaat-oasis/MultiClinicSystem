@@ -269,6 +269,9 @@ builder.Services.AddScoped<IPatientPortalService, PatientPortalService>();
 builder.Services.AddScoped<IInventoryService, InventoryService>();
 builder.Services.AddScoped<ITimeEngineService, TimeEngineService>();
 builder.Services.AddScoped<ITimeEngineDurationProvider>(sp => (TimeEngineService)sp.GetRequiredService<ITimeEngineService>());
+builder.Services.AddScoped<IFinanceExtendedService, FinanceExtendedService>();
+builder.Services.AddScoped<IReportsService, ReportsService>();
+builder.Services.AddScoped<IExcelImportService, ExcelImportService>();
 builder.Services.AddScoped<IScheduleRealtimeNotifier, Platform.Api.Hubs.SignalRScheduleRealtimeNotifier>();
 builder.Services.AddSignalR();
 

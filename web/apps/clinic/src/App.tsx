@@ -28,6 +28,7 @@ import {
   Phase11PortalBookingScreen,
   Phase12InventoryScreen,
   Phase13TimeEngineScreen,
+  Phase14FinanceReportsScreen,
   type PatientSummaryItem,
   type PatientDetailData,
   type PatientScopingSettings,
@@ -98,6 +99,7 @@ type ActiveTab =
   | 'portalBooking'
   | 'inventory'
   | 'timeEngine'
+  | 'financeReports'
   | 'portfolio'
   | 'profile'
   | 'health';
@@ -523,6 +525,14 @@ export const App: React.FC = () => {
           <Clock size={16} />
           محرك الزمن
         </GlassButton>
+        <GlassButton
+          aria-label="تبويب المالية والتقارير"
+          variant={activeTab === 'financeReports' ? 'prominent' : 'default'}
+          onClick={() => setActiveTab('financeReports')}
+        >
+          <BarChart3 size={16} />
+          المالية والتقارير
+        </GlassButton>
 
         <GlassButton
           aria-label="تبويب المحفظة والمؤشرات"
@@ -882,6 +892,9 @@ export const App: React.FC = () => {
         )}
         {activeTab === 'timeEngine' && (
           <Phase13TimeEngineScreen clinicId={activeClinic?.clinicId ?? 'clinic-1'} />
+        )}
+        {activeTab === 'financeReports' && (
+          <Phase14FinanceReportsScreen clinicId={activeClinic?.clinicId ?? 'clinic-1'} />
         )}
 
         {activeTab === 'portfolio' && (
