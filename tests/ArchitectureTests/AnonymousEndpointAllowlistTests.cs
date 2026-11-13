@@ -21,7 +21,8 @@ public sealed class AnonymousEndpointAllowlistTests
         "AuthController.ResendCode",
         "AuthController.RefreshToken",
         "PlatformAuthController.Login",
-        "PlatformAuthController.BreakGlassReset"
+        "PlatformAuthController.BreakGlassReset",
+        "PublicClinicDirectoryController.ResolveBySlug"
     };
 
     [Fact]

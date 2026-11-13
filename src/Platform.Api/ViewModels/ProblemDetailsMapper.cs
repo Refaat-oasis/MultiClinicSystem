@@ -19,17 +19,24 @@ public static class ProblemDetailsMapper
                        c.Contains("INVALID_TOTP_CODE", StringComparison.OrdinalIgnoreCase) ||
                        c.Contains("STEP_UP_INVALID", StringComparison.OrdinalIgnoreCase) ||
                        c.Contains("INVALID_BREAK_GLASS_SECRET", StringComparison.OrdinalIgnoreCase) ||
+                       c.Contains("INVALID_CURRENT_PASSWORD", StringComparison.OrdinalIgnoreCase) ||
                        c.Contains("ACCOUNT_LOCKED", StringComparison.OrdinalIgnoreCase) ||
                        c.Contains("ACCOUNT_NOT_ACTIVATED", StringComparison.OrdinalIgnoreCase) ||
                        c.Contains("DEVICE_REVOKED", StringComparison.OrdinalIgnoreCase) ||
                        c.Contains("REFRESH_TOKEN", StringComparison.OrdinalIgnoreCase) => StatusCodes.Status401Unauthorized,
             var c when c.Contains("FORBIDDEN", StringComparison.OrdinalIgnoreCase) ||
                        c.Contains("STEP_UP_REQUIRED", StringComparison.OrdinalIgnoreCase) ||
-                       c.Contains("INSPECT_MODE_READ_ONLY", StringComparison.OrdinalIgnoreCase) => StatusCodes.Status403Forbidden,
+                       c.Contains("INSPECT_MODE_READ_ONLY", StringComparison.OrdinalIgnoreCase) ||
+                       c.Contains("CLINIC_SUSPENDED", StringComparison.OrdinalIgnoreCase) ||
+                       c.Contains("OWNER_DEACTIVATED", StringComparison.OrdinalIgnoreCase) => StatusCodes.Status403Forbidden,
             var c when c.Contains("NOT_FOUND", StringComparison.OrdinalIgnoreCase) => StatusCodes.Status404NotFound,
             var c when c.Contains("CONFLICT", StringComparison.OrdinalIgnoreCase) ||
                        c.Contains("ALREADY_EXISTS", StringComparison.OrdinalIgnoreCase) ||
-                       c.Contains("COOLDOWN", StringComparison.OrdinalIgnoreCase) => StatusCodes.Status409Conflict,
+                       c.Contains("COOLDOWN", StringComparison.OrdinalIgnoreCase) ||
+                       c.Contains("CLINIC_QUOTA_REACHED", StringComparison.OrdinalIgnoreCase) ||
+                       c.Contains("ONBOARDING_REQUIRED", StringComparison.OrdinalIgnoreCase) ||
+                       c.Contains("SLUG_TAKEN", StringComparison.OrdinalIgnoreCase) ||
+                       c.Contains("FINANCIAL_SETTINGS_LOCKED", StringComparison.OrdinalIgnoreCase) => StatusCodes.Status409Conflict,
             _ => StatusCodes.Status400BadRequest
         };
 

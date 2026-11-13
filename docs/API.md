@@ -241,3 +241,36 @@
 ### Monitoring & Audit (`/api/v1/platform`) — Requires `PlatformAdmin`
 - `GET /api/v1/platform/dashboard`: Returns `PlatformDashboardViewModel` aggregate metrics, failed login counts, expiring subscriptions, outbox queue count, and recent audit rows.
 - `GET /api/v1/platform/audit?clinicId=...&action=...&page=1&pageSize=50`: Paginated platform-wide audit viewer.
+
+
+---
+
+## 4. Clinic Creation, Switching, Resumable Onboarding, Settings & Public Slugs (`/api/v1/clinics/**`, `/api/v1/c/{slug}`)
+
+- `GET /api/v1/clinics/mine`: Lists clinics owned by or associated with the authenticated user (`MyClinicCardViewModel[]`).
+- `POST /api/v1/clinics`: Owner creates a new clinic within optional `MaxClinics` quota (`409 CLINIC_QUOTA_REACHED` if exceeded). Starts as `PendingOnboarding` with 0 enabled modules.
+- `POST /api/v1/clinics/{clinicId}/switch`: Issues updated staff JWT & refresh token scoped to the target `clinicId` (`404 CLINIC_NOT_FOUND` on unauthorized clinics, `403 CLINIC_SUSPENDED` if suspended).
+- `GET /api/v1/clinics/slug-check?slug=...&clinicId=...`: Validates format, reserved words, and uniqueness (including historical slugs) and returns availability + suggested alternative (`SlugCheckViewModel`).
+- `GET /api/v1/clinics/specialties`: Returns available specialty catalog (`SpecialtyCatalogItemViewModel[]`).
+- `GET /api/v1/clinics/{clinicId}/onboarding`: Returns resumable onboarding progress (`CompletedSteps`, clinic fields, specialties).
+- `POST /api/v1/clinics/{clinicId}/onboarding/welcome`: Marks welcome step seen and completes step 1.
+- `PUT /api/v1/clinics/{clinicId}/onboarding/details`: Saves validated address, normalized Egyptian/international phones (`+20...`), email, and logo reference.
+- `POST /api/v1/clinics/{clinicId}/onboarding/logo`: Validates SVG rejection (`LOGO_SVG_REJECTED`), size/type limits, strips image metadata chunks (`PNG tEXt/iTXt/eXIf/zTXt`, `JPEG APP1-APP15/COM`), and stores full + thumb versions via `IFileStorage`.
+- `PUT /api/v1/clinics/{clinicId}/onboarding/types`: Saves selected clinic specialties (`dental` attaches `HasDentalPlugin: true`).
+- `PUT /api/v1/clinics/{clinicId}/onboarding/slug`: Reserves/updates unique public URL slug and maintains redirect history.
+- `POST /api/v1/clinics/{clinicId}/onboarding/complete`: Finalizes onboarding, transitions clinic to `Active`, and returns `ClinicDashboardViewModel` (`AwaitingModuleSetup: true` until Super Admin enables modules).
+- `GET /api/v1/clinics/{clinicId}/dashboard`: Blocked with `409 ONBOARDING_REQUIRED` until onboarding completes; otherwise returns clinic dashboard summary (`ClinicDashboardViewModel`).
+- `GET /api/v1/clinics/{clinicId}/settings`: Blocked with `409 ONBOARDING_REQUIRED` until onboarding completes; returns clinic settings and available `ISettingsSectionRegistry` sections (`ClinicSettingsViewModel`).
+- `PUT /api/v1/clinics/{clinicId}/settings`: Owner-only (`403 FORBIDDEN_OWNER_ONLY` for staff); updates general settings, reserves slug redirect history on slug changes, and locks `TimeZone`/`Currency`/`RoundingRule` once `HasFinancialEntries` is true (`409 FINANCIAL_SETTINGS_LOCKED`).
+- `GET /api/v1/c/{slug}` (`[AllowAnonymous]`): Resolves current or historical clinic slug to clinic metadata or `301`-semantics redirect payload (`IsRedirect`, `RedirectUrl`, `CurrentSlug`), returning `404` for unknown or suspended slugs.
+
+---
+
+## 5. Self-Service User Profile (`/api/v1/profile`) — Policy `profile.self`
+
+- `GET /api/v1/profile`: Returns `UserProfileViewModel` (user details, preferences, active devices, and clinic memberships).
+- `PUT /api/v1/profile`: Updates `FullName`, normalized `PhoneNumber`, `Locale`, `Theme`, and `AvatarAssetId`.
+- `POST /api/v1/profile/request-email-change`: Generates 6-digit verification code (`HMAC-SHA256`) and dispatches email to the proposed address.
+- `POST /api/v1/profile/confirm-email-change`: Verifies code, updates email, rotates `SecurityStamp`, revokes old refresh tokens, notifies old email address, and returns fresh `TokenResult`.
+- `POST /api/v1/profile/change-password`: Validates current password + policy, rotates `SecurityStamp`, optionally signs out other devices (`SignOutOtherDevices`), and returns fresh `TokenResult`.
+- `DELETE /api/v1/profile/devices/{deviceId}`: Revokes user device and its active refresh tokens.

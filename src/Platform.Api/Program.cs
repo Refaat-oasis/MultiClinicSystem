@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using System.Text;
 using BuildingBlocks.Application;
 using BuildingBlocks.Domain;
@@ -94,7 +95,7 @@ builder.Services.AddAuthentication(options =>
 
             return Task.CompletedTask;
         },
-        OnTokenValidated = context =>
+        OnTokenValidated = async context =>
         {
             bool isAdminHost = HostRoutingMiddleware.IsAdminHost(context.Request);
             string? realm = context.Principal?.FindFirst("realm")?.Value;
@@ -102,13 +103,40 @@ builder.Services.AddAuthentication(options =>
             if (isAdminHost && !string.Equals(realm, "PlatformAdmin", StringComparison.Ordinal))
             {
                 context.Fail("Clinic credentials are not permitted on the admin host.");
+                return;
             }
             else if (!isAdminHost && string.Equals(realm, "PlatformAdmin", StringComparison.Ordinal))
             {
                 context.Fail("Platform admin credentials are not permitted on the clinic host.");
+                return;
             }
 
-            return Task.CompletedTask;
+            if (!string.Equals(realm, "PlatformAdmin", StringComparison.Ordinal))
+            {
+                string? sub = context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier);
+                string? tokenStamp = context.Principal?.FindFirst("securityStamp")?.Value;
+                if (Guid.TryParse(sub, out Guid uid) && !string.IsNullOrEmpty(tokenStamp))
+                {
+                    var db = context.HttpContext.RequestServices.GetRequiredService<CoreDbContext>();
+                    var userStamp = await db.Users
+                        .Where(u => u.Id == uid)
+                        .Select(u => u.SecurityStamp)
+                        .FirstOrDefaultAsync(context.HttpContext.RequestAborted);
+
+                    if (userStamp == null || !string.Equals(userStamp, tokenStamp, StringComparison.Ordinal))
+                    {
+                        context.Fail("Session invalidated due to security stamp rotation.");
+                        return;
+                    }
+                }
+
+                string? clinicClaim = context.Principal?.FindFirst("clinic_id")?.Value;
+                if (Guid.TryParse(clinicClaim, out Guid clinicGuid))
+                {
+                    var clinicContext = context.HttpContext.RequestServices.GetRequiredService<CurrentClinicContext>();
+                    clinicContext.SetTenant(clinicGuid);
+                }
+            }
         }
     };
 });
@@ -134,10 +162,16 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("PlatformAdminEnrollment", policy =>
         policy.RequireAuthenticatedUser()
               .RequireClaim("realm", "PlatformAdmin"));
+
+    options.AddPolicy("profile.self", policy =>
+        policy.RequireAuthenticatedUser());
 });
 
 // Application & Infrastructure Services
+builder.Services.AddSingleton<IFileStorage, LocalFileStorage>();
 builder.Services.AddSingleton<IEmailSender, FakeEmailSender>();
+builder.Services.AddSingleton<ISpecialtyCatalog, SpecialtyCatalog>();
+builder.Services.AddSingleton<ISettingsSectionRegistry, SettingsSectionRegistry>();
 builder.Services.AddScoped<IOutbox, OutboxService>();
 builder.Services.AddScoped<OutboxService>();
 builder.Services.AddScoped<IPasswordPolicy, PasswordPolicy>();
@@ -148,6 +182,8 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IHourlyTotpService, HourlyTotpService>();
 builder.Services.AddScoped<IPlatformAdminAuthService, PlatformAdminAuthService>();
 builder.Services.AddScoped<IPlatformAdminService, PlatformAdminService>();
+builder.Services.AddScoped<IClinicManagementService, ClinicManagementService>();
+builder.Services.AddScoped<IProfileService, ProfileService>();
 
 // Configure ProblemDetails and Controllers
 builder.Services.AddProblemDetails();

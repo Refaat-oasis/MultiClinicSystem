@@ -613,6 +613,7 @@ public sealed class PlatformAdminService : IPlatformAdminService
         int totalClinics = clinics.Count;
         int activeClinics = clinics.Count(c => c.Status == "Active");
         int pendingOnboarding = clinics.Count(c => c.Status == "PendingOnboarding");
+        int awaitingModuleSetup = clinics.Count(c => c.IsActive && !string.Equals(c.Status, "Suspended", StringComparison.OrdinalIgnoreCase));
         int readOnly = clinics.Count(c => c.Status == "ReadOnly");
         int suspended = clinics.Count(c => c.Status == "Suspended");
 
@@ -652,7 +653,7 @@ public sealed class PlatformAdminService : IPlatformAdminService
             PendingOnboardingClinics: pendingOnboarding,
             ReadOnlyClinics: readOnly,
             SuspendedClinics: suspended,
-            ClinicsAwaitingModuleSetup: pendingOnboarding,
+            ClinicsAwaitingModuleSetup: awaitingModuleSetup,
             ExpiringSubscriptionsCount: expiringSoon,
             FailedLoginsLast24Hours: failedLogins,
             PendingOutboxMessages: pendingOutbox,

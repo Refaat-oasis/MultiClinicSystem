@@ -9,6 +9,16 @@ import {
   ForgotPasswordScreen,
   ResetPasswordScreen,
   DeviceManagementScreen,
+  ClinicSwitcher,
+  MyClinicsScreen,
+  OnboardingWizardScreen,
+  ClinicSettingsScreen,
+  UserProfileScreen,
+  type MyClinicCard,
+  type OnboardingWizardState,
+  type SpecialtyOption,
+  type ClinicSettingsData,
+  type UserProfileData,
 } from '@clinic/feature-core';
 import {
   Activity,
@@ -20,6 +30,9 @@ import {
   LogOut,
   UserCheck,
   LayoutDashboard,
+  Sparkles,
+  Settings,
+  User,
 } from 'lucide-react';
 
 interface HealthStatus {
@@ -27,12 +40,130 @@ interface HealthStatus {
   timestampUtc: string;
 }
 
-type ActiveTab = 'login' | 'activate' | 'forgot' | 'reset' | 'devices' | 'health';
+type ActiveTab =
+  | 'login'
+  | 'activate'
+  | 'forgot'
+  | 'reset'
+  | 'devices'
+  | 'myClinics'
+  | 'onboarding'
+  | 'clinicSettings'
+  | 'profile'
+  | 'health';
+
+const DEFAULT_SPECIALTY_CATALOG: SpecialtyOption[] = [
+  { catalogCode: 'dental', nameAr: 'طب الأسنان', nameEn: 'Dental', hasDentalPlugin: true },
+  { catalogCode: 'cardiology', nameAr: 'القلب والأوعية', nameEn: 'Cardiology', hasDentalPlugin: false },
+  { catalogCode: 'general_practice', nameAr: 'الطب العام', nameEn: 'General Practice', hasDentalPlugin: false },
+  { catalogCode: 'dermatology', nameAr: 'الأمراض الجلدية', nameEn: 'Dermatology', hasDentalPlugin: false },
+];
 
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<ActiveTab>('login');
   const [resetEmail, setResetEmail] = useState('');
   const { user, isAuthenticated, logout } = useAuthStore();
+  const [clinics, setClinics] = useState<MyClinicCard[]>([]);
+  const [activeClinicId, setActiveClinicId] = useState<string | null>(null);
+  const [clinicError, setClinicError] = useState<string | null>(null);
+
+  const activeClinic = clinics.find((c) => c.clinicId === activeClinicId) ?? clinics[0] ?? null;
+
+  const onboardingState: OnboardingWizardState = activeClinic
+    ? {
+        clinicId: activeClinic.clinicId,
+        name: activeClinic.name,
+        slug: activeClinic.slug,
+        onboardingStatus: activeClinic.onboardingStatus,
+        completedSteps: activeClinic.completedSteps,
+        specialties: [],
+      }
+    : {
+        clinicId: 'default-onboarding',
+        name: 'عيادة الأمل التخصصية',
+        slug: 'alamal-clinic',
+        onboardingStatus: 'Pending',
+        completedSteps: [],
+        specialties: [],
+      };
+
+  const settingsData: ClinicSettingsData = activeClinic
+    ? {
+        clinicId: activeClinic.clinicId,
+        name: activeClinic.name,
+        slug: activeClinic.slug,
+        street: '',
+        city: '',
+        governorate: '',
+        mainPhone: '',
+        contactEmail: null,
+        timeZone: activeClinic.timeZone,
+        currency: activeClinic.currency,
+        roundingRule: activeClinic.roundingRule,
+        hasFinancialEntries: false,
+        sections: [{ sectionKey: 'general', titleAr: 'البيانات العامة', titleEn: 'General Info' }],
+      }
+    : {
+        clinicId: 'default-clinic',
+        name: 'عيادة الأمل التخصصية',
+        slug: 'alamal-clinic',
+        street: '',
+        city: '',
+        governorate: '',
+        mainPhone: '',
+        contactEmail: null,
+        timeZone: 'Africa/Cairo',
+        currency: 'EGP',
+        roundingRule: 'NearestPound',
+        hasFinancialEntries: false,
+        sections: [{ sectionKey: 'general', titleAr: 'البيانات العامة', titleEn: 'General Info' }],
+      };
+
+  const profileData: UserProfileData = {
+    email: user?.email ?? '',
+    fullName: user?.fullName ?? '',
+    phoneNumber: '',
+    locale: 'ar',
+    theme: 'light',
+    devices: [],
+    clinics: clinics.map((c) => ({
+      clinicId: c.clinicId,
+      clinicName: c.name,
+      role: user?.role ?? 'Owner',
+      status: c.status,
+    })),
+  };
+
+  const handleCreateClinic = (name: string) => {
+    setClinicError(null);
+    const id = typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `clinic-${Date.now()}`;
+    const nextClinic: MyClinicCard = {
+      clinicId: id,
+      name,
+      slug: `clinic-${clinics.length + 1}`,
+      status: 'PendingOnboarding',
+      onboardingStatus: 'Pending',
+      timeZone: 'Africa/Cairo',
+      currency: 'EGP',
+      roundingRule: 'NearestPound',
+      modulesEnabled: [],
+      completedSteps: [],
+    };
+    setClinics((prev) => [...prev, nextClinic]);
+    setActiveClinicId(id);
+    if (isAuthenticated) {
+      void apiClient.post('/clinics', { name, deviceId: 'web-browser' }).catch((err: unknown) => {
+        setClinicError(err instanceof Error ? err.message : 'تعذر إضافة العيادة');
+      });
+    }
+  };
+
+  const handleSwitchClinic = (clinicId: string) => {
+    setActiveClinicId(clinicId);
+    if (isAuthenticated) {
+      void apiClient.post(`/clinics/${clinicId}/switch`, {});
+    }
+  };
 
   const { data: health, isLoading } = useQuery<HealthStatus>({
     queryKey: ['health'],
@@ -65,6 +196,13 @@ export const App: React.FC = () => {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          {isAuthenticated && clinics.length > 0 && (
+            <ClinicSwitcher
+              clinics={clinics}
+              activeClinicId={activeClinicId}
+              onSwitch={handleSwitchClinic}
+            />
+          )}
           {isAuthenticated && user && (
             <div
               style={{
@@ -172,6 +310,42 @@ export const App: React.FC = () => {
         </GlassButton>
 
         <GlassButton
+          aria-label="تبويب عياداتي"
+          variant={activeTab === 'myClinics' ? 'prominent' : 'default'}
+          onClick={() => setActiveTab('myClinics')}
+        >
+          <Building2 size={16} />
+          عياداتي
+        </GlassButton>
+
+        <GlassButton
+          aria-label="تبويب تأسيس العيادة"
+          variant={activeTab === 'onboarding' ? 'prominent' : 'default'}
+          onClick={() => setActiveTab('onboarding')}
+        >
+          <Sparkles size={16} />
+          معالج التأسيس
+        </GlassButton>
+
+        <GlassButton
+          aria-label="تبويب إعدادات العيادة"
+          variant={activeTab === 'clinicSettings' ? 'prominent' : 'default'}
+          onClick={() => setActiveTab('clinicSettings')}
+        >
+          <Settings size={16} />
+          إعدادات العيادة
+        </GlassButton>
+
+        <GlassButton
+          aria-label="تبويب الملف الشخصي"
+          variant={activeTab === 'profile' ? 'prominent' : 'default'}
+          onClick={() => setActiveTab('profile')}
+        >
+          <User size={16} />
+          الملف الشخصي
+        </GlassButton>
+
+        <GlassButton
           aria-label="تبويب نظرة عامة والسلامة"
           variant={activeTab === 'health' ? 'prominent' : 'default'}
           onClick={() => setActiveTab('health')}
@@ -217,6 +391,108 @@ export const App: React.FC = () => {
         )}
 
         {activeTab === 'devices' && <DeviceManagementScreen />}
+
+        {activeTab === 'myClinics' && (
+          <MyClinicsScreen
+            clinics={clinics}
+            activeClinicId={activeClinicId}
+            onCreateClinic={handleCreateClinic}
+            onSelectClinic={handleSwitchClinic}
+            onResumeOnboarding={(clinicId) => {
+              setActiveClinicId(clinicId);
+              setActiveTab('onboarding');
+            }}
+            onOpenSettings={(clinicId) => {
+              setActiveClinicId(clinicId);
+              setActiveTab('clinicSettings');
+            }}
+            errorMessage={clinicError}
+          />
+        )}
+
+        {activeTab === 'onboarding' && (
+          <OnboardingWizardScreen
+            ownerName={user?.fullName || 'مالك العيادة'}
+            state={onboardingState}
+            catalog={DEFAULT_SPECIALTY_CATALOG}
+            onSaveDetails={(details) => {
+              if (!activeClinic) return;
+              setClinics((prev) =>
+                prev.map((c) =>
+                  c.clinicId === activeClinic.clinicId
+                    ? { ...c, name: details.name, completedSteps: [...new Set([...c.completedSteps, 'welcome', 'details'])] }
+                    : c
+                )
+              );
+            }}
+            onSaveTypes={(codes) => {
+              if (!activeClinic || codes.length === 0) return;
+              setClinics((prev) =>
+                prev.map((c) =>
+                  c.clinicId === activeClinic.clinicId
+                    ? { ...c, completedSteps: [...new Set([...c.completedSteps, 'types'])] }
+                    : c
+                )
+              );
+            }}
+            onSaveSlug={(slug) => {
+              if (!activeClinic) return;
+              setClinics((prev) =>
+                prev.map((c) =>
+                  c.clinicId === activeClinic.clinicId
+                    ? { ...c, slug, completedSteps: [...new Set([...c.completedSteps, 'slug'])] }
+                    : c
+                )
+              );
+            }}
+            onCompleteOnboarding={() => {
+              if (!activeClinic) return;
+              setClinics((prev) =>
+                prev.map((c) =>
+                  c.clinicId === activeClinic.clinicId
+                    ? { ...c, onboardingStatus: 'Completed', status: 'Active' }
+                    : c
+                )
+              );
+              setActiveTab('clinicSettings');
+            }}
+          />
+        )}
+
+        {activeTab === 'clinicSettings' && (
+          <ClinicSettingsScreen
+            settings={settingsData}
+            isOwner={!user || user.role === 'Owner'}
+            onSave={(payload) => {
+              if (!activeClinic) return;
+              setClinics((prev) =>
+                prev.map((c) =>
+                  c.clinicId === activeClinic.clinicId
+                    ? {
+                        ...c,
+                        name: payload.name,
+                        slug: payload.slug,
+                        timeZone: payload.timeZone,
+                        currency: payload.currency,
+                        roundingRule: payload.roundingRule,
+                      }
+                    : c
+                )
+              );
+            }}
+          />
+        )}
+
+        {activeTab === 'profile' && (
+          <UserProfileScreen
+            profile={profileData}
+            onUpdateProfile={() => {}}
+            onRequestEmailChange={() => {}}
+            onConfirmEmailChange={() => {}}
+            onChangePassword={() => {}}
+            onRevokeDevice={() => {}}
+          />
+        )}
 
         {activeTab === 'health' && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem' }}>

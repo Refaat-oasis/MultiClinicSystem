@@ -9,6 +9,7 @@ public sealed class Owner
     public Guid UserId { get; private set; }
     public int? MaxClinics { get; private set; }
     public string Status { get; private set; }
+    public bool WelcomeSeen { get; private set; }
     public DateTimeOffset CreatedAtUtc { get; private set; }
 
     private Owner()
@@ -38,5 +39,10 @@ public sealed class Owner
     public void Activate()
     {
         Status = "Active";
+    }
+
+    public void MarkWelcomeSeen()
+    {
+        WelcomeSeen = true;
     }
 }

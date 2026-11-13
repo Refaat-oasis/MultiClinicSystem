@@ -25,6 +25,10 @@ public sealed class CoreDbContext : IdentityDbContext<AppUser, AppRole, Guid>
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
     public DbSet<PlatformAdmin> PlatformAdmins => Set<PlatformAdmin>();
+    public DbSet<OnboardingProgress> OnboardingProgresses => Set<OnboardingProgress>();
+    public DbSet<ClinicSlugHistory> ClinicSlugs => Set<ClinicSlugHistory>();
+    public DbSet<ClinicSpecialty> ClinicSpecialties => Set<ClinicSpecialty>();
+    public DbSet<ClinicAsset> ClinicAssets => Set<ClinicAsset>();
 
     public CoreDbContext(DbContextOptions<CoreDbContext> options, ICurrentClinic currentClinic)
         : base(options)
@@ -45,6 +49,7 @@ public sealed class CoreDbContext : IdentityDbContext<AppUser, AppRole, Guid>
             b.Property(u => u.FullName).HasMaxLength(200).IsRequired();
             b.Property(u => u.Locale).HasMaxLength(10).HasDefaultValue("ar");
             b.Property(u => u.Theme).HasMaxLength(10).HasDefaultValue("light");
+            b.Property(u => u.AvatarAssetId);
         });
 
         builder.Entity<AppRole>(b =>
@@ -85,16 +90,20 @@ public sealed class CoreDbContext : IdentityDbContext<AppUser, AppRole, Guid>
             b.Property(c => c.Name).IsRequired().HasMaxLength(200);
             b.Property(c => c.Slug).IsRequired().HasMaxLength(100);
             b.Property(c => c.Status).IsRequired().HasMaxLength(50).HasDefaultValue("PendingOnboarding");
+            b.Property(c => c.OnboardingStatus).IsRequired().HasMaxLength(32).HasDefaultValue("NotStarted");
+            b.Property(c => c.TimeZone).IsRequired().HasMaxLength(64).HasDefaultValue("Africa/Cairo");
+            b.Property(c => c.Currency).IsRequired().HasMaxLength(16).HasDefaultValue("EGP");
+            b.Property(c => c.RoundingRule).IsRequired().HasMaxLength(32).HasDefaultValue("NearestPound");
+            b.Property(c => c.Street).HasMaxLength(250);
+            b.Property(c => c.City).HasMaxLength(120);
+            b.Property(c => c.Governorate).HasMaxLength(120);
+            b.Property(c => c.MainPhone).HasMaxLength(40);
+            b.Property(c => c.ExtraPhonesJson).IsRequired().HasMaxLength(1000).HasDefaultValue("[]");
+            b.Property(c => c.ContactEmail).HasMaxLength(256);
+            b.Property(c => c.LogoAssetId);
+            b.Property(c => c.HasFinancialEntries).HasDefaultValue(false);
+            b.Property(c => c.RowVersion).IsRowVersion();
             b.HasIndex(c => c.Slug).IsUnique();
-        });
-
-        // PatientAccessLog entity configuration
-        builder.Entity<PatientAccessLog>(b =>
-        {
-            b.ToTable("PatientAccessLogs", "core");
-            b.HasKey(l => l.Id);
-            b.Property(l => l.ActorId).IsRequired().HasMaxLength(150);
-            b.Property(l => l.Reason).IsRequired().HasMaxLength(500);
         });
 
         // Owner entity configuration
@@ -103,6 +112,7 @@ public sealed class CoreDbContext : IdentityDbContext<AppUser, AppRole, Guid>
             b.ToTable("Owners", "core");
             b.HasKey(o => o.Id);
             b.Property(o => o.Status).IsRequired().HasMaxLength(50);
+            b.Property(o => o.WelcomeSeen).HasDefaultValue(false);
             b.HasIndex(o => o.UserId).IsUnique();
         });
 
@@ -198,6 +208,66 @@ public sealed class CoreDbContext : IdentityDbContext<AppUser, AppRole, Guid>
             // Layer 1 Tenant Isolation: EF Core Global Query Filter
             b.HasQueryFilter(r => _currentClinic.IsPlatformAdmin || r.ClinicId == _currentClinic.ClinicId);
         });
+
+        // PatientAccessLog entity configuration
+        builder.Entity<PatientAccessLog>(b =>
+        {
+            b.ToTable("PatientAccessLogs", "core");
+            b.HasKey(l => l.Id);
+            b.Property(l => l.ActorId).IsRequired().HasMaxLength(150);
+            b.Property(l => l.Reason).IsRequired().HasMaxLength(500);
+        });
+
+        // ClinicSlugs history table (unique slugs across platform for redirect preservation)
+        builder.Entity<ClinicSlugHistory>(b =>
+        {
+            b.ToTable("ClinicSlugs", "core");
+            b.HasKey(s => s.Id);
+            b.Property(s => s.Slug).IsRequired().HasMaxLength(100);
+            b.HasIndex(s => s.Slug).IsUnique();
+            b.HasIndex(s => s.ClinicId);
+        });
+
+        // OnboardingProgress tenant table
+        builder.Entity<OnboardingProgress>(b =>
+        {
+            b.ToTable("OnboardingProgress", "core");
+            b.HasKey(p => p.Id);
+            b.Property(p => p.StepKey).IsRequired().HasMaxLength(64);
+            b.Property(p => p.RowVersion).IsRowVersion();
+            b.HasIndex(p => new { p.ClinicId, p.StepKey }).IsUnique();
+            b.HasQueryFilter(p => _currentClinic.IsPlatformAdmin || p.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // ClinicSpecialty tenant table
+        builder.Entity<ClinicSpecialty>(b =>
+        {
+            b.ToTable("ClinicSpecialties", "core");
+            b.HasKey(s => s.Id);
+            b.Property(s => s.CatalogCode).IsRequired().HasMaxLength(64);
+            b.Property(s => s.NameAr).IsRequired().HasMaxLength(120);
+            b.Property(s => s.NameEn).IsRequired().HasMaxLength(120);
+            b.Property(s => s.DefaultFormSchemaJson).IsRequired();
+            b.Property(s => s.DefaultAppointmentCategoriesJson).IsRequired();
+            b.Property(s => s.RowVersion).IsRowVersion();
+            b.HasIndex(s => new { s.ClinicId, s.CatalogCode });
+            b.HasQueryFilter(s => _currentClinic.IsPlatformAdmin || s.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // ClinicAsset tenant table
+        builder.Entity<ClinicAsset>(b =>
+        {
+            b.ToTable("ClinicAssets", "core");
+            b.HasKey(a => a.Id);
+            b.Property(a => a.OwnerType).IsRequired().HasMaxLength(50);
+            b.Property(a => a.FileName).IsRequired().HasMaxLength(255);
+            b.Property(a => a.ContentType).IsRequired().HasMaxLength(100);
+            b.Property(a => a.FullStorageKey).IsRequired().HasMaxLength(500);
+            b.Property(a => a.ThumbStorageKey).IsRequired().HasMaxLength(500);
+            b.Property(a => a.RowVersion).IsRowVersion();
+            b.HasIndex(a => a.ClinicId);
+            b.HasQueryFilter(a => _currentClinic.IsPlatformAdmin || a.ClinicId == _currentClinic.ClinicId);
+        });
     }
 
     /// <summary>
@@ -230,7 +300,13 @@ public sealed class CoreDbContext : IdentityDbContext<AppUser, AppRole, Guid>
             EXEC('
                 CREATE SECURITY POLICY sec.TenantSecurityPolicy
                 ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON core.TenantSampleRecords,
-                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON core.TenantSampleRecords
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON core.TenantSampleRecords,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON core.OnboardingProgress,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON core.OnboardingProgress,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON core.ClinicSpecialties,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON core.ClinicSpecialties,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON core.ClinicAssets,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON core.ClinicAssets
                 WITH (STATE = ON);
             ');
         ";
