@@ -376,3 +376,26 @@ Status: 0 Errors, Clean Build
 - [x] Dental specialty plugin supports FDI & Universal notation for permanent & primary teeth with historical `ToothRecords` and derived current chart state, while non-dental specialties (Ophthalmology) validate structured JSON-Schema forms with zero dental rows touched.
 - [x] `SessionCompleted` enqueued once in transactional outbox, doctor scoping returns `404`, portal queries exclude hidden visits and omit `PrivateDoctorNotes` while logging `PatientAccessLog`, and `clinical`-off leaves `scheduling` working.
 - [x] Phases 0 to 7 integration gates, all architecture sweeps, and frontend test/lint/build pass 100% green.
+
+---
+
+## Phase 8: Billing, Ledger, Cash Closing, and Suppliers (DONE)
+- **Branch**: `phase-8/billing-ledger-closing-suppliers`
+- **Completed Tasks**:
+  - **Domain (`src/Modules/Core/Core.Domain/`)**: Added Phase 8 value objects, enums, calculator (`BillingCalculator`, `ChargeLineCalculation`, `ChargeCalculationResult`, `ClosingMethodSummary`, `PaymentMethod`, `ChargeStatus`, `ChargeLineKind`, `LedgerEntryType`, `RoundingRule`, `DailyClosingStatus`) and 14 single-type entities (`PriceListItem`, `Charge`, `ChargeLine`, `LedgerEntry`, `Payment`, `PaymentAllocation`, `Refund`, `SkippedReceiptNumber`, `LabWorkOrder`, `Supplier`, `SupplierPayment`, `Expense`, `DailyClosing`, `ClosingMethodTotal`) plus 10 unit tests in `BillingDomainTests`.
+  - **Application & Infrastructure**: Added `IBillingService` & `IBillingPortalQueries` with 13 inputs & 18 results, `CoreDbContext` mappings (`billing` and `finance` schemas, `decimal(18,2)`, EF global query filters & SQL Server RLS filter/block predicates for all 14 tables), `BillingReceiptPdfGenerator` (`%PDF-1.4` printable receipts), `BillingService` (sequential receipt `NumberBlock` allocation, split payments, skipped receipts, append-only refunds, lab work cost vs patient price, supplier payables, expenses, daily closing reconciliation, closed-day lock, and audited owner reopen), `ClinicalService` visit-completion draft charge hook, and live `billing.*` & `finance.*` dashboard aggregates in `ModuleCatalogService` and `DashboardService`.
+  - **API (`src/Platform.Api/`)**: Added `BillingController`, thin DTOs & ViewModels + `BillingViewModelMapper`, Super Admin read-only `InspectBilling` endpoint on `PlatformClinicsController`, `ProblemDetailsMapper` codes (`INSUFFICIENT_PERMISSION`, `DAY_CLOSED_LOCKED`, `DAY_ALREADY_CLOSED`, `DAY_ALREADY_REOPENED`, `RECEIPT_ALREADY_USED`), and DI registrations in `Program.cs` & `TestServiceFactory.cs`.
+  - **Frontend (`web/`)**: Added `Phase8BillingScreen` + `Phase8BillingScreen.test.tsx`, wired `'billing'` tab (`الفواتير والخزينة`) into `web/apps/clinic/src/App.tsx` and read-only inspect billing panel into `web/apps/admin/src/InspectClinicShell.tsx`.
+- **Verification Output Summary**:
+  - `dotnet test tests/UnitTests/UnitTests.csproj`: `Passed! - Failed: 0, Passed: 135, Skipped: 0, Total: 135`
+  - `dotnet test tests/ArchitectureTests/ArchitectureTests.csproj`: `Passed! - Failed: 0, Passed: 12, Skipped: 0, Total: 12`
+  - `dotnet test tests/IntegrationTests/IntegrationTests.csproj`: `Passed! - Failed: 0, Passed: 28, Skipped: 0, Total: 28`
+  - `dotnet test tests/Gates/Gates.csproj` (Phases 0–8 cumulative): `Passed! - Failed: 0, Passed: 21, Skipped: 0, Total: 21`
+  - Frontend `npm --prefix web test; npm --prefix web run lint; npm --prefix web run build`: `41/41` Vitest tests passed (`admin-app`: 7, `clinic-app`: 2, `api-client`: 3, `ui`: 3, `feature-core`: 26), `tsc --noEmit` 0 errors, Vite production builds succeeded for both apps.
+
+### Phase 8 Exit Checklist
+- [x] Visit completion auto-creates a Draft charge when `billing` is enabled; calculator separates tool cost vs patient charge/markup, enforces mandatory reasons for free session / extra / discount, and respects rounding rules without doctor commissions.
+- [x] Receipt numbers allocate strictly from `NumberBlock` across split payments (`Cash`, `Visa`, `InstaPay`, `Wallet`) and support documented skipped receipts and `%PDF-1.4` printable receipt output.
+- [x] Refunds write append-only compensating ledger entries without deleting original payments, and lab work keeps clinic `LabCostAmount` separated from patient `PatientPriceAmount`.
+- [x] Daily closing reconciles per payment method (`finance` expenses included when enabled, gracefully excluded with `FinanceExpensesExcluded = true` when `finance` is off), locks closed days (`409 DAY_CLOSED_LOCKED`), and requires owner claim + reason + audit to reopen.
+- [x] Phases 0 to 8 cumulative gates, tenant/policy/module-off/portal-privacy/architecture sweeps, and frontend test/lint/build pass 100% green.

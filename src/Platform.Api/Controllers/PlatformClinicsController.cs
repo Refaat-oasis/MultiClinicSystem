@@ -272,6 +272,24 @@ public sealed class PlatformClinicsController : ControllerBase
             : Ok(ClinicalViewModelMapper.ToViewModel(result.Value));
     }
 
+    [HttpGet("{clinicId:guid}/inspect/billing")]
+    [ProducesResponseType(typeof(ClinicBillingInspectViewModel), StatusCodes.Status200OK)]
+    public async Task<IActionResult> InspectBilling(
+        Guid clinicId,
+        [FromServices] IBillingService billingService,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetAdminId(out Guid adminId))
+        {
+            return Unauthorized();
+        }
+
+        var result = await billingService.InspectClinicBillingAsync(adminId, clinicId, cancellationToken);
+        return result.IsFailure
+            ? ProblemDetailsMapper.ToProblemDetails(result.Error)
+            : Ok(BillingViewModelMapper.ToViewModel(result.Value));
+    }
+
     [HttpPost("{clinicId:guid}/inspect/{*subpath}")]
     [HttpPut("{clinicId:guid}/inspect/{*subpath}")]
     [HttpDelete("{clinicId:guid}/inspect/{*subpath}")]

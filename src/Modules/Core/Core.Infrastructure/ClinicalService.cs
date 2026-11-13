@@ -31,6 +31,7 @@ public sealed class ClinicalService : IClinicalService, IClinicalPortalQueries
     private readonly IClinicAuthorizationService _authorizationService;
     private readonly IAuditService _auditService;
     private readonly IClock _clock;
+    private readonly IBillingService? _billingService;
     private readonly Dictionary<string, ISpecialtyPlugin> _pluginsByCode;
 
     public ClinicalService(
@@ -39,13 +40,15 @@ public sealed class ClinicalService : IClinicalService, IClinicalPortalQueries
         IClinicAuthorizationService authorizationService,
         IAuditService auditService,
         IClock clock,
-        IEnumerable<ISpecialtyPlugin> specialtyPlugins)
+        IEnumerable<ISpecialtyPlugin> specialtyPlugins,
+        IBillingService? billingService = null)
     {
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _currentClinicContext = currentClinicContext ?? throw new ArgumentNullException(nameof(currentClinicContext));
         _authorizationService = authorizationService ?? throw new ArgumentNullException(nameof(authorizationService));
         _auditService = auditService ?? throw new ArgumentNullException(nameof(auditService));
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
+        _billingService = billingService;
         _pluginsByCode = (specialtyPlugins ?? Array.Empty<ISpecialtyPlugin>())
             .ToDictionary(p => p.SpecialtyCode, StringComparer.OrdinalIgnoreCase);
     }
@@ -1033,6 +1036,18 @@ public sealed class ClinicalService : IClinicalService, IClinicalPortalQueries
             }
 
             await _dbContext.SaveChangesAsync(cancellationToken);
+
+            if (_billingService != null)
+            {
+                await _billingService.CreateDraftChargeForCompletedVisitAsync(
+                    clinicId,
+                    visit.Id,
+                    visit.PatientId,
+                    visit.AppointmentId,
+                    visit.DoctorId,
+                    userId.ToString(),
+                    cancellationToken);
+            }
 
             await _auditService.LogAsync(
                 "VisitCompleted",
