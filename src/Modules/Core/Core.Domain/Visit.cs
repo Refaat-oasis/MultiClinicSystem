@@ -137,5 +137,11 @@ public sealed class Visit : ITenantEntity
         Status = VisitStatus.Completed;
         UpdatedAtUtc = updatedAtUtc.ToUniversalTime();
     }
+
+    public void SetVisibleToPatient(bool visible, DateTimeOffset updatedAtUtc)
+    {
+        IsVisibleToPatient = visible;
+        UpdatedAtUtc = updatedAtUtc.ToUniversalTime();
+    }
 }
 

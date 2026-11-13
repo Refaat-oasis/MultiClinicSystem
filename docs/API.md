@@ -379,3 +379,26 @@
 - `POST /api/v1/clinics/{clinicId}/treatment-plans/{planId}/installments/{installmentId}/pay` & `POST .../installments/{installmentId}/refund`: Collect upfront deposits or scheduled installments (issuing receipt numbers via `IBillingService`) and issue online-only append-only deposit/installment refunds with mandatory reason without deleting prior payments.
 - `PUT /api/v1/clinics/{clinicId}/treatment-plans/{planId}/portal-cost-visibility`: Toggle `ShowCostToPatient` (default derived from clinic configuration) controlling whether treatment plan pricing and installments are exposed to `ITreatmentPlanPortalQueries`.
 - `GET /api/v1/platform/clinics/{clinicId}/inspect/treatment-plans`: Super Admin read-only treatment-plans inspect snapshot via `IPlatformAccess` (`PatientAccessLog`).
+
+## 12. Phase 10: Patient Portal (Public Clinic Page, Read-Only Record & Staff Management)
+All `/api/v1/c/{slug}/portal/**` responses enforce `Cache-Control: no-store`, `Pragma: no-cache`, and `X-Robots-Tag: noindex, nofollow`. Patient endpoints use isolated `__Host-Portal-Token` (`realm = "PatientPortal"`) and never accept a patient ID from client input.
+
+### Public & Patient Portal Endpoints (`/api/v1/c/{slug}/portal/...`)
+- `GET /api/v1/c/{slug}/portal/landing`: Anonymous public clinic landing resolving active clinic info, welcome/terms copy, and available module sections; historical slugs set `IsRedirect = true` with `X-Canonical-Slug` & `X-Redirect-Target`, while unknown, suspended, pending-onboarding, or `portal`-disabled clinics return identical `404 CLINIC_NOT_FOUND`.
+- `POST /api/v1/c/{slug}/portal/activate`: Activate invited `PatientAccount` using 6-digit HMAC email verification code and set password; issues portal session + `__Host-Portal-Token` cookie.
+- `POST /api/v1/c/{slug}/portal/register-pin`: Verify patient file number + date of birth + 10-character single-use printed PIN and send 6-digit email verification code for account completion.
+- `POST /api/v1/c/{slug}/portal/login` & `POST .../logout`: Sign in with isolated `PatientPortal` JWT & `__Host-Portal-Token` cookie, or sign out.
+- `POST /api/v1/c/{slug}/portal/forgot-password` & `POST .../reset-password`: Enumeration-safe 6-digit password reset (`ResetPassword` rotates `SecurityStamp`, invalidating existing portal tokens).
+- `GET /api/v1/c/{slug}/portal/overview` (`portal.patient`): Patient home overview combining demographics/blood type, allergies & shared medical background (`patient-history`), shared attachments (`attachments`), upcoming appointments (`scheduling`), ended visible visits (`clinical`), and treatment plan progress without material costs (`treatment-plans`); logs `PatientAccessLog` (`ActorType = "Patient"`).
+- `GET /api/v1/c/{slug}/portal/medical-record` (`portal.patient`): Dedicated medical background (allergies, chronic conditions, medications, surgeries, non-private visible notes, shared attachments).
+- `GET /api/v1/c/{slug}/portal/visits` & `GET .../visits/{visitId}` (`portal.patient`): List ended visits marked `VisibleToPatient` and read visit detail (`404 VISIT_NOT_FOUND` across patients or when hidden; never includes `PrivateDoctorNotes`).
+- `GET /api/v1/c/{slug}/portal/treatment-plans` (`portal.patient`): Patient treatment plans with session targets/status and patient-facing costs only when `ShowCostToPatient` is true (`materialsCost` omitted).
+- `POST /api/v1/c/{slug}/portal/prescriptions/{prescriptionId}/signed-url` & `POST .../attachments/{attachmentId}/signed-url` & `GET .../downloads/{kind}/{resourceId}?token=...`: Issue HMAC-signed 5-minute single-resource download URLs and stream authorized prescription PDFs or shared attachments (`401 INVALID_OR_EXPIRED_DOWNLOAD_TOKEN` after TTL expiry or patient mismatch).
+
+### Staff Portal Management & Super Admin Inspect
+- `GET /api/v1/clinics/{clinicId}/portal/patients/{patientId}`: Read patient portal status (`NotInvited`, `Invited`, `Active`, `Disabled`), consent metadata, and last login.
+- `POST /api/v1/clinics/{clinicId}/portal/patients/{patientId}/invite` & `POST .../resend` & `PUT .../status`: Invite patient with mandatory documented consent (via email 6-digit code or single-use 10-character printed PIN for no-email/guardian accounts), resend activation code (60s cooldown, hourly cap), and enable/disable portal access (`portal.invite`).
+- `PUT /api/v1/clinics/{clinicId}/portal/patients/{patientId}/profile` & `PUT .../notes/{noteId}/visibility` & `PUT .../attachments/{attachmentId}/visibility` & `PUT .../visits/{visitId}/visibility`: Update portal profile fields (email, blood type, guardian details) and control per-item patient visibility (`IsDoctorPrivate` notes are rejected from sharing).
+- `GET /api/v1/clinics/{clinicId}/portal/settings` & `PUT .../settings`: Manage `ShowPricesByDefault`, `ShowDoctorNames`, `DefaultVisitVisibility`, bilingual welcome/terms copy (`portal.manage`).
+- `GET /api/v1/clinics/{clinicId}/portal/access-logs`: Clinic-scoped patient portal access log audit viewer (`portal.manage`).
+- `GET /api/v1/platform/clinics/{clinicId}/inspect/portal`: Super Admin read-only portal account & view summary (`PatientAccessLog` recorded via `IPlatformAccess`).

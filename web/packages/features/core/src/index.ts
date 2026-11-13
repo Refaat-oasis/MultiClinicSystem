@@ -14,5 +14,6 @@ export * from './Phase6SchedulingScreen';
 export * from './Phase7ClinicalScreen';
 export * from './Phase8BillingScreen';
 export * from './Phase9TreatmentPlansScreen';
+export * from './Phase10PortalScreen';
 
 

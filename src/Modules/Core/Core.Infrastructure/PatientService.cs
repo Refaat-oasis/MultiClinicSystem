@@ -14,7 +14,7 @@ namespace Core.Infrastructure;
 /// Manages clinic patient registry, Arabic search, duplicate detection, doctor/specialty scoping,
 /// medical history, notes, attachments behind IFileStorage, and Super Admin inspection.
 /// </summary>
-public sealed class PatientService : IPatientService
+public sealed class PatientService : IPatientService, IPatientPortalQueries
 {
     private const int MaxAttachmentBytes = 10 * 1024 * 1024;
     private static readonly HashSet<string> AllowedAttachmentContentTypes = new(StringComparer.OrdinalIgnoreCase)
@@ -1434,6 +1434,390 @@ public sealed class PatientService : IPatientService
         {
             return new List<string>();
         }
+    }
+
+    public async Task<Result> SetNotePortalVisibilityAsync(
+        Guid userId,
+        Guid clinicId,
+        Guid patientId,
+        Guid noteId,
+        bool visibleToPatient,
+        string? deviceId,
+        string? ipAddress,
+        string? requestId,
+        CancellationToken cancellationToken = default)
+    {
+        var gate = await _authorizationService.EnsureClinicAccessAsync(userId, clinicId, "patients.history.write", "patient-history", deviceId, cancellationToken);
+        if (gate.IsFailure)
+        {
+            return Result.Failure(gate.Error);
+        }
+
+        var scopeContext = await ResolveScopingContextAsync(userId, clinicId, cancellationToken);
+        return await ExecuteForClinicAsync(clinicId, async () =>
+        {
+            var patient = await _dbContext.Patients
+                .AsNoTracking()
+                .FirstOrDefaultAsync(p => p.ClinicId == clinicId && p.Id == patientId && !p.IsVoided, cancellationToken);
+            if (patient == null || !IsPatientVisibleToScope(patient, scopeContext))
+            {
+                return Result.Failure(Error.NotFound("PATIENT_NOT_FOUND", "Patient was not found."));
+            }
+
+            var note = await _dbContext.PatientNotes
+                .FirstOrDefaultAsync(n => n.ClinicId == clinicId && n.PatientId == patientId && n.Id == noteId && !n.IsVoided, cancellationToken);
+            if (note == null)
+            {
+                return Result.Failure(Error.NotFound("NOTE_NOT_FOUND", "Patient note was not found."));
+            }
+
+            if (note.IsPrivate && visibleToPatient)
+            {
+                return Result.Failure(Error.Validation("PRIVATE_NOTE_CANNOT_BE_SHARED", "Doctor-private notes cannot be shared with the patient portal."));
+            }
+
+            bool previous = note.VisibleToPatient;
+            note.SetVisibleToPatient(visibleToPatient);
+            await _dbContext.SaveChangesAsync(cancellationToken);
+
+            await _auditService.LogAsync(
+                "PatientNotePortalVisibilityChanged",
+                "PatientNote",
+                note.Id.ToString(),
+                JsonSerializer.Serialize(new { VisibleToPatient = previous }),
+                JsonSerializer.Serialize(new { VisibleToPatient = note.VisibleToPatient }),
+                userId,
+                clinicId,
+                ipAddress,
+                requestId,
+                cancellationToken);
+
+            return Result.Success();
+        });
+    }
+
+    public async Task<Result> SetAttachmentPortalVisibilityAsync(
+        Guid userId,
+        Guid clinicId,
+        Guid patientId,
+        Guid attachmentId,
+        bool sharedWithPatient,
+        string? deviceId,
+        string? ipAddress,
+        string? requestId,
+        CancellationToken cancellationToken = default)
+    {
+        var gate = await _authorizationService.EnsureClinicAccessAsync(userId, clinicId, "attachments.write", "attachments", deviceId, cancellationToken);
+        if (gate.IsFailure)
+        {
+            return Result.Failure(gate.Error);
+        }
+
+        var scopeContext = await ResolveScopingContextAsync(userId, clinicId, cancellationToken);
+        return await ExecuteForClinicAsync(clinicId, async () =>
+        {
+            var patient = await _dbContext.Patients
+                .AsNoTracking()
+                .FirstOrDefaultAsync(p => p.ClinicId == clinicId && p.Id == patientId && !p.IsVoided, cancellationToken);
+            if (patient == null || !IsPatientVisibleToScope(patient, scopeContext))
+            {
+                return Result.Failure(Error.NotFound("PATIENT_NOT_FOUND", "Patient was not found."));
+            }
+
+            var attachment = await _dbContext.PatientAttachments
+                .FirstOrDefaultAsync(a => a.ClinicId == clinicId && a.PatientId == patientId && a.Id == attachmentId && !a.IsVoided, cancellationToken);
+            if (attachment == null)
+            {
+                return Result.Failure(Error.NotFound("ATTACHMENT_NOT_FOUND", "Attachment was not found."));
+            }
+
+            bool previous = attachment.SharedWithPatient;
+            attachment.SetSharedWithPatient(sharedWithPatient);
+            await _dbContext.SaveChangesAsync(cancellationToken);
+
+            await _auditService.LogAsync(
+                "PatientAttachmentPortalVisibilityChanged",
+                "PatientAttachment",
+                attachment.Id.ToString(),
+                JsonSerializer.Serialize(new { SharedWithPatient = previous }),
+                JsonSerializer.Serialize(new { SharedWithPatient = attachment.SharedWithPatient }),
+                userId,
+                clinicId,
+                ipAddress,
+                requestId,
+                cancellationToken);
+
+            return Result.Success();
+        });
+    }
+
+    public async Task<Result> UpdatePatientPortalProfileAsync(
+        Guid userId,
+        Guid clinicId,
+        Guid patientId,
+        string? email,
+        string? bloodType,
+        string? guardianName,
+        string? guardianEmail,
+        string? deviceId,
+        string? ipAddress,
+        string? requestId,
+        CancellationToken cancellationToken = default)
+    {
+        var gate = await _authorizationService.EnsureClinicAccessAsync(userId, clinicId, "patients.write", "patients", deviceId, cancellationToken);
+        if (gate.IsFailure)
+        {
+            return Result.Failure(gate.Error);
+        }
+
+        var scopeContext = await ResolveScopingContextAsync(userId, clinicId, cancellationToken);
+        return await ExecuteForClinicAsync(clinicId, async () =>
+        {
+            var patient = await _dbContext.Patients
+                .FirstOrDefaultAsync(p => p.ClinicId == clinicId && p.Id == patientId && !p.IsVoided, cancellationToken);
+            if (patient == null || !IsPatientVisibleToScope(patient, scopeContext))
+            {
+                return Result.Failure(Error.NotFound("PATIENT_NOT_FOUND", "Patient was not found."));
+            }
+
+            string? beforeEmail = patient.Email;
+            string? beforeBlood = patient.BloodType;
+            patient.SetPortalProfile(email, bloodType, guardianName, guardianEmail, _clock.UtcNow);
+            await _dbContext.SaveChangesAsync(cancellationToken);
+
+            await _auditService.LogAsync(
+                "PatientPortalProfileUpdated",
+                "Patient",
+                patient.Id.ToString(),
+                JsonSerializer.Serialize(new { HasEmail = !string.IsNullOrEmpty(beforeEmail), BloodType = beforeBlood }),
+                JsonSerializer.Serialize(new { HasEmail = !string.IsNullOrEmpty(patient.Email), BloodType = patient.BloodType }),
+                userId,
+                clinicId,
+                ipAddress,
+                requestId,
+                cancellationToken);
+
+            return Result.Success();
+        });
+    }
+
+    public async Task<Result<PortalPatientSummaryResult>> GetPatientSummaryForPortalAsync(
+        Guid clinicId,
+        Guid patientId,
+        CancellationToken cancellationToken = default)
+    {
+        return await ExecuteForClinicAsync(clinicId, async () =>
+        {
+            Patient? patient = await _dbContext.Patients
+                .AsNoTracking()
+                .FirstOrDefaultAsync(p => p.ClinicId == clinicId && !p.IsVoided && p.Id == patientId, cancellationToken);
+            if (patient == null)
+            {
+                return Result<PortalPatientSummaryResult>.Failure(Error.NotFound("PATIENT_NOT_FOUND", "Patient was not found."));
+            }
+
+            int? ageYears = ComputeAgeYears(patient.DateOfBirth, patient.ApproximateAgeYears);
+            return Result<PortalPatientSummaryResult>.Success(new PortalPatientSummaryResult(
+                patient.Id,
+                patient.FileNumber,
+                patient.FullName,
+                ageYears,
+                patient.DateOfBirth,
+                patient.Gender,
+                patient.BloodType,
+                patient.Email,
+                patient.GuardianName));
+        });
+    }
+
+    public async Task<Result<PortalMedicalBackgroundResult>> GetPatientMedicalBackgroundForPortalAsync(
+        Guid clinicId,
+        Guid patientId,
+        bool includeMedicalBackground,
+        CancellationToken cancellationToken = default)
+    {
+        return await ExecuteForClinicAsync(clinicId, async () =>
+        {
+            Patient? patient = await _dbContext.Patients
+                .AsNoTracking()
+                .FirstOrDefaultAsync(p => p.ClinicId == clinicId && !p.IsVoided && p.Id == patientId, cancellationToken);
+            if (patient == null)
+            {
+                return Result<PortalMedicalBackgroundResult>.Failure(Error.NotFound("PATIENT_NOT_FOUND", "Patient was not found."));
+            }
+
+            List<PatientAllergyItemResult> allergies = Array.Empty<PatientAllergyItemResult>().ToList();
+            List<string> chronic = new();
+            List<string> medications = new();
+            List<string> surgeries = new();
+            List<PortalVisibleNoteItemResult> visibleNotes = new();
+
+            if (includeMedicalBackground)
+            {
+                allergies = (await _dbContext.PatientAllergies
+                    .AsNoTracking()
+                    .Where(a => a.ClinicId == clinicId && !a.IsVoided && a.PatientId == patientId)
+                    .OrderBy(a => a.CreatedAtUtc)
+                    .ToListAsync(cancellationToken))
+                    .OrderByDescending(a => string.Equals(a.Severity, "Severe", StringComparison.OrdinalIgnoreCase) ? 3 :
+                                           string.Equals(a.Severity, "Moderate", StringComparison.OrdinalIgnoreCase) ? 2 : 1)
+                    .ThenBy(a => a.CreatedAtUtc)
+                    .Select(a => new PatientAllergyItemResult(
+                        a.Id, a.PatientId, a.Allergen, a.Severity, a.Reaction, a.RecordedByUserId, a.CreatedAtUtc))
+                    .ToList();
+
+                chronic = DeserializeList(patient.ChronicConditionsJson);
+                medications = DeserializeList(patient.CurrentMedicationsJson);
+                surgeries = DeserializeList(patient.PastSurgeriesJson);
+
+                visibleNotes = await _dbContext.PatientNotes
+                    .AsNoTracking()
+                    .Where(n => n.ClinicId == clinicId && !n.IsVoided && n.PatientId == patientId && !n.IsPrivate && n.VisibleToPatient)
+                    .OrderByDescending(n => n.CreatedAtUtc)
+                    .Select(n => new PortalVisibleNoteItemResult(n.Id, n.NoteText, n.CreatedAtUtc))
+                    .ToListAsync(cancellationToken);
+            }
+
+            List<PortalSharedAttachmentItemResult> sharedAttachments = await _dbContext.PatientAttachments
+                .AsNoTracking()
+                .Where(a => a.ClinicId == clinicId && !a.IsVoided && a.PatientId == patientId && a.SharedWithPatient)
+                .OrderByDescending(a => a.CreatedAtUtc)
+                .Select(a => new PortalSharedAttachmentItemResult(
+                    a.Id, a.Category, a.FileName, a.ContentType, a.SizeBytes, a.Notes, a.CreatedAtUtc))
+                .ToListAsync(cancellationToken);
+
+            return Result<PortalMedicalBackgroundResult>.Success(new PortalMedicalBackgroundResult(
+                allergies,
+                chronic,
+                medications,
+                surgeries,
+                includeMedicalBackground && patient.IsMedicalHistoryReviewed,
+                includeMedicalBackground ? patient.MedicalHistorySummary : null,
+                visibleNotes,
+                sharedAttachments));
+        });
+    }
+
+    public async Task<Result<PortalContactSnapshotResult>> GetPatientPortalContactAsync(
+        Guid clinicId,
+        Guid patientId,
+        CancellationToken cancellationToken = default)
+    {
+        return await ExecuteForClinicAsync(clinicId, async () =>
+        {
+            Patient? patient = await _dbContext.Patients
+                .AsNoTracking()
+                .FirstOrDefaultAsync(p => p.ClinicId == clinicId && !p.IsVoided && p.Id == patientId, cancellationToken);
+            if (patient == null)
+            {
+                return Result<PortalContactSnapshotResult>.Failure(Error.NotFound("PATIENT_NOT_FOUND", "Patient was not found."));
+            }
+
+            return Result<PortalContactSnapshotResult>.Success(new PortalContactSnapshotResult(
+                patient.Id,
+                patient.FileNumber,
+                patient.FullName,
+                patient.DateOfBirth,
+                patient.Email,
+                patient.GuardianName,
+                patient.GuardianEmail));
+        });
+    }
+
+    public async Task<Result<PortalContactSnapshotResult>> FindPatientByFileNumberAndDobForPortalAsync(
+        Guid clinicId,
+        string fileNumber,
+        DateOnly dateOfBirth,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(fileNumber))
+        {
+            return Result<PortalContactSnapshotResult>.Failure(Error.Validation("FILE_NUMBER_REQUIRED", "File number is required."));
+        }
+
+        string trimmedFile = fileNumber.Trim();
+        return await ExecuteForClinicAsync(clinicId, async () =>
+        {
+            Patient? patient = await _dbContext.Patients
+                .AsNoTracking()
+                .FirstOrDefaultAsync(
+                    p => p.ClinicId == clinicId && !p.IsVoided && p.FileNumber == trimmedFile && p.DateOfBirth == dateOfBirth,
+                    cancellationToken);
+            if (patient == null)
+            {
+                return Result<PortalContactSnapshotResult>.Failure(Error.NotFound("PATIENT_NOT_FOUND", "Patient was not found."));
+            }
+
+            return Result<PortalContactSnapshotResult>.Success(new PortalContactSnapshotResult(
+                patient.Id,
+                patient.FileNumber,
+                patient.FullName,
+                patient.DateOfBirth,
+                patient.Email,
+                patient.GuardianName,
+                patient.GuardianEmail));
+        });
+    }
+
+    public async Task<Result<PatientAttachmentDownloadResult>> DownloadSharedAttachmentForPortalAsync(
+        Guid clinicId,
+        Guid patientId,
+        Guid attachmentId,
+        CancellationToken cancellationToken = default)
+    {
+        PatientAttachment? attachment = await ExecuteForClinicAsync(clinicId, async () =>
+        {
+            return await _dbContext.PatientAttachments
+                .AsNoTracking()
+                .FirstOrDefaultAsync(
+                    a => a.ClinicId == clinicId && !a.IsVoided && a.PatientId == patientId && a.Id == attachmentId && a.SharedWithPatient,
+                    cancellationToken);
+        });
+
+        if (attachment == null)
+        {
+            return Result<PatientAttachmentDownloadResult>.Failure(Error.NotFound("ATTACHMENT_NOT_FOUND", "Attachment was not found."));
+        }
+
+        byte[]? bytes = await _fileStorage.ReadAsync(attachment.StorageKey, cancellationToken);
+        if (bytes == null)
+        {
+            return Result<PatientAttachmentDownloadResult>.Failure(Error.NotFound("ATTACHMENT_FILE_MISSING", "Attachment payload was not found in storage."));
+        }
+
+        await ExecuteForClinicAsync(clinicId, async () =>
+        {
+            _dbContext.PatientAccessLogs.Add(new PatientAccessLog(
+                GuidV7.NewGuid(),
+                patientId.ToString(),
+                "PortalDownloadAttachment",
+                _clock.UtcNow,
+                clinicId,
+                attachmentId.ToString(),
+                "Patient"));
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            return true;
+        });
+
+        return Result<PatientAttachmentDownloadResult>.Success(
+            new PatientAttachmentDownloadResult(attachment.FileName, attachment.ContentType, bytes));
+    }
+
+    private int? ComputeAgeYears(DateOnly? dateOfBirth, int? approximateAgeYears)
+    {
+        if (!dateOfBirth.HasValue)
+        {
+            return approximateAgeYears;
+        }
+
+        DateOnly today = DateOnly.FromDateTime(_clock.UtcNow.UtcDateTime);
+        int age = today.Year - dateOfBirth.Value.Year;
+        if (dateOfBirth.Value > today.AddYears(-age))
+        {
+            age--;
+        }
+
+        return age < 0 ? 0 : age;
     }
 
     private Task<T> ExecuteWithCurrentOrClinicAsync<T>(Guid clinicId, bool keepPlatformAdmin, Func<Task<T>> action)

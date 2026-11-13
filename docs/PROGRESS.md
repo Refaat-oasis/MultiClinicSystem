@@ -422,3 +422,26 @@ Status: 0 Errors, Clean Build
 - [x] Installment payments allocate real receipt numbers via `IBillingService` and appear in daily closing; deposit/installment refunds are append-only, online-only, and never delete payments.
 - [x] Portal cost visibility toggle hides/exposes prices & installments via `ITreatmentPlanPortalQueries`; Super Admin read-only inspect works while writes return 403; turning `treatment-plans` off returns 403/404 and removes widgets without breaking billing or scheduling.
 - [x] Phases 0 to 9 cumulative gates, tenant/policy/module-off/architecture sweeps, and frontend test/lint/build pass 100% green.
+
+---
+
+## Phase 10: Patient Portal — Public Clinic Page and Read-Only Record (DONE)
+- **Branch**: `phase-10/patient-portal-readonly`
+- **Completed Tasks**:
+  - **Domain (`src/Modules/Core/Core.Domain/`)**: Extended `Patient` (`Email`, `BloodType`, `GuardianName`, `GuardianEmail`, `SetPortalProfile`), `PatientNote` (`VisibleToPatient`, `SetVisibleToPatient`), `PatientAttachment` (`SharedWithPatient`, `SetSharedWithPatient`), `Visit` (`SetVisibleToPatient`); added single-type `PatientAccountStatus`, `PatientAccount`, `PortalConsent`, `ClinicPortalSetting`, `PortalSignedTokenHelper`, and 4 unit tests in `PatientPortalDomainTests`.
+  - **Application & Infrastructure**: Added `IPatientPortalService`, `IPatientPortalQueries`, `ISchedulingPortalQueries`, 6 inputs, and 15 results; implemented `PatientPortalService` (historical slug redirects, identical `404 CLINIC_NOT_FOUND` parity when slug unknown/suspended/pending-onboarding/`portal` off, consent-gated invitations via email 6-digit HMAC codes with cooldown/hourly-cap or single-use 10-character printed PIN + DOB, isolated `PatientPortal` JWT realm with `SecurityStamp` rotation on password reset, modular read sections for `patient-history`/`attachments`/`scheduling`/`clinical`/`treatment-plans`, 5-minute HMAC signed download URLs, `PatientAccessLog` with `ActorType = Patient`, clinic portal settings, and Super Admin read-only inspect), updated `CoreDbContext` (`portal` schema + EF filters + SQL Server RLS filter/block predicates), registered `"portal"` manifest & 5 live `portal.*` dashboard widgets in `ModuleCatalogService` and `DashboardService`.
+  - **API & Architecture Sweeps**: Added `PortalSecurityHeadersAttribute` (`Cache-Control: no-store`, `Pragma: no-cache`, `X-Robots-Tag: noindex, nofollow`), `PatientPortalController` (`/api/v1/c/{slug}/portal/**`), `StaffPortalManagementController` (`/api/v1/clinics/{clinicId}/portal/**`), `PlatformClinicsController.InspectPortal`, 10 single-type DTOs, 16 single-type ViewModels + `PatientPortalViewModelMapper`, `__Host-Portal-Token` cookie isolation (`portal.patient` policy) in `Program.cs` & `TestServiceFactory.cs`, and `PortalIsolationSweepTests` + `AnonymousEndpointAllowlistTests` updates.
+  - **Frontend (`web/`)**: Added lazy-loaded mobile-first Arabic RTL portal app `web/apps/clinic/src/portal/PortalApp.tsx` + `PortalApp.test.tsx` (wired in `web/apps/clinic/src/main.tsx` for `/c/:slug` routes as a separate Vite chunk), staff management tab `Phase10PortalScreen.tsx` + `Phase10PortalScreen.test.tsx` (wired into `web/apps/clinic/src/App.tsx`), and Super Admin read-only portal inspect in `web/apps/admin/src/InspectClinicShell.tsx`.
+- **Verification Output Summary**:
+  - `dotnet test tests/UnitTests/UnitTests.csproj --no-restore`: `Passed! - Failed: 0, Passed: 143, Skipped: 0, Total: 143`
+  - `dotnet test tests/ArchitectureTests/ArchitectureTests.csproj --no-build`: `Passed! - Failed: 0, Passed: 15, Skipped: 0, Total: 15`
+  - `dotnet test tests/IntegrationTests/IntegrationTests.csproj --no-build`: `Passed! - Failed: 0, Passed: 30, Skipped: 0, Total: 30`
+  - `dotnet test tests/Gates/Gates.csproj --no-build` (Phases 0–10 cumulative): `Passed! - Failed: 0, Passed: 23, Skipped: 0, Total: 23`
+  - Frontend `npm --prefix web test; npm --prefix web run lint; npm --prefix web run build`: `48/48` Vitest tests passed (`admin-app`: 7, `clinic-app`: 4, `api-client`: 3, `ui`: 3, `feature-core`: 31), `tsc --noEmit` 0 errors, Vite production builds succeeded for both apps (`PortalApp` emitted as a separate lazy chunk).
+
+### Phase 10 Exit Checklist
+- [x] Public clinic landing handles active, historical redirect (`X-Canonical-Slug`/`X-Redirect-Target`), and `404 CLINIC_NOT_FOUND` parity for unknown, suspended, pending-onboarding, and `portal`-off clinics.
+- [x] Consent-gated enrollment supports 6-digit HMAC email activation (lockout + resend cooldown + single use) and 10-character printed PIN + DOB registration for minor/no-email patients.
+- [x] Portal cookie/JWT realm (`__Host-Portal-Token`) is strictly isolated from staff/admin tokens, responses include `no-store` & `noindex`, signed download URLs expire cleanly, and hidden visits/private doctor notes/internal costs never leak.
+- [x] Turning `portal` or optional section modules (`treatment-plans`, etc.) off disables only those portal sections with `MODULE_DISABLED`, while `ReadOnly` clinics preserve read access and `Suspended` returns 404.
+- [x] Phases 0 to 10 cumulative gates, portal isolation & architecture sweeps, and frontend test/lint/build pass 100% green.

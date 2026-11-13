@@ -1106,6 +1106,50 @@ public sealed class ClinicalService : IClinicalService, IClinicalPortalQueries
         });
     }
 
+    public async Task<Result<VisitSessionResult>> SetVisitPortalVisibilityAsync(
+        Guid userId,
+        Guid clinicId,
+        Guid visitId,
+        bool isVisibleToPatient,
+        string? deviceId,
+        string? ipAddress,
+        string? requestId,
+        CancellationToken cancellationToken = default)
+    {
+        var gate = await _authorizationService.EnsureClinicAccessAsync(userId, clinicId, "clinical.write", "clinical", deviceId, cancellationToken);
+        if (gate.IsFailure)
+        {
+            return Result<VisitSessionResult>.Failure(gate.Error);
+        }
+
+        return await ExecuteForClinicAsync(clinicId, async () =>
+        {
+            Visit? visit = await LoadAuthorizedVisitAsync(userId, clinicId, visitId, cancellationToken);
+            if (visit == null)
+            {
+                return Result<VisitSessionResult>.Failure(Error.NotFound("VISIT_NOT_FOUND", "Visit was not found."));
+            }
+
+            bool previous = visit.IsVisibleToPatient;
+            visit.SetVisibleToPatient(isVisibleToPatient, _clock.UtcNow);
+            await _dbContext.SaveChangesAsync(cancellationToken);
+
+            await _auditService.LogAsync(
+                "VisitPortalVisibilityChanged",
+                "Visit",
+                visit.Id.ToString(),
+                JsonSerializer.Serialize(new { IsVisibleToPatient = previous }),
+                JsonSerializer.Serialize(new { IsVisibleToPatient = visit.IsVisibleToPatient }),
+                userId,
+                clinicId,
+                ipAddress,
+                requestId,
+                cancellationToken);
+
+            return Result<VisitSessionResult>.Success(await ProjectVisitAsync(clinicId, visit, cancellationToken));
+        });
+    }
+
     public async Task<Result<IReadOnlyList<PortalVisitSummaryResult>>> ListPatientVisibleVisitsAsync(
         Guid clinicId,
         Guid patientId,

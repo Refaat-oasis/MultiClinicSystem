@@ -22,7 +22,13 @@ public sealed class AnonymousEndpointAllowlistTests
         "AuthController.RefreshToken",
         "PlatformAuthController.Login",
         "PlatformAuthController.BreakGlassReset",
-        "PublicClinicDirectoryController.ResolveBySlug"
+        "PublicClinicDirectoryController.ResolveBySlug",
+        "PatientPortalController.GetLanding",
+        "PatientPortalController.Activate",
+        "PatientPortalController.RegisterPrintedPin",
+        "PatientPortalController.Login",
+        "PatientPortalController.ForgotPassword",
+        "PatientPortalController.ResetPassword"
     };
 
     [Fact]

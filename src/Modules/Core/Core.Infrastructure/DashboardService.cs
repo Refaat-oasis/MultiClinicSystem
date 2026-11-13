@@ -539,6 +539,93 @@ public sealed class DashboardService : IDashboardService
                     breakdown["totalRefunded"] = Math.Round(plans.Sum(p => p.RefundedAmount), 2);
                     break;
                 }
+                case "portal.accounts-summary":
+                {
+                    unit = "accounts";
+                    List<PatientAccount> accounts = await _dbContext.PatientAccounts
+                        .AsNoTracking()
+                        .Where(a => a.ClinicId == clinicId && !a.IsVoided)
+                        .ToListAsync(cancellationToken);
+
+                    int invited = accounts.Count(a => a.Status == PatientAccountStatus.Invited || a.Status == PatientAccountStatus.PendingEmailConfirmation);
+                    int active = accounts.Count(a => a.Status == PatientAccountStatus.Active);
+                    int disabled = accounts.Count(a => a.Status == PatientAccountStatus.Disabled);
+                    primary = accounts.Count;
+                    breakdown["invited"] = invited;
+                    breakdown["active"] = active;
+                    breakdown["disabled"] = disabled;
+                    break;
+                }
+                case "portal.logins-week":
+                {
+                    unit = "logins";
+                    DateTimeOffset weekStart = end.AddDays(-7);
+                    int logins = await _dbContext.PatientAccessLogs
+                        .AsNoTracking()
+                        .CountAsync(
+                            l => l.ClinicId == clinicId && l.ActorType == "Patient" && l.Reason == "PortalLogin" && l.TimestampUtc >= weekStart && l.TimestampUtc <= end,
+                            cancellationToken);
+                    primary = logins;
+                    breakdown["loginsWeek"] = logins;
+                    break;
+                }
+                case "portal.failed-logins":
+                {
+                    unit = "attempts";
+                    int failed = await _dbContext.PatientAccessLogs
+                        .AsNoTracking()
+                        .CountAsync(
+                            l => l.ClinicId == clinicId && l.ActorType == "Patient" && l.Reason == "PortalLoginFailed" && l.TimestampUtc >= start && l.TimestampUtc <= end,
+                            cancellationToken);
+                    primary = failed;
+                    breakdown["failedLogins"] = failed;
+                    break;
+                }
+                case "portal.record-views-month":
+                {
+                    unit = "patients";
+                    DateTimeOffset monthStart = new DateTimeOffset(end.Year, end.Month, 1, 0, 0, 0, TimeSpan.Zero);
+                    string[] viewReasons =
+                    [
+                        "PortalViewOverview",
+                        "PortalViewRecord",
+                        "PortalListVisits",
+                        "PortalViewVisit",
+                        "PortalViewPlans",
+                        "PortalDownloadPrescriptionPdf",
+                        "PortalDownloadAttachment"
+                    ];
+                    List<string> actorIds = await _dbContext.PatientAccessLogs
+                        .AsNoTracking()
+                        .Where(l => l.ClinicId == clinicId
+                                    && l.ActorType == "Patient"
+                                    && l.TimestampUtc >= monthStart
+                                    && l.TimestampUtc <= end
+                                    && viewReasons.Contains(l.Reason))
+                        .Select(l => l.ActorId)
+                        .ToListAsync(cancellationToken);
+
+                    int distinctPatients = actorIds.Distinct(StringComparer.OrdinalIgnoreCase).Count();
+                    primary = distinctPatients;
+                    breakdown["distinctPatients"] = distinctPatients;
+                    breakdown["totalReadEvents"] = actorIds.Count;
+                    break;
+                }
+                case "portal.access-log-summary":
+                {
+                    unit = "events";
+                    List<PatientAccessLog> logs = await _dbContext.PatientAccessLogs
+                        .AsNoTracking()
+                        .Where(l => l.ClinicId == clinicId && l.ActorType == "Patient" && l.TimestampUtc >= start && l.TimestampUtc <= end)
+                        .ToListAsync(cancellationToken);
+
+                    primary = logs.Count;
+                    breakdown["logins"] = logs.Count(l => l.Reason == "PortalLogin");
+                    breakdown["failedLogins"] = logs.Count(l => l.Reason == "PortalLoginFailed");
+                    breakdown["recordViews"] = logs.Count(l => l.Reason == "PortalViewRecord" || l.Reason == "PortalListVisits" || l.Reason == "PortalViewVisit" || l.Reason == "PortalViewPlans" || l.Reason == "PortalViewOverview");
+                    breakdown["downloads"] = logs.Count(l => l.Reason == "PortalDownloadPrescriptionPdf" || l.Reason == "PortalDownloadAttachment");
+                    break;
+                }
                 default:
                 {
                     breakdown["configured"] = 1m;
