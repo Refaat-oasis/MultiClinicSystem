@@ -272,6 +272,7 @@ builder.Services.AddScoped<ITimeEngineDurationProvider>(sp => (TimeEngineService
 builder.Services.AddScoped<IFinanceExtendedService, FinanceExtendedService>();
 builder.Services.AddScoped<IReportsService, ReportsService>();
 builder.Services.AddScoped<IExcelImportService, ExcelImportService>();
+builder.Services.AddScoped<ISyncService, SyncService>();
 builder.Services.AddScoped<IScheduleRealtimeNotifier, Platform.Api.Hubs.SignalRScheduleRealtimeNotifier>();
 builder.Services.AddSignalR();
 

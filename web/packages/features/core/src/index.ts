@@ -19,5 +19,6 @@ export * from './Phase11PortalBookingScreen';
 export * from './Phase12InventoryScreen';
 export * from './Phase13TimeEngineScreen';
 export * from './Phase14FinanceReportsScreen';
+export * from './Phase15OfflineSyncScreen';
 
 

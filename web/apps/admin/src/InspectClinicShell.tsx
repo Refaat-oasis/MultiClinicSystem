@@ -12,6 +12,7 @@ import {
   Phase12InventoryScreen,
   Phase13TimeEngineScreen,
   Phase14FinanceReportsScreen,
+  Phase15OfflineSyncScreen,
   type AppointmentItem,
   type QueueEntryItem,
   type WaitingListItem,
@@ -25,7 +26,19 @@ import {
   type ClinicInventoryInspectData,
   type ClinicTimeEngineInspectData,
   type ClinicFinanceReportsInspectData,
+  type ClinicSyncSettingData,
+  type SyncDeviceItemData,
+  type SyncConflictItemData,
+  type SyncNumberBlockData,
 } from '@clinic/feature-core';
+
+interface InspectClinicOfflineSyncSnapshot {
+  clinicId: string;
+  settings: ClinicSyncSettingData;
+  devices: SyncDeviceItemData[];
+  conflicts: SyncConflictItemData[];
+  numberBlocks: SyncNumberBlockData[];
+}
 
 interface InspectClinicScheduleSnapshot {
   clinicId: string;
@@ -140,6 +153,13 @@ export const InspectClinicShell: React.FC<InspectClinicShellProps> = ({ clinicId
   const { data: financeReportsSnapshot } = useQuery<ClinicFinanceReportsInspectData>({
     queryKey: ['platform-inspect-finance-reports', clinicId],
     queryFn: () => apiClient.get<ClinicFinanceReportsInspectData>(`/platform/clinics/${clinicId}/inspect/finance-reports`),
+    enabled: Boolean(clinicId),
+    retry: false,
+  });
+
+  const { data: offlineSyncSnapshot } = useQuery<InspectClinicOfflineSyncSnapshot>({
+    queryKey: ['platform-inspect-offline-sync', clinicId],
+    queryFn: () => apiClient.get<InspectClinicOfflineSyncSnapshot>(`/platform/clinics/${clinicId}/inspect/offline-sync`),
     enabled: Boolean(clinicId),
     retry: false,
   });
@@ -279,6 +299,14 @@ export const InspectClinicShell: React.FC<InspectClinicShellProps> = ({ clinicId
           clinicId={clinicId}
           readOnlyInspectMode={true}
           initialInspectSnapshot={financeReportsSnapshot}
+        />
+      )}
+      {clinicId && offlineSyncSnapshot && (
+        <Phase15OfflineSyncScreen
+          clinicId={clinicId}
+          enabledModules={['offline-sync']}
+          readOnlyInspectMode={true}
+          inspectData={offlineSyncSnapshot}
         />
       )}
     </div>

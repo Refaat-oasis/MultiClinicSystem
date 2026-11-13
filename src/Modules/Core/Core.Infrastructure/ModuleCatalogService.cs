@@ -612,16 +612,30 @@ public sealed class ModuleCatalogService : IModuleCatalogService
                 ModuleKey: "offline-sync",
                 TitleAr: "المزامنة دون اتصال",
                 TitleEn: "Offline Sync",
-                DescriptionAr: "العمل دون إنترنت والمزامنة التلقائية.",
-                DescriptionEn: "IndexedDB offline queue and background synchronization.",
+                DescriptionAr: "العمل دون إنترنت والمزامنة التلقائية وحل التعارضات.",
+                DescriptionEn: "IndexedDB offline queue, background synchronization, and conflict resolution.",
                 Prerequisites: Array.Empty<string>(),
                 Permissions:
                 [
-                    new("offline_sync.use", "offline-sync", "Offline Sync", "استخدام المزامنة دون اتصال", "Use Offline Sync", false)
+                    new("offline_sync.use", "offline-sync", "Offline Sync", "استخدام المزامنة دون اتصال", "Use Offline Sync", false),
+                    new("offline_sync.resolve", "offline-sync", "Offline Sync", "حل تعارضات المزامنة", "Resolve Sync Conflicts", false),
+                    new("offline_sync.settings", "offline-sync", "Offline Sync", "إدارة إعدادات المزامنة", "Manage Sync Settings", false)
                 ],
-                MenuItems: Array.Empty<ModuleMenuItemResult>(),
-                SettingsSections: Array.Empty<SettingsSectionResult>(),
-                DashboardWidgets: Array.Empty<DashboardWidgetDefinitionResult>())
+                MenuItems:
+                [
+                    new("offline-sync.dashboard", "offline-sync", "لوحة المزامنة والتعارضات", "Offline Sync & Conflicts", "/offline-sync/dashboard", "offline_sync.use", 250)
+                ],
+                SettingsSections:
+                [
+                    new("offline-sync-settings", "إعدادات المزامنة دون اتصال", "Offline Sync Settings", "offline_sync.settings", "offline-sync")
+                ],
+                DashboardWidgets:
+                [
+                    new("offline-sync.registered-devices", "offline-sync", "offline_sync.use", "Clinic", "الأجهزة المسجلة للمزامنة", "Registered Sync Devices"),
+                    new("offline-sync.last-sync", "offline-sync", "offline_sync.use", "Clinic", "آخر مزامنة", "Last Successful Sync"),
+                    new("offline-sync.pending-operations", "offline-sync", "offline_sync.use", "Clinic", "العمليات المعلقة", "Pending Offline Operations"),
+                    new("offline-sync.open-conflicts", "offline-sync", "offline_sync.use", "Clinic", "تعارضات المزامنة المفتوحة", "Open Sync Conflicts")
+                ])
         ];
     }
 }

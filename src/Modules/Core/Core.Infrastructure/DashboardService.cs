@@ -1155,6 +1155,79 @@ public sealed class DashboardService : IDashboardService
                     breakdown["acceptedRows"] = logs.Sum(b => b.AcceptedRows);
                     break;
                 }
+                case "offline-sync.registered-devices":
+                {
+                    unit = "devices";
+                    List<SyncDeviceState> states = await _dbContext.SyncDeviceStates
+                        .AsNoTracking()
+                        .Where(s => s.ClinicId == clinicId)
+                        .ToListAsync(cancellationToken);
+
+                    List<AppDevice> appDevices = await _dbContext.AppDevices
+                        .AsNoTracking()
+                        .Where(d => !d.IsRevoked)
+                        .ToListAsync(cancellationToken);
+
+                    HashSet<string> activeAppDeviceIds = appDevices
+                        .Select(d => d.DeviceId)
+                        .ToHashSet(StringComparer.Ordinal);
+
+                    int activeSyncDevices = states.Count(s => activeAppDeviceIds.Contains(s.DeviceId) || states.Count > 0);
+                    primary = activeSyncDevices;
+                    breakdown["totalTrackedDevices"] = states.Count;
+                    breakdown["maxClockSkewSecondsObserved"] = states.Count == 0
+                        ? 0
+                        : states.Max(s => s.MaxClockSkewSecondsObserved);
+                    break;
+                }
+                case "offline-sync.last-sync":
+                {
+                    unit = "minutes_ago";
+                    List<SyncDeviceState> states = await _dbContext.SyncDeviceStates
+                        .AsNoTracking()
+                        .Where(s => s.ClinicId == clinicId)
+                        .ToListAsync(cancellationToken);
+
+                    DateTimeOffset? latestSync = states
+                        .Select(s => s.LastPushAtUtc > s.LastPullAtUtc ? s.LastPushAtUtc : (s.LastPullAtUtc ?? s.LastPushAtUtc))
+                        .Where(dt => dt.HasValue)
+                        .OrderByDescending(dt => dt!.Value)
+                        .FirstOrDefault();
+
+                    primary = latestSync.HasValue
+                        ? (decimal)Math.Max(0, Math.Round((_clock.UtcNow - latestSync.Value).TotalMinutes, 1, MidpointRounding.AwayFromZero))
+                        : 0m;
+                    breakdown["devicesWithSync"] = states.Count(s => s.LastPushAtUtc.HasValue || s.LastPullAtUtc.HasValue);
+                    breakdown["hasEverSynced"] = latestSync.HasValue ? 1m : 0m;
+                    break;
+                }
+                case "offline-sync.pending-operations":
+                {
+                    unit = "operations";
+                    List<SyncDeviceState> states = await _dbContext.SyncDeviceStates
+                        .AsNoTracking()
+                        .Where(s => s.ClinicId == clinicId)
+                        .ToListAsync(cancellationToken);
+
+                    int totalPending = states.Sum(s => s.PendingOperationsReported);
+                    primary = totalPending;
+                    breakdown["devicesReportingPending"] = states.Count(s => s.PendingOperationsReported > 0);
+                    break;
+                }
+                case "offline-sync.open-conflicts":
+                {
+                    unit = "conflicts";
+                    List<SyncConflict> conflicts = await _dbContext.SyncConflicts
+                        .AsNoTracking()
+                        .Where(c => c.ClinicId == clinicId)
+                        .ToListAsync(cancellationToken);
+
+                    int openCount = conflicts.Count(c => c.Status == SyncConflictStatus.Open);
+                    primary = openCount;
+                    breakdown["openConflicts"] = openCount;
+                    breakdown["resolvedConflicts"] = conflicts.Count(c => c.Status != SyncConflictStatus.Open);
+                    break;
+                }
                 default:
                 {
                     breakdown["configured"] = 1m;

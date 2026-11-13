@@ -540,3 +540,27 @@ Status: 0 Errors, Clean Build
 - [x] ClosedXML `.xlsx` and deterministic `.pdf` exports reconcile 1:1 with on-screen report numbers.
 - [x] Excel import enforces dry-run validation (0 rows saved on error), module-aware targets (`excel-import`), and atomic `OperationId`-idempotent commits.
 - [x] Phases 0 to 14 cumulative gates, SQL Server RLS/architecture sweeps, and frontend test/lint/build pass 100% green.
+
+
+---
+
+## Phase 15: Offline PWA and Sync (Completed) (DONE)
+- **Branch**: `phase-15/offline-pwa-sync`
+- **Completed Tasks**:
+  - **Domain & Unit Tests (`Core.Domain`, `UnitTests`)**: Added single-type sync enums, entities, and calculator (`SyncConflictClass`, `SyncOperationStatus`, `SyncConflictStatus`, `SyncConflictResolution`, `SyncDeviceState`, `SyncOperationLog`, `SyncConflict`, `ClinicSyncSetting`, `SyncCalculator`) plus 28 domain unit tests in `Phase15SyncDomainTests`.
+  - **Application & Infrastructure (`Core.Application`, `Core.Infrastructure`)**: Added `ISyncService` and 14 single-type input/result models; updated `CoreDbContext` (`sync` schema tables with `IsRowVersion()`, string enums, EF global query filters, and SQL Server RLS `FILTER`/`BLOCK` predicates); implemented `SyncService` (per-`OperationId` idempotency, online-only rejection `ONLINE_ONLY_ACTION_FORBIDDEN`, clock skew detection & `SyncLargeClockSkew` audit, batch failure isolation via `ChangeTracker.Clear()`, sequential replay for patients/bookings/queue/visits/FEFO tools/billing/receipt blocks/LWW clinic settings, cursor-based incremental pull, conflict resolution + audit, revoked device `DEVICE_REVOKED`, and Super Admin read-only `InspectClinicOfflineSyncAsync` + `PatientAccessLog`); added `"offline-sync"` manifest & 4 live `offline-sync.*` dashboard widgets in `ModuleCatalogService` and `DashboardService`.
+  - **API (`Platform.Api`)**: Added `SyncController` (`/api/v1/clinics/{clinicId}/sync/...`), 5 single-type DTOs, 9 single-type ViewModels + `SyncViewModelMapper`, `PlatformClinicsController.InspectOfflineSync`, and `Phase15OfflineSyncTests` + `Phase15Gate`.
+  - **Frontend PWA & E2E (`web/`)**: Configured `VitePWA` / Workbox in `web/apps/clinic/vite.config.ts` (strictly excluding `/c/*/portal` and `/api/*/portal` via `navigateFallbackDenylist` & `NetworkOnly`), added WebCrypto AES-GCM `cryptoStore.ts`, Dexie `ClinicOfflineDb`, `useSyncStatusStore.ts`, `outboxManager.ts` (per-entity ordering, exponential backoff, pre-allocated receipt blocks + provisional fallback, `DEVICE_REVOKED` wipe, logout wipe), `Phase15OfflineSyncScreen.tsx` + tests, header online/pending badge & `'offlineSync'` tab in `web/apps/clinic/src/App.tsx`, Super Admin `InspectClinicShell.tsx` integration, and Playwright offline E2E (`web/e2e/offline-sync.spec.ts`).
+- **Verification Output Summary**:
+  - `dotnet test tests/UnitTests/UnitTests.csproj --no-restore`: `Passed! - Failed: 0, Passed: 194, Skipped: 0, Total: 194`
+  - `dotnet test tests/ArchitectureTests/ArchitectureTests.csproj --no-restore`: `Passed! - Failed: 0, Passed: 15, Skipped: 0, Total: 15`
+  - `dotnet test tests/IntegrationTests/IntegrationTests.csproj --no-restore`: `Passed! - Failed: 0, Passed: 35, Skipped: 0, Total: 35`
+  - `dotnet test tests/Gates/Gates.csproj --no-restore` (Phases 0–15 cumulative): `Passed! - Failed: 0, Passed: 28, Skipped: 0, Total: 28`
+  - Frontend `npm --prefix web test; npm --prefix web run lint; npm --prefix web run build`: `65/65` Vitest tests passed (`admin-app`: 7, `clinic-app`: 5, `api-client`: 7, `ui`: 3, `feature-core`: 43), `tsc --noEmit` 0 errors across all 5 workspaces, Vite production builds & PWA SW generation succeeded for both apps.
+  - Playwright E2E (`npx --prefix web playwright test --config=web/playwright.config.ts`): `1/1` passed (`setOffline(true)` navigation & outbox queueing, portal uncached verification, reconnect flush).
+
+### Phase 15 Exit Checklist
+- [x] Two offline devices sync deterministically: non-overlapping receipt `NumberBlock` ranges, single FEFO stock deduction, idempotent `OperationId` replay, and conflict inbox detection for booking/portal slot clashes.
+- [x] Clinic B isolation (`404`), portal booking precedence, online-only enforcement (`ONLINE_ONLY_ACTION_FORBIDDEN`), and revoked-device IndexedDB wipe (`DEVICE_REVOKED`) verified.
+- [x] Service Worker caches clinic shell cleanly while never caching patient portal routes or endpoints.
+- [x] Phases 0 to 15 cumulative gates, SQL Server RLS/architecture sweeps, Vitest, lint/build, and Playwright offline E2E pass 100% green.

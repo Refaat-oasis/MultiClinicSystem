@@ -445,3 +445,21 @@ All `/api/v1/c/{slug}/portal/**` responses enforce `Cache-Control: no-store`, `P
 - `GET /api/v1/clinics/{clinicId}/import/targets`, `GET .../templates/{targetKind}`, `POST .../{targetKind}/preview`, `POST .../{targetKind}/commit`, & `GET .../history` (`excel_import.execute`): Module-aware Excel import (`Patients`, `InventoryItems`, `Suppliers`), dry-run row/column validation preview (zero database writes when any row fails), atomic idempotent batch commit (`OperationId`), and import batch history.
 - `GET /api/v1/platform/reports/cross-clinic?fromDate=&toDate=` (`PlatformAdmin`, admin host only, `404` elsewhere): Super Admin audited Dapper cross-clinic portfolio financial summary writing `PatientAccessLog`.
 - `GET /api/v1/platform/clinics/{clinicId}/inspect/finance-reports?fromDate=&toDate=` (`PlatformAdmin`, admin host only): Super Admin read-only clinic finance, fixed costs, payroll runs, exports, and import batch snapshot (`PatientAccessLog` via `IPlatformAccess`).
+
+---
+
+## 17. Phase 15: Offline Sync & PWA (`/api/v1/clinics/{clinicId}/sync`)
+
+Requires `"offline-sync"` module enabled, staff clinic membership, and non-revoked approved device (`DEVICE_REVOKED` returns `401`). All endpoints enforce strict tenant isolation (`404` across clinics).
+
+### Sync Endpoints
+- `GET /api/v1/clinics/{clinicId}/sync/settings`: Returns `ClinicSyncSettingViewModel` (`offlineSessionMaxHours`, `receiptBlockSize`, `receiptBlockLowWaterMark`, `clockSkewWarningSeconds`).
+- `PUT /api/v1/clinics/{clinicId}/sync/settings` (`offline_sync.settings`): Updates clinic offline sync policy thresholds (audited).
+- `POST /api/v1/clinics/{clinicId}/sync/number-blocks` (`offline_sync.use`): Allocates an atomic non-overlapping receipt or patient file number block for the device (`sp_getapplock` + `Serializable`).
+- `GET /api/v1/clinics/{clinicId}/sync/number-blocks` (`offline_sync.use`): Lists allocated number blocks for the clinic/device.
+- `POST /api/v1/clinics/{clinicId}/sync/push` (`offline_sync.use`): Replays offline mutations sequentially with per-`OperationId` idempotency (`Applied` / `DuplicateIgnored` / `Conflict` / `Rejected`), rejects online-only actions (`ONLINE_ONLY_ACTION_FORBIDDEN`), enforces server-validated booking/portal/FEFO/receipt rules, records `SyncLastWriterWinsOverwrite` or `SyncLargeClockSkew` audits, and returns `SyncPushBatchViewModel`.
+- `GET /api/v1/clinics/{clinicId}/sync/pull?cursor=&limit=&deviceId=` (`offline_sync.use`): Returns incremental clinic change feed items after `cursor` (`SyncPullResponseViewModel`).
+- `GET /api/v1/clinics/{clinicId}/sync/conflicts?status=` (`offline_sync.use`): Lists offline sync conflicts (filterable by `Open`, `ResolvedKeepServer`, `Dismissed`).
+- `POST /api/v1/clinics/{clinicId}/sync/conflicts/{conflictId}/resolve` (`offline_sync.resolve`): Resolves or dismisses an open sync conflict with optional `resolutionNote` (audited).
+- `GET /api/v1/clinics/{clinicId}/sync/devices` (`offline_sync.use`): Lists tracked device sync cursors, max clock skew observed, pending counts, and revocation state.
+- `GET /api/v1/platform/clinics/{clinicId}/inspect/offline-sync` (`PlatformAdmin`, admin host only): Super Admin read-only offline sync devices, conflicts, number blocks, and settings snapshot (`PatientAccessLog` via `IPlatformAccess`).

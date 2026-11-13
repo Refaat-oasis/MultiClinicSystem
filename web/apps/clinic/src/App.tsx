@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { GlassCard, GlassButton, ThemeToggle, LanguageSwitcher } from '@clinic/ui';
-import { apiClient } from '@clinic/api-client';
+import { apiClient, useSyncStatusStore, flushOutbox, refreshSyncCounters } from '@clinic/api-client';
 import {
   useAuthStore,
   LoginScreen,
@@ -29,6 +29,7 @@ import {
   Phase12InventoryScreen,
   Phase13TimeEngineScreen,
   Phase14FinanceReportsScreen,
+  Phase15OfflineSyncScreen,
   type PatientSummaryItem,
   type PatientDetailData,
   type PatientScopingSettings,
@@ -70,6 +71,9 @@ import {
   ClipboardList,
   Package,
   Clock,
+  Wifi,
+  WifiOff,
+  RefreshCw,
 } from 'lucide-react';
 
 interface HealthStatus {
@@ -100,6 +104,7 @@ type ActiveTab =
   | 'inventory'
   | 'timeEngine'
   | 'financeReports'
+  | 'offlineSync'
   | 'portfolio'
   | 'profile'
   | 'health';
@@ -147,6 +152,27 @@ export const App: React.FC = () => {
   });
 
   const activeClinic = clinics.find((c) => c.clinicId === activeClinicId) ?? clinics[0] ?? null;
+  const { isOnline, pendingCount, provisionalReceiptsCount, isSyncing, setOnline } = useSyncStatusStore();
+
+  useEffect(() => {
+    const clinicKey = activeClinic?.clinicId ?? 'clinic-1';
+    refreshSyncCounters(clinicKey).catch(() => undefined);
+
+    const handleOnline = () => {
+      setOnline(true);
+      flushOutbox(clinicKey, 'web-browser').catch(() => undefined);
+    };
+    const handleOffline = () => {
+      setOnline(false);
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [activeClinic?.clinicId, setOnline]);
 
   const onboardingState: OnboardingWizardState = activeClinic
     ? {
@@ -327,6 +353,42 @@ export const App: React.FC = () => {
               </button>
             </div>
           )}
+          <div
+            role="status"
+            aria-label="حالة الاتصال والمزامنة"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.45rem',
+              paddingInline: '0.65rem',
+              paddingBlock: '0.35rem',
+              borderRadius: '0.5rem',
+              fontSize: '0.8125rem',
+              backgroundColor: isOnline ? 'rgba(16, 185, 129, 0.12)' : 'rgba(245, 158, 11, 0.15)',
+              border: isOnline ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(245, 158, 11, 0.35)',
+              color: isOnline ? '#047857' : '#b45309',
+            }}
+          >
+            {isOnline ? <Wifi size={15} /> : <WifiOff size={15} />}
+            <span>{isOnline ? 'متصل' : 'وضع عدم الاتصال'}</span>
+            {pendingCount > 0 && (
+              <span
+                data-testid="pending-sync-badge"
+                style={{
+                  paddingInline: '0.4rem',
+                  paddingBlock: '1px',
+                  borderRadius: '9999px',
+                  backgroundColor: 'var(--color-accent-teal)',
+                  color: '#fff',
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                }}
+              >
+                {pendingCount} معلق{provisionalReceiptsCount > 0 ? ` (${provisionalReceiptsCount} مؤقت)` : ''}
+              </span>
+            )}
+            {isSyncing && <RefreshCw size={14} className="animate-spin" />}
+          </div>
           <LanguageSwitcher />
           <ThemeToggle />
         </div>
@@ -532,6 +594,15 @@ export const App: React.FC = () => {
         >
           <BarChart3 size={16} />
           المالية والتقارير
+        </GlassButton>
+
+        <GlassButton
+          aria-label="تبويب المزامنة والعمل دون اتصال"
+          variant={activeTab === 'offlineSync' ? 'prominent' : 'default'}
+          onClick={() => setActiveTab('offlineSync')}
+        >
+          <RefreshCw size={16} />
+          المزامنة دون اتصال
         </GlassButton>
 
         <GlassButton
@@ -895,6 +966,12 @@ export const App: React.FC = () => {
         )}
         {activeTab === 'financeReports' && (
           <Phase14FinanceReportsScreen clinicId={activeClinic?.clinicId ?? 'clinic-1'} />
+        )}
+        {activeTab === 'offlineSync' && (
+          <Phase15OfflineSyncScreen
+            clinicId={activeClinic?.clinicId ?? 'clinic-1'}
+            enabledModules={activeClinic?.modulesEnabled ?? ['offline-sync']}
+          />
         )}
 
         {activeTab === 'portfolio' && (

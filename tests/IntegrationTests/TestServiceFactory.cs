@@ -133,6 +133,7 @@ public static class TestServiceFactory
         services.AddScoped<IFinanceExtendedService, FinanceExtendedService>();
         services.AddScoped<IReportsService, ReportsService>();
         services.AddScoped<IExcelImportService, ExcelImportService>();
+        services.AddScoped<ISyncService, SyncService>();
 
         var provider = services.BuildServiceProvider();
         return (provider, emailSender);
