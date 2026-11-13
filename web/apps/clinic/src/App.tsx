@@ -27,6 +27,7 @@ import {
   Phase10PortalScreen,
   Phase11PortalBookingScreen,
   Phase12InventoryScreen,
+  Phase13TimeEngineScreen,
   type PatientSummaryItem,
   type PatientDetailData,
   type PatientScopingSettings,
@@ -67,6 +68,7 @@ import {
   Receipt,
   ClipboardList,
   Package,
+  Clock,
 } from 'lucide-react';
 
 interface HealthStatus {
@@ -95,6 +97,7 @@ type ActiveTab =
   | 'portal'
   | 'portalBooking'
   | 'inventory'
+  | 'timeEngine'
   | 'portfolio'
   | 'profile'
   | 'health';
@@ -512,6 +515,14 @@ export const App: React.FC = () => {
           <Package size={16} />
           المخزون
         </GlassButton>
+        <GlassButton
+          aria-label="تبويب محرك الزمن"
+          variant={activeTab === 'timeEngine' ? 'prominent' : 'default'}
+          onClick={() => setActiveTab('timeEngine')}
+        >
+          <Clock size={16} />
+          محرك الزمن
+        </GlassButton>
 
         <GlassButton
           aria-label="تبويب المحفظة والمؤشرات"
@@ -868,6 +879,9 @@ export const App: React.FC = () => {
         )}
         {activeTab === 'inventory' && (
           <Phase12InventoryScreen clinicId={activeClinic?.clinicId ?? 'clinic-1'} />
+        )}
+        {activeTab === 'timeEngine' && (
+          <Phase13TimeEngineScreen clinicId={activeClinic?.clinicId ?? 'clinic-1'} />
         )}
 
         {activeTab === 'portfolio' && (

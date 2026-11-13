@@ -470,21 +470,27 @@ public sealed class ModuleCatalogService : IModuleCatalogService
                 ModuleKey: "time-engine",
                 TitleAr: "محرك الزمن ومؤشرات التاخير",
                 TitleEn: "Time & Delay Analytics",
-                DescriptionAr: "تحليل أزمنة الانتظار ومعدلات الالتزام.",
-                DescriptionEn: "Visit durations, waiting delays, and doctor utilization.",
+                DescriptionAr: "تحليل أزمنة الانتظار ومعدلات الالتزام وحساب المدة المتكيفة لكل طبيب.",
+                DescriptionEn: "Adaptive per-doctor session duration learning, overtime excuses, and waiting analytics.",
                 Prerequisites: ["scheduling", "clinical"],
                 Permissions:
                 [
-                    new("time_engine.read", "time-engine", "Time Analytics", "عرض مؤشرات الزمن", "View Time Analytics", false)
+                    new("time_engine.read", "time-engine", "Time Analytics", "عرض محرك الزمن", "View Time Engine", false),
+                    new("time_engine.manage", "time-engine", "Time Analytics", "إدارة إعدادات محرك الزمن", "Manage Time Engine Settings", false),
+                    new("time_engine.dashboard.view", "time-engine", "Time Analytics", "عرض لوحة محرك الزمن", "View Time Engine Dashboard", false)
                 ],
                 MenuItems:
                 [
-                    new("time-engine.metrics", "time-engine", "محرك الزمن", "Time Engine", "/time-engine", "time_engine.read", 210)
+                    new("time-engine.metrics", "time-engine", "محرك الزمن", "Time Engine", "/time-engine", "time_engine.read", 210),
+                    new("time-engine.dashboard", "time-engine", "لوحة محرك الزمن", "Time Engine Dashboard", "/time-engine/dashboard", "time_engine.dashboard.view", 211)
                 ],
                 SettingsSections: Array.Empty<SettingsSectionResult>(),
                 DashboardWidgets:
                 [
-                    new("time-engine.avg-wait", "time-engine", "time_engine.read", "Clinic", "متوسط الانتظار", "Average Wait Minutes")
+                    new("time-engine.avg-wait", "time-engine", "time_engine.read", "Clinic", "متوسط الانتظار", "Average Wait Minutes"),
+                    new("time-engine.suggested-vs-applied", "time-engine", "time_engine.dashboard.view", "Clinic", "المدة المقترحة مقابل المطبقة", "Suggested vs Applied Duration"),
+                    new("time-engine.sample-counts", "time-engine", "time_engine.dashboard.view", "Clinic", "عينات محرك الزمن", "Time Engine Sample Counts"),
+                    new("time-engine.adoption-rate", "time-engine", "time_engine.dashboard.view", "Clinic", "معدل اعتماد المحرك", "Time Engine Adoption Rate")
                 ]),
 
             new ModuleManifestEntry(

@@ -14,5 +14,6 @@ public sealed class StartVisitDto
     public int? PlannedDurationMinutes { get; set; }
     public bool IsVisibleToPatient { get; set; } = true;
     public Guid? OperationId { get; set; }
+    public Guid? CategoryId { get; set; }
 }
 

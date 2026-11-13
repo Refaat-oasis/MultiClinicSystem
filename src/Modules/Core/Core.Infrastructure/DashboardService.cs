@@ -865,6 +865,110 @@ public sealed class DashboardService : IDashboardService
                     breakdown["itemsCurrentlyNegative"] = currentlyNegative;
                     break;
                 }
+                case "time-engine.avg-wait":
+                {
+                    unit = "minutes";
+                    List<QueueEntry> queueRows = await _dbContext.QueueEntries
+                        .AsNoTracking()
+                        .Where(q => q.ClinicId == clinicId
+                                    && !q.IsVoided
+                                    && q.ArrivedAtUtc.HasValue
+                                    && (q.ServedAtUtc.HasValue || q.CalledAtUtc.HasValue)
+                                    && q.CreatedAtUtc >= start
+                                    && q.CreatedAtUtc <= end)
+                        .ToListAsync(cancellationToken);
+
+                    decimal avgWait = queueRows.Count == 0
+                        ? 0m
+                        : decimal.Round(
+                            (decimal)queueRows.Average(q => Math.Max(0.0, ((q.ServedAtUtc ?? q.CalledAtUtc)!.Value - q.ArrivedAtUtc!.Value).TotalMinutes)),
+                            2,
+                            MidpointRounding.AwayFromZero);
+
+                    primary = avgWait;
+                    breakdown["averageWaitMinutes"] = avgWait;
+                    breakdown["measuredAppointments"] = queueRows.Count;
+                    break;
+                }
+                case "time-engine.suggested-vs-applied":
+                {
+                    unit = "minutes";
+                    List<CategoryTimeStat> stats = await _dbContext.CategoryTimeStats
+                        .AsNoTracking()
+                        .Where(s => s.ClinicId == clinicId && !s.IsVoided)
+                        .ToListAsync(cancellationToken);
+
+                    List<DoctorTimeEngineSetting> docSettings = await _dbContext.DoctorTimeEngineSettings
+                        .AsNoTracking()
+                        .Where(d => d.ClinicId == clinicId && !d.IsVoided)
+                        .ToListAsync(cancellationToken);
+
+                    Dictionary<Guid, bool> enabledByDoc = docSettings.ToDictionary(d => d.DoctorId, d => d.IsEngineEnabled);
+                    List<AppointmentCategory> categories = await _dbContext.AppointmentCategories
+                        .AsNoTracking()
+                        .Where(c => c.ClinicId == clinicId && !c.IsVoided)
+                        .ToListAsync(cancellationToken);
+                    Dictionary<Guid, int> defaults = categories.ToDictionary(c => c.Id, c => c.DefaultDurationMinutes);
+
+                    decimal avgSuggested = stats.Count == 0
+                        ? 0m
+                        : decimal.Round((decimal)stats.Average(s => s.SuggestedDurationMinutes), 2, MidpointRounding.AwayFromZero);
+                    decimal avgApplied = stats.Count == 0
+                        ? 0m
+                        : decimal.Round(
+                            (decimal)stats.Average(s => enabledByDoc.TryGetValue(s.DoctorId, out bool en) && en
+                                ? s.AppliedDurationMinutes
+                                : (defaults.TryGetValue(s.CategoryId, out int defDur) ? defDur : s.AppliedDurationMinutes)),
+                            2,
+                            MidpointRounding.AwayFromZero);
+
+                    primary = avgApplied;
+                    breakdown["averageSuggestedMinutes"] = avgSuggested;
+                    breakdown["averageAppliedMinutes"] = avgApplied;
+                    breakdown["trackedPairs"] = stats.Count;
+                    break;
+                }
+                case "time-engine.sample-counts":
+                {
+                    unit = "sessions";
+                    List<SessionDuration> durations = await _dbContext.SessionDurations
+                        .AsNoTracking()
+                        .Where(d => d.ClinicId == clinicId && !d.IsVoided)
+                        .ToListAsync(cancellationToken);
+
+                    int total = durations.Count;
+                    int excused = durations.Count(d => d.IsExcused);
+                    int active = total - excused;
+                    primary = active;
+                    breakdown["activeSampleCount"] = active;
+                    breakdown["excusedSampleCount"] = excused;
+                    breakdown["totalRecordedSessions"] = total;
+                    break;
+                }
+                case "time-engine.adoption-rate":
+                {
+                    unit = "percent";
+                    List<ClinicDoctor> doctors = await _dbContext.ClinicDoctors
+                        .AsNoTracking()
+                        .Where(d => d.ClinicId == clinicId && !d.IsVoided && d.IsActive)
+                        .ToListAsync(cancellationToken);
+
+                    List<DoctorTimeEngineSetting> settings = await _dbContext.DoctorTimeEngineSettings
+                        .AsNoTracking()
+                        .Where(s => s.ClinicId == clinicId && !s.IsVoided)
+                        .ToListAsync(cancellationToken);
+
+                    int enabledDoctors = settings.Count(s => s.IsEngineEnabled && doctors.Any(d => d.Id == s.DoctorId));
+                    decimal adoptionRate = doctors.Count == 0
+                        ? 0m
+                        : decimal.Round((enabledDoctors * 100m) / doctors.Count, 2, MidpointRounding.AwayFromZero);
+
+                    primary = adoptionRate;
+                    breakdown["adoptionPercent"] = adoptionRate;
+                    breakdown["enabledDoctorsCount"] = enabledDoctors;
+                    breakdown["totalActiveDoctors"] = doctors.Count;
+                    break;
+                }
                 default:
                 {
                     breakdown["configured"] = 1m;

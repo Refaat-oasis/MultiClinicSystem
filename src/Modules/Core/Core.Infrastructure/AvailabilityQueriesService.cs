@@ -1,6 +1,7 @@
 using BuildingBlocks.Application;
 using BuildingBlocks.Domain;
 using Core.Application;
+using Core.Contracts;
 using Core.Domain;
 using Microsoft.EntityFrameworkCore;
 
@@ -16,17 +17,20 @@ public sealed class AvailabilityQueriesService : IAvailabilityQueries
     private readonly CurrentClinicContext _currentClinicContext;
     private readonly IClinicAuthorizationService _authorizationService;
     private readonly IClock _clock;
+    private readonly ITimeEngineDurationProvider? _timeEngineDurationProvider;
 
     public AvailabilityQueriesService(
         CoreDbContext dbContext,
         CurrentClinicContext currentClinicContext,
         IClinicAuthorizationService authorizationService,
-        IClock clock)
+        IClock clock,
+        ITimeEngineDurationProvider? timeEngineDurationProvider = null)
     {
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _currentClinicContext = currentClinicContext ?? throw new ArgumentNullException(nameof(currentClinicContext));
         _authorizationService = authorizationService ?? throw new ArgumentNullException(nameof(authorizationService));
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
+        _timeEngineDurationProvider = timeEngineDurationProvider;
     }
 
     public async Task<Result<IReadOnlyList<FreeSlotItemResult>>> GetFreeSlotsAsync(
@@ -134,6 +138,10 @@ public sealed class AvailabilityQueriesService : IAvailabilityQueries
                     SchedulingProjectionHelper.GetPrimarySpecialty(d)))
                 .ToList();
 
+            IReadOnlyDictionary<Guid, int>? durationOverrides = _timeEngineDurationProvider != null
+                ? await _timeEngineDurationProvider.GetAppliedDurationsByDoctorAsync(clinicId, categoryId, cancellationToken)
+                : null;
+
             TimeZoneInfo tz = ClinicTimeZoneResolver.Resolve(clinic.TimeZone);
             IReadOnlyList<AvailableSlotCandidate> candidates = AvailabilityCalculator.ComputeFreeSlots(
                 fromUtc,
@@ -146,7 +154,8 @@ public sealed class AvailabilityQueriesService : IAvailabilityQueries
                 doctorProfiles,
                 workingHours,
                 daysOff,
-                busy);
+                busy,
+                durationOverrides);
 
             Dictionary<Guid, ClinicDoctor> doctorLookup = doctors.ToDictionary(d => d.Id);
             List<FreeSlotItemResult> output = candidates
@@ -154,6 +163,7 @@ public sealed class AvailabilityQueriesService : IAvailabilityQueries
                 {
                     ClinicDoctor doc = doctorLookup[c.DoctorId];
                     string? roomCode = c.RoomId.HasValue && roomCodes.TryGetValue(c.RoomId.Value, out string? rc) ? rc : null;
+                    int slotMinutes = (int)Math.Round((c.EndUtc - c.StartUtc).TotalMinutes);
                     return new FreeSlotItemResult(
                         c.DoctorId,
                         doc.FullName,
@@ -162,7 +172,7 @@ public sealed class AvailabilityQueriesService : IAvailabilityQueries
                         roomCode,
                         c.StartUtc,
                         c.EndUtc,
-                        category.DefaultDurationMinutes);
+                        slotMinutes);
                 })
                 .ToList();
 

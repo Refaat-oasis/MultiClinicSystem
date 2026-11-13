@@ -60,7 +60,8 @@ public sealed class ClinicalController : ControllerBase
             dto.RoomId,
             dto.PlannedDurationMinutes,
             dto.IsVisibleToPatient,
-            dto.OperationId);
+            dto.OperationId,
+            dto.CategoryId);
 
         var result = await _clinicalService.StartOrResumeVisitAsync(
             userId, clinicId, input, GetDeviceId(), GetIp(), GetRequestId(), cancellationToken);

@@ -89,6 +89,10 @@ public sealed class CoreDbContext : IdentityDbContext<AppUser, AppRole, Guid>
     public DbSet<PurchaseInvoiceLine> PurchaseInvoiceLines => Set<PurchaseInvoiceLine>();
     public DbSet<ClinicInventorySetting> ClinicInventorySettings => Set<ClinicInventorySetting>();
     public DbSet<InventoryAlert> InventoryAlerts => Set<InventoryAlert>();
+    public DbSet<SessionDuration> SessionDurations => Set<SessionDuration>();
+    public DbSet<CategoryTimeStat> CategoryTimeStats => Set<CategoryTimeStat>();
+    public DbSet<DoctorTimeEngineSetting> DoctorTimeEngineSettings => Set<DoctorTimeEngineSetting>();
+    public DbSet<ClinicTimeEngineSetting> ClinicTimeEngineSettings => Set<ClinicTimeEngineSetting>();
 
     public CoreDbContext(DbContextOptions<CoreDbContext> options, ICurrentClinic currentClinic)
         : base(options)
@@ -1288,6 +1292,59 @@ public sealed class CoreDbContext : IdentityDbContext<AppUser, AppRole, Guid>
             b.HasIndex(x => new { x.ClinicId, x.IsResolved, x.Kind });
             b.HasQueryFilter(x => _currentClinic.IsPlatformAdmin || x.ClinicId == _currentClinic.ClinicId);
         });
+
+        // SessionDurations tenant table (time_engine schema)
+        builder.Entity<SessionDuration>(b =>
+        {
+            b.ToTable("SessionDurations", "time_engine");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.ExcuseReason).HasMaxLength(500);
+            b.Property(x => x.VoidedBy).HasMaxLength(128);
+            b.Property(x => x.VoidReason).HasMaxLength(500);
+            b.Property(x => x.RowVersion).IsRowVersion();
+            b.HasIndex(x => new { x.ClinicId, x.VisitId }).IsUnique();
+            b.HasIndex(x => new { x.ClinicId, x.DoctorId, x.CategoryId });
+            b.HasQueryFilter(x => _currentClinic.IsPlatformAdmin || x.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // CategoryTimeStats tenant table (time_engine schema)
+        builder.Entity<CategoryTimeStat>(b =>
+        {
+            b.ToTable("CategoryTimeStats", "time_engine");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.TrimmedAverageMinutes).HasPrecision(10, 2);
+            b.Property(x => x.VoidedBy).HasMaxLength(128);
+            b.Property(x => x.VoidReason).HasMaxLength(500);
+            b.Property(x => x.RowVersion).IsRowVersion();
+            b.HasIndex(x => new { x.ClinicId, x.DoctorId, x.CategoryId }).IsUnique();
+            b.HasQueryFilter(x => _currentClinic.IsPlatformAdmin || x.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // DoctorTimeEngineSettings tenant table (time_engine schema)
+        builder.Entity<DoctorTimeEngineSetting>(b =>
+        {
+            b.ToTable("DoctorTimeEngineSettings", "time_engine");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.VoidedBy).HasMaxLength(128);
+            b.Property(x => x.VoidReason).HasMaxLength(500);
+            b.Property(x => x.RowVersion).IsRowVersion();
+            b.HasIndex(x => new { x.ClinicId, x.DoctorId }).IsUnique();
+            b.HasQueryFilter(x => _currentClinic.IsPlatformAdmin || x.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // ClinicTimeEngineSettings tenant table (time_engine schema)
+        builder.Entity<ClinicTimeEngineSetting>(b =>
+        {
+            b.ToTable("ClinicTimeEngineSettings", "time_engine");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.TrimFraction).HasPrecision(5, 2);
+            b.Property(x => x.MaxStepChangePercent).HasPrecision(5, 2);
+            b.Property(x => x.VoidedBy).HasMaxLength(128);
+            b.Property(x => x.VoidReason).HasMaxLength(500);
+            b.Property(x => x.RowVersion).IsRowVersion();
+            b.HasIndex(x => x.ClinicId).IsUnique();
+            b.HasQueryFilter(x => _currentClinic.IsPlatformAdmin || x.ClinicId == _currentClinic.ClinicId);
+        });
     }
 
     /// <summary>
@@ -1446,7 +1503,15 @@ public sealed class CoreDbContext : IdentityDbContext<AppUser, AppRole, Guid>
                 ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON inventory.ClinicInventorySettings,
                 ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON inventory.ClinicInventorySettings,
                 ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON inventory.InventoryAlerts,
-                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON inventory.InventoryAlerts
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON inventory.InventoryAlerts,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON time_engine.SessionDurations,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON time_engine.SessionDurations,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON time_engine.CategoryTimeStats,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON time_engine.CategoryTimeStats,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON time_engine.DoctorTimeEngineSettings,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON time_engine.DoctorTimeEngineSettings,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON time_engine.ClinicTimeEngineSettings,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON time_engine.ClinicTimeEngineSettings
                 WITH (STATE = ON);
             ');
         ";

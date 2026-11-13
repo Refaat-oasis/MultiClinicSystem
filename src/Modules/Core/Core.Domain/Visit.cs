@@ -10,6 +10,7 @@ public sealed class Visit : ITenantEntity
     public Guid Id { get; private set; }
     public Guid ClinicId { get; set; }
     public Guid? AppointmentId { get; private set; }
+    public Guid? CategoryId { get; private set; }
     public Guid PatientId { get; private set; }
     public Guid DoctorId { get; private set; }
     public string SpecialtyCode { get; private set; } = string.Empty;
@@ -142,6 +143,11 @@ public sealed class Visit : ITenantEntity
     {
         IsVisibleToPatient = visible;
         UpdatedAtUtc = updatedAtUtc.ToUniversalTime();
+    }
+
+    public void SetCategoryId(Guid? categoryId)
+    {
+        CategoryId = categoryId.HasValue && categoryId.Value != Guid.Empty ? categoryId.Value : null;
     }
 }
 
