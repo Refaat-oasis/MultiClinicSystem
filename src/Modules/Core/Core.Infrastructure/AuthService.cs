@@ -123,7 +123,9 @@ public sealed class AuthService : IAuthService
 
         if (device == null)
         {
-            device = new AppDevice(GuidV7.NewGuid(), user.Id, cleanDeviceId, deviceName ?? "Web Browser", _clock.UtcNow);
+            bool isOwnerAccount = owner != null || await _dbContext.UserClinics
+                .AnyAsync(uc => uc.UserId == user.Id && uc.Role == "Owner", cancellationToken);
+            device = new AppDevice(GuidV7.NewGuid(), user.Id, cleanDeviceId, deviceName ?? "Web Browser", _clock.UtcNow, isApproved: isOwnerAccount);
             _dbContext.AppDevices.Add(device);
             await _dbContext.SaveChangesAsync(cancellationToken);
         }
@@ -247,9 +249,11 @@ public sealed class AuthService : IAuthService
         user.IsActive = true;
         await _userManager.UpdateAsync(user);
 
-        // Register device
+        // Register device (owners auto-approve their primary device; staff devices require owner approval)
         string cleanDeviceId = string.IsNullOrWhiteSpace(deviceId) ? Guid.NewGuid().ToString("N") : deviceId.Trim();
-        var device = new AppDevice(GuidV7.NewGuid(), user.Id, cleanDeviceId, deviceName ?? "Web Browser", _clock.UtcNow);
+        bool isOwnerAccount = await _dbContext.Owners.AnyAsync(o => o.UserId == user.Id, cancellationToken) ||
+                              await _dbContext.UserClinics.AnyAsync(uc => uc.UserId == user.Id && uc.Role == "Owner", cancellationToken);
+        var device = new AppDevice(GuidV7.NewGuid(), user.Id, cleanDeviceId, deviceName ?? "Web Browser", _clock.UtcNow, isApproved: isOwnerAccount);
         _dbContext.AppDevices.Add(device);
         await _dbContext.SaveChangesAsync(cancellationToken);
 

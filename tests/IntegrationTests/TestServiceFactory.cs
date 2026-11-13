@@ -100,12 +100,17 @@ public static class TestServiceFactory
         services.AddScoped<IPlatformAccess, PlatformAccessService>();
         services.AddSingleton<IFileStorage, LocalFileStorage>();
         services.AddSingleton<ISpecialtyCatalog, SpecialtyCatalog>();
+        services.AddSingleton<IModuleCatalogService, ModuleCatalogService>();
         services.AddSingleton<ISettingsSectionRegistry, SettingsSectionRegistry>();
         services.AddScoped<IHourlyTotpService, HourlyTotpService>();
         services.AddScoped<IPlatformAdminAuthService, PlatformAdminAuthService>();
         services.AddScoped<IPlatformAdminService, PlatformAdminService>();
         services.AddScoped<IClinicManagementService, ClinicManagementService>();
         services.AddScoped<IProfileService, ProfileService>();
+        services.AddScoped<IClinicAuthorizationService, ClinicAuthorizationService>();
+        services.AddScoped<IDashboardService, DashboardService>();
+        services.AddScoped<IOwnerPortfolio, OwnerPortfolioService>();
+        services.AddScoped<IClinicStructureService, ClinicStructureService>();
 
         var provider = services.BuildServiceProvider();
         return (provider, emailSender);

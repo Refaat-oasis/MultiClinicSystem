@@ -8,5 +8,6 @@ export * from './ClinicSwitcher';
 export * from './OnboardingWizardScreen';
 export * from './ClinicSettingsScreen';
 export * from './UserProfileScreen';
+export * from './Phase4Screens';
 
 

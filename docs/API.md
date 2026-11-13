@@ -274,3 +274,45 @@
 - `POST /api/v1/profile/confirm-email-change`: Verifies code, updates email, rotates `SecurityStamp`, revokes old refresh tokens, notifies old email address, and returns fresh `TokenResult`.
 - `POST /api/v1/profile/change-password`: Validates current password + policy, rotates `SecurityStamp`, optionally signs out other devices (`SignOutOtherDevices`), and returns fresh `TokenResult`.
 - `DELETE /api/v1/profile/devices/{deviceId}`: Revokes user device and its active refresh tokens.
+
+---
+
+## 6. Modules, Roles & Claims, Dashboards, Owner Portfolio & Clinic Structure
+
+### Platform Module Administration (Admin Host Only — `PlatformAdmin`)
+- `GET /api/v1/platform/clinics/{clinicId}/modules`: Lists all 16 switchable modules with `Enabled` state, `Prerequisites`, `MissingPrerequisites`, `EnabledDependents`, timestamps, and notes.
+- `PUT /api/v1/platform/clinics/{clinicId}/modules`: Step-up protected toggle endpoint (`UpdateClinicModulesDto`). Validates prerequisite graph (`409 MODULE_PREREQUISITE_OFF`, `409 MODULE_HAS_DEPENDENTS`), emits transactional outbox `ClinicModuleChanged`, and writes `AuditLog`.
+
+### Clinic Read-Only Module Manifest (`/api/v1/clinics/{clinicId}/modules`)
+- `GET /api/v1/clinics/{clinicId}/modules`: Returns `MyModulesManifestViewModel` with read-only module flags, active menu items filtered by `(enabled modules ∩ effective permissions)`, settings sections, and effective permissions.
+- `PUT /api/v1/clinics/{clinicId}/modules`: Always returns `403 FORBIDDEN_SUPER_ADMIN_ONLY`.
+
+### Roles, Permissions, Staff & Device Approval (`/api/v1/clinics/{clinicId}/...`)
+- `GET /api/v1/clinics/{clinicId}/permissions/catalog`: Returns full permission catalog (`PermissionDefinitionViewModel[]`).
+- `GET /api/v1/clinics/{clinicId}/permissions/me`: Returns caller's `EffectivePermissions`, `DormantPermissions`, and `EnabledModules`.
+- `GET /api/v1/clinics/{clinicId}/roles`: Lists built-in (`Owner`, `Doctor`, `Assistant`, `Receptionist`) and custom clinic roles.
+- `POST /api/v1/clinics/{clinicId}/roles`: Creates custom role (enforcing reserved owner permissions & delegation ceiling).
+- `POST /api/v1/clinics/{clinicId}/roles/{roleId}/clone`: Clones an existing role while stripping owner-reserved claims.
+- `PUT /api/v1/clinics/{clinicId}/roles/{roleId}/permissions`: Updates role permissions (`403 RESERVED_PERMISSION_FORBIDDEN`, `403 DELEGATION_CEILING_EXCEEDED`).
+- `DELETE /api/v1/clinics/{clinicId}/roles/{roleId}`: Soft-voids an unused custom role.
+- `GET /api/v1/clinics/{clinicId}/staff`: Lists clinic staff with effective/dormant permissions and individual overrides.
+- `POST /api/v1/clinics/{clinicId}/staff/invite`: Invites staff under a clinic role with a 6-digit email activation code.
+- `PUT /api/v1/clinics/{clinicId}/staff/{staffUserId}/role`: Reassigns staff role (`409 LAST_OWNER_PROTECTED` prevents demoting owner).
+- `PUT /api/v1/clinics/{clinicId}/staff/{staffUserId}/overrides`: Sets per-user `Grant` / `Deny` overrides (`Deny` wins; delegation ceiling enforced).
+- `DELETE /api/v1/clinics/{clinicId}/staff/{staffUserId}`: Removes staff membership (`409 LAST_OWNER_PROTECTED` prevents removing primary owner).
+- `GET /api/v1/clinics/{clinicId}/devices`: Lists devices across clinic staff (`isApproved`, `isRevoked`).
+- `POST /api/v1/clinics/{clinicId}/devices/{targetDeviceId}/approve`: Owner/manager approves a non-owner staff device (`DEVICE_APPROVAL_REQUIRED` enforced until approved).
+
+### Dashboards & Multi-Clinic Owner Portfolio
+- `GET /api/v1/clinics/{clinicId}/dashboards/widgets`: Returns authorized widgets for enabled modules and user layout.
+- `GET /api/v1/clinics/{clinicId}/dashboards/widgets/{widgetKey}?from=...&to=...&scope=...`: Queries aggregate-only widget metrics (`403 MODULE_DISABLED`, `403 FORBIDDEN_PERMISSION`, `400 WIDGET_DATE_RANGE_EXCEEDED` over 366 days).
+- `PUT /api/v1/clinics/{clinicId}/dashboards/layout`: Saves user pinned widgets layout.
+- `GET /api/v1/portfolio?clinicIds=...&from=...&to=...`: Owner-only aggregate portfolio executed sequentially under each owned clinic's SQL Server RLS tenant context (`404 CLINIC_NOT_FOUND` for any non-owned clinic ID).
+
+### Clinic Structure, Atomic Number Blocks & Owner Audit Viewer (`/api/v1/clinics/{clinicId}/...`)
+- `GET/POST/PUT/DELETE /api/v1/clinics/{clinicId}/rooms`: Clinic room management.
+- `GET/POST/PUT/DELETE /api/v1/clinics/{clinicId}/doctors`: Clinic doctors, assigned rooms, specialties, and slot duration.
+- `GET/PUT /api/v1/clinics/{clinicId}/working-hours`: Clinic & per-doctor weekly schedules.
+- `GET/POST/DELETE /api/v1/clinics/{clinicId}/days-off`: Clinic & per-doctor holidays/days off.
+- `GET /api/v1/clinics/{clinicId}/number-blocks` & `POST /api/v1/clinics/{clinicId}/number-blocks/reserve`: Concurrency-safe `Receipt` and `PatientFile` number block allocation using SQL Server `sp_getapplock` + `Serializable` transaction isolation.
+- `GET /api/v1/clinics/{clinicId}/audit`: Owner/auditor clinic-scoped audit log viewer (`audit.read`).

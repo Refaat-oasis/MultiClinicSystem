@@ -3,26 +3,25 @@ using Core.Application;
 namespace Core.Infrastructure;
 
 /// <summary>
-/// Default settings section registry exposing General clinic settings in Phase 3
-/// and extensible module-gated sections in subsequent phases.
+/// Settings section registry exposing core General settings plus module-contributed sections for enabled modules.
 /// </summary>
 public sealed class SettingsSectionRegistry : ISettingsSectionRegistry
 {
-    private static readonly IReadOnlyList<SettingsSectionResult> CoreSections =
-    [
-        new(
-            SectionKey: "general",
-            TitleAr: "البيانات العامة للعيادة",
-            TitleEn: "General Clinic Information",
-            RequiredPermission: "clinic.settings.edit",
-            ModuleKey: null)
-    ];
+    private readonly IModuleCatalogService _moduleCatalog;
+
+    public SettingsSectionRegistry(IModuleCatalogService moduleCatalog)
+    {
+        _moduleCatalog = moduleCatalog ?? throw new ArgumentNullException(nameof(moduleCatalog));
+    }
 
     public IReadOnlyList<SettingsSectionResult> GetAvailableSections(IReadOnlyCollection<string> enabledModules)
     {
-        return CoreSections
-            .Where(s => s.ModuleKey == null || enabledModules.Contains(s.ModuleKey, StringComparer.OrdinalIgnoreCase))
+        var enabledSet = new HashSet<string>(enabledModules ?? Array.Empty<string>(), StringComparer.OrdinalIgnoreCase) { "core" };
+
+        return _moduleCatalog
+            .GetAllManifests()
+            .Where(m => enabledSet.Contains(m.ModuleKey))
+            .SelectMany(m => m.SettingsSections)
             .ToList();
     }
 }
-

@@ -29,6 +29,16 @@ public sealed class CoreDbContext : IdentityDbContext<AppUser, AppRole, Guid>
     public DbSet<ClinicSlugHistory> ClinicSlugs => Set<ClinicSlugHistory>();
     public DbSet<ClinicSpecialty> ClinicSpecialties => Set<ClinicSpecialty>();
     public DbSet<ClinicAsset> ClinicAssets => Set<ClinicAsset>();
+    public DbSet<ClinicModule> ClinicModules => Set<ClinicModule>();
+    public DbSet<ClinicRole> ClinicRoles => Set<ClinicRole>();
+    public DbSet<ClinicRoleClaim> ClinicRolePermissions => Set<ClinicRoleClaim>();
+    public DbSet<UserPermissionOverride> UserPermissionOverrides => Set<UserPermissionOverride>();
+    public DbSet<UserDashboardLayout> UserDashboardLayouts => Set<UserDashboardLayout>();
+    public DbSet<ClinicRoom> ClinicRooms => Set<ClinicRoom>();
+    public DbSet<ClinicDoctor> ClinicDoctors => Set<ClinicDoctor>();
+    public DbSet<ClinicWorkingHour> ClinicWorkingHours => Set<ClinicWorkingHour>();
+    public DbSet<ClinicDayOff> ClinicDaysOff => Set<ClinicDayOff>();
+    public DbSet<NumberBlock> NumberBlocks => Set<NumberBlock>();
 
     public CoreDbContext(DbContextOptions<CoreDbContext> options, ICurrentClinic currentClinic)
         : base(options)
@@ -143,6 +153,7 @@ public sealed class CoreDbContext : IdentityDbContext<AppUser, AppRole, Guid>
             b.HasKey(d => d.Id);
             b.Property(d => d.DeviceId).IsRequired().HasMaxLength(128);
             b.Property(d => d.DeviceName).IsRequired().HasMaxLength(200);
+            b.Property(d => d.IsApproved).HasDefaultValue(true);
             b.HasIndex(d => new { d.UserId, d.DeviceId });
         });
 
@@ -268,6 +279,135 @@ public sealed class CoreDbContext : IdentityDbContext<AppUser, AppRole, Guid>
             b.HasIndex(a => a.ClinicId);
             b.HasQueryFilter(a => _currentClinic.IsPlatformAdmin || a.ClinicId == _currentClinic.ClinicId);
         });
+
+        // ClinicModules tenant table
+        builder.Entity<ClinicModule>(b =>
+        {
+            b.ToTable("ClinicModules", "core");
+            b.HasKey(m => m.Id);
+            b.Property(m => m.ModuleKey).IsRequired().HasMaxLength(64);
+            b.Property(m => m.Note).HasMaxLength(500);
+            b.Property(m => m.RowVersion).IsRowVersion();
+            b.HasIndex(m => new { m.ClinicId, m.ModuleKey }).IsUnique();
+            b.HasQueryFilter(m => _currentClinic.IsPlatformAdmin || m.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // ClinicRoles tenant table
+        builder.Entity<ClinicRole>(b =>
+        {
+            b.ToTable("ClinicRoles", "core");
+            b.HasKey(r => r.Id);
+            b.Property(r => r.Name).IsRequired().HasMaxLength(100);
+            b.Property(r => r.NameAr).IsRequired().HasMaxLength(120);
+            b.Property(r => r.NameEn).IsRequired().HasMaxLength(120);
+            b.Property(r => r.TemplateKey).HasMaxLength(64);
+            b.Property(r => r.RowVersion).IsRowVersion();
+            b.HasIndex(r => new { r.ClinicId, r.Name });
+            b.HasQueryFilter(r => _currentClinic.IsPlatformAdmin || r.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // ClinicRolePermissions tenant table
+        builder.Entity<ClinicRoleClaim>(b =>
+        {
+            b.ToTable("ClinicRolePermissions", "core");
+            b.HasKey(rp => rp.Id);
+            b.Property(rp => rp.PermissionKey).IsRequired().HasMaxLength(100);
+            b.Property(rp => rp.RowVersion).IsRowVersion();
+            b.HasIndex(rp => new { rp.ClinicId, rp.ClinicRoleId, rp.PermissionKey }).IsUnique();
+            b.HasQueryFilter(rp => _currentClinic.IsPlatformAdmin || rp.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // UserPermissionOverrides tenant table
+        builder.Entity<UserPermissionOverride>(b =>
+        {
+            b.ToTable("UserPermissionOverrides", "core");
+            b.HasKey(o => o.Id);
+            b.Property(o => o.PermissionKey).IsRequired().HasMaxLength(100);
+            b.Property(o => o.Effect).IsRequired().HasMaxLength(16);
+            b.Property(o => o.RowVersion).IsRowVersion();
+            b.HasIndex(o => new { o.ClinicId, o.UserId, o.PermissionKey }).IsUnique();
+            b.HasQueryFilter(o => _currentClinic.IsPlatformAdmin || o.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // UserDashboardLayouts tenant table
+        builder.Entity<UserDashboardLayout>(b =>
+        {
+            b.ToTable("UserDashboardLayouts", "core");
+            b.HasKey(l => l.Id);
+            b.Property(l => l.PinnedWidgetsJson).IsRequired();
+            b.Property(l => l.RowVersion).IsRowVersion();
+            b.HasIndex(l => new { l.ClinicId, l.UserId }).IsUnique();
+            b.HasQueryFilter(l => _currentClinic.IsPlatformAdmin || l.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // ClinicRooms tenant table
+        builder.Entity<ClinicRoom>(b =>
+        {
+            b.ToTable("ClinicRooms", "core");
+            b.HasKey(r => r.Id);
+            b.Property(r => r.Code).IsRequired().HasMaxLength(40);
+            b.Property(r => r.NameAr).IsRequired().HasMaxLength(120);
+            b.Property(r => r.NameEn).IsRequired().HasMaxLength(120);
+            b.Property(r => r.SpecialtyCode).HasMaxLength(64);
+            b.Property(r => r.FloorOrLocation).HasMaxLength(120);
+            b.Property(r => r.RowVersion).IsRowVersion();
+            b.HasIndex(r => new { r.ClinicId, r.Code });
+            b.HasQueryFilter(r => _currentClinic.IsPlatformAdmin || r.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // ClinicDoctors tenant table
+        builder.Entity<ClinicDoctor>(b =>
+        {
+            b.ToTable("ClinicDoctors", "core");
+            b.HasKey(d => d.Id);
+            b.Property(d => d.FullName).IsRequired().HasMaxLength(200);
+            b.Property(d => d.TitleAr).IsRequired().HasMaxLength(120);
+            b.Property(d => d.TitleEn).IsRequired().HasMaxLength(120);
+            b.Property(d => d.SpecialtyCodesJson).IsRequired();
+            b.Property(d => d.AssignedRoomIdsJson).IsRequired();
+            b.Property(d => d.RowVersion).IsRowVersion();
+            b.HasIndex(d => d.ClinicId);
+            b.HasQueryFilter(d => _currentClinic.IsPlatformAdmin || d.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // ClinicWorkingHours tenant table
+        builder.Entity<ClinicWorkingHour>(b =>
+        {
+            b.ToTable("ClinicWorkingHours", "core");
+            b.HasKey(w => w.Id);
+            b.Property(w => w.StartTime).IsRequired().HasMaxLength(16);
+            b.Property(w => w.EndTime).IsRequired().HasMaxLength(16);
+            b.Property(w => w.RowVersion).IsRowVersion();
+            b.HasIndex(w => new { w.ClinicId, w.DoctorId, w.DayOfWeek });
+            b.HasQueryFilter(w => _currentClinic.IsPlatformAdmin || w.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // ClinicDaysOff tenant table
+        builder.Entity<ClinicDayOff>(b =>
+        {
+            b.ToTable("ClinicDaysOff", "core");
+            b.HasKey(d => d.Id);
+            b.Property(d => d.StartDate).IsRequired().HasMaxLength(32);
+            b.Property(d => d.EndDate).IsRequired().HasMaxLength(32);
+            b.Property(d => d.ReasonAr).IsRequired().HasMaxLength(200);
+            b.Property(d => d.ReasonEn).IsRequired().HasMaxLength(200);
+            b.Property(d => d.RowVersion).IsRowVersion();
+            b.HasIndex(d => d.ClinicId);
+            b.HasQueryFilter(d => _currentClinic.IsPlatformAdmin || d.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // NumberBlocks tenant table
+        builder.Entity<NumberBlock>(b =>
+        {
+            b.ToTable("NumberBlocks", "core");
+            b.HasKey(n => n.Id);
+            b.Property(n => n.DeviceId).IsRequired().HasMaxLength(128);
+            b.Property(n => n.Kind).IsRequired().HasMaxLength(32);
+            b.Property(n => n.Status).IsRequired().HasMaxLength(32);
+            b.Property(n => n.RowVersion).IsRowVersion();
+            b.HasIndex(n => new { n.ClinicId, n.Kind, n.FromNumber }).IsUnique();
+            b.HasQueryFilter(n => _currentClinic.IsPlatformAdmin || n.ClinicId == _currentClinic.ClinicId);
+        });
     }
 
     /// <summary>
@@ -306,7 +446,27 @@ public sealed class CoreDbContext : IdentityDbContext<AppUser, AppRole, Guid>
                 ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON core.ClinicSpecialties,
                 ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON core.ClinicSpecialties,
                 ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON core.ClinicAssets,
-                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON core.ClinicAssets
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON core.ClinicAssets,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON core.ClinicModules,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON core.ClinicModules,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON core.ClinicRoles,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON core.ClinicRoles,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON core.ClinicRolePermissions,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON core.ClinicRolePermissions,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON core.UserPermissionOverrides,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON core.UserPermissionOverrides,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON core.UserDashboardLayouts,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON core.UserDashboardLayouts,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON core.ClinicRooms,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON core.ClinicRooms,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON core.ClinicDoctors,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON core.ClinicDoctors,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON core.ClinicWorkingHours,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON core.ClinicWorkingHours,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON core.ClinicDaysOff,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON core.ClinicDaysOff,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON core.NumberBlocks,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON core.NumberBlocks
                 WITH (STATE = ON);
             ');
         ";

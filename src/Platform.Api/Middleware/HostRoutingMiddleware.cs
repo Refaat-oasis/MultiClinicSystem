@@ -35,6 +35,7 @@ public sealed class HostRoutingMiddleware
                                  path.StartsWith("/api/v1/c/", StringComparison.OrdinalIgnoreCase) ||
                                  path.StartsWith("/api/v1/auth", StringComparison.OrdinalIgnoreCase) ||
                                  path.StartsWith("/api/v1/clinics", StringComparison.OrdinalIgnoreCase) ||
+                                 path.StartsWith("/api/v1/portfolio", StringComparison.OrdinalIgnoreCase) ||
                                  path.StartsWith("/api/v1/profile", StringComparison.OrdinalIgnoreCase);
 
         if (isPlatformRoute && !isAdminHost)

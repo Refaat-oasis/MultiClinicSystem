@@ -9,6 +9,7 @@ public sealed class AppDevice
     public Guid UserId { get; private set; }
     public string DeviceId { get; private set; }
     public string DeviceName { get; private set; }
+    public bool IsApproved { get; private set; }
     public bool IsRevoked { get; private set; }
     public DateTimeOffset? RevokedAtUtc { get; private set; }
     public DateTimeOffset? ApprovedAtUtc { get; private set; }
@@ -20,14 +21,21 @@ public sealed class AppDevice
         DeviceName = string.Empty;
     }
 
-    public AppDevice(Guid id, Guid userId, string deviceId, string deviceName, DateTimeOffset createdAtUtc)
+    public AppDevice(
+        Guid id,
+        Guid userId,
+        string deviceId,
+        string deviceName,
+        DateTimeOffset createdAtUtc,
+        bool isApproved = true)
     {
         Id = id;
         UserId = userId;
         DeviceId = deviceId ?? string.Empty;
         DeviceName = deviceName ?? string.Empty;
         CreatedAtUtc = createdAtUtc;
-        ApprovedAtUtc = createdAtUtc;
+        IsApproved = isApproved;
+        ApprovedAtUtc = isApproved ? createdAtUtc : null;
         IsRevoked = false;
     }
 
@@ -39,8 +47,15 @@ public sealed class AppDevice
 
     public void Approve(DateTimeOffset approvedAtUtc)
     {
+        IsApproved = true;
         IsRevoked = false;
         ApprovedAtUtc = approvedAtUtc;
         RevokedAtUtc = null;
+    }
+
+    public void RequireApproval()
+    {
+        IsApproved = false;
+        ApprovedAtUtc = null;
     }
 }

@@ -264,3 +264,44 @@ Status: 0 Errors, Clean Build
 - [x] Owner-only clinic settings editing, financial lock (`TimeZone`, `Currency`, `RoundingRule`) after first financial entry, and Super Admin owner/clinic dashboard aggregates verified.
 - [x] Self-service user profile updates, 6-digit email change confirmation + old-email security alert, password change, and `SecurityStamp` token invalidation verified.
 - [x] Phase 0, Phase 1, Phase 2, and Phase 3 integration gates pass 100% green.
+
+
+---
+
+## Phase 4 — Modules, Roles & Claims, Dashboards, Owner Portfolio & Clinic Structure
+
+**Status:** COMPLETE  
+**Date:** 2026-11-13  
+
+### Tasks Completed
+- **Domain Entities & Pure Policy Evaluation (`Core.Domain`, Single Type Per File):**
+  - Added [`ClinicModule.cs`](file:///c:/Users/ahta6/OneDrive/Desktop/Clinic/src/Modules/Core/Core.Domain/ClinicModule.cs), [`ClinicRole.cs`](file:///c:/Users/ahta6/OneDrive/Desktop/Clinic/src/Modules/Core/Core.Domain/ClinicRole.cs), [`ClinicRoleClaim.cs`](file:///c:/Users/ahta6/OneDrive/Desktop/Clinic/src/Modules/Core/Core.Domain/ClinicRoleClaim.cs), [`UserPermissionOverride.cs`](file:///c:/Users/ahta6/OneDrive/Desktop/Clinic/src/Modules/Core/Core.Domain/UserPermissionOverride.cs), [`EffectivePermissionsEvaluation.cs`](file:///c:/Users/ahta6/OneDrive/Desktop/Clinic/src/Modules/Core/Core.Domain/EffectivePermissionsEvaluation.cs), [`EffectivePermissionsEvaluator.cs`](file:///c:/Users/ahta6/OneDrive/Desktop/Clinic/src/Modules/Core/Core.Domain/EffectivePermissionsEvaluator.cs), [`UserDashboardLayout.cs`](file:///c:/Users/ahta6/OneDrive/Desktop/Clinic/src/Modules/Core/Core.Domain/UserDashboardLayout.cs), [`ClinicRoom.cs`](file:///c:/Users/ahta6/OneDrive/Desktop/Clinic/src/Modules/Core/Core.Domain/ClinicRoom.cs), [`ClinicDoctor.cs`](file:///c:/Users/ahta6/OneDrive/Desktop/Clinic/src/Modules/Core/Core.Domain/ClinicDoctor.cs), [`ClinicWorkingHour.cs`](file:///c:/Users/ahta6/OneDrive/Desktop/Clinic/src/Modules/Core/Core.Domain/ClinicWorkingHour.cs), [`ClinicDayOff.cs`](file:///c:/Users/ahta6/OneDrive/Desktop/Clinic/src/Modules/Core/Core.Domain/ClinicDayOff.cs), and [`NumberBlock.cs`](file:///c:/Users/ahta6/OneDrive/Desktop/Clinic/src/Modules/Core/Core.Domain/NumberBlock.cs).
+  - Updated [`AppDevice.cs`](file:///c:/Users/ahta6/OneDrive/Desktop/Clinic/src/Modules/Core/Core.Domain/AppDevice.cs) and [`AuthService.cs`](file:///c:/Users/ahta6/OneDrive/Desktop/Clinic/src/Modules/Core/Core.Infrastructure/AuthService.cs) so non-owner staff logins/activations require owner device approval (`DEVICE_APPROVAL_REQUIRED`).
+- **EF Core Mappings, SQL Server RLS & Core Services (`Core.Infrastructure`):**
+  - Updated [`CoreDbContext.cs`](file:///c:/Users/ahta6/OneDrive/Desktop/Clinic/src/Modules/Core/Core.Infrastructure/CoreDbContext.cs) with 10 new tenant entities (`ClinicModules`, `ClinicRoles`, `ClinicRolePermissions`, `UserPermissionOverrides`, `UserDashboardLayouts`, `ClinicRooms`, `ClinicDoctors`, `ClinicWorkingHours`, `ClinicDaysOff`, `NumberBlocks`), global query filters, and SQL Server Row-Level Security filter + block predicates on all 10 tables.
+  - Added [`ModuleCatalogService.cs`](file:///c:/Users/ahta6/OneDrive/Desktop/Clinic/src/Modules/Core/Core.Infrastructure/ModuleCatalogService.cs) with all 16 switchable modules + `core`, dependency graph validation (`MODULE_PREREQUISITE_OFF`, `MODULE_HAS_DEPENDENTS`), permission catalog, menu items, settings sections, and widget declarations.
+  - Added [`ClinicAuthorizationService.cs`](file:///c:/Users/ahta6/OneDrive/Desktop/Clinic/src/Modules/Core/Core.Infrastructure/ClinicAuthorizationService.cs) (built-in role seeding, role cloning, reserved owner permission guard, delegation ceiling check, per-user Grant/Deny overrides where Deny wins, dormant permission preservation across module toggles, last-owner protection `LAST_OWNER_PROTECTED`, staff invitations, and device approvals).
+  - Added [`DashboardService.cs`](file:///c:/Users/ahta6/OneDrive/Desktop/Clinic/src/Modules/Core/Core.Infrastructure/DashboardService.cs) & [`OwnerPortfolioService.cs`](file:///c:/Users/ahta6/OneDrive/Desktop/Clinic/src/Modules/Core/Core.Infrastructure/OwnerPortfolioService.cs) (bounded aggregate-only widgets, 366-day range cap, per-clinic RLS portfolio queries returning 404 on unowned clinics).
+  - Added [`ClinicStructureService.cs`](file:///c:/Users/ahta6/OneDrive/Desktop/Clinic/src/Modules/Core/Core.Infrastructure/ClinicStructureService.cs) (rooms, doctors, weekly working hours, days off, owner clinic audit viewer, and concurrency-safe `ReserveNumberBlockAsync` using `sp_getapplock` + `Serializable` transaction isolation).
+- **Thin API Controllers & Strict DTO / ViewModel Separation (`Platform.Api`):**
+  - Added [`ModulesController.cs`](file:///c:/Users/ahta6/OneDrive/Desktop/Clinic/src/Platform.Api/Controllers/ModulesController.cs), [`RolesPermissionsController.cs`](file:///c:/Users/ahta6/OneDrive/Desktop/Clinic/src/Platform.Api/Controllers/RolesPermissionsController.cs), [`DashboardsController.cs`](file:///c:/Users/ahta6/OneDrive/Desktop/Clinic/src/Platform.Api/Controllers/DashboardsController.cs), and [`ClinicStructureController.cs`](file:///c:/Users/ahta6/OneDrive/Desktop/Clinic/src/Platform.Api/Controllers/ClinicStructureController.cs); updated [`PlatformClinicsController.cs`](file:///c:/Users/ahta6/OneDrive/Desktop/Clinic/src/Platform.Api/Controllers/PlatformClinicsController.cs), [`HostRoutingMiddleware.cs`](file:///c:/Users/ahta6/OneDrive/Desktop/Clinic/src/Platform.Api/Middleware/HostRoutingMiddleware.cs), [`ProblemDetailsMapper.cs`](file:///c:/Users/ahta6/OneDrive/Desktop/Clinic/src/Platform.Api/ViewModels/ProblemDetailsMapper.cs), and single-type DTOs/ViewModels.
+- **Frontend UI & Vitest Coverage (`web/`):**
+  - Updated [`ClinicDirectoryScreen.tsx`](file:///c:/Users/ahta6/OneDrive/Desktop/Clinic/web/apps/admin/src/ClinicDirectoryScreen.tsx) & [`App.test.tsx`](file:///c:/Users/ahta6/OneDrive/Desktop/Clinic/web/apps/admin/src/App.test.tsx) with per-clinic **Module Toggles & Dependencies** panel and step-up password verification.
+  - Added [`Phase4Screens.tsx`](file:///c:/Users/ahta6/OneDrive/Desktop/Clinic/web/packages/features/core/src/Phase4Screens.tsx) (`MyFeaturesScreen`, `RolesPermissionsScreen`, `StaffDevicesScreen`, `ClinicStructureScreen`, `OwnerPortfolioAndWidgetsScreen`), wired tabs into [`App.tsx`](file:///c:/Users/ahta6/OneDrive/Desktop/Clinic/web/apps/clinic/src/App.tsx), and added tests in [`Phase4Screens.test.tsx`](file:///c:/Users/ahta6/OneDrive/Desktop/Clinic/web/packages/features/core/src/Phase4Screens.test.tsx).
+
+### Verification Results (Phase 4 Integration Gate + Cumulative Regression)
+- `dotnet test tests/UnitTests/UnitTests.csproj --no-restore`: `Passed! - Failed: 0, Passed: 90, Skipped: 0, Total: 90, Duration: 248 ms`
+- `dotnet test tests/ArchitectureTests/ArchitectureTests.csproj --no-restore`: `Passed! - Failed: 0, Passed: 12, Skipped: 0, Total: 12, Duration: 541 ms` (includes `PermissionCeilingSweepTests` & `DashboardSweepTests`)
+- `dotnet test tests/IntegrationTests/IntegrationTests.csproj --no-restore`: `Passed! - Failed: 0, Passed: 24, Skipped: 0, Total: 24, Duration: 41 s` (real SQL Server + concurrent `NumberBlock` reservation test)
+- `dotnet test tests/Gates/Gates.csproj --no-restore`: `Passed! - Failed: 0, Passed: 17, Skipped: 0, Total: 17, Duration: 12 s` (Phase 0 + Phase 1 + Phase 2 + Phase 3 + Phase 4 gates all green)
+- `npm --prefix web test`: All 5 workspaces passed (`@clinic/admin-app`: 7/7, `@clinic/clinic-app`: 2/2, `@clinic/api-client`: 3/3, `@clinic/ui`: 3/3, `@clinic/feature-core`: 14/14) — Total: 29 passed
+- `npm --prefix web run lint`: `tsc --noEmit` passed across all 5 workspaces (0 errors)
+- `npm --prefix web run build`: `@clinic/admin-app` built in `3.28s`; `@clinic/clinic-app` built in `3.01s`
+
+### Phase 4 Exit Checklist
+- [x] Super Admin assigns and toggles all 16 clinic modules with dependency validation, step-up password, outbox event, and audit trail; clinic owners cannot alter modules (read-only My Features + 403 on PUT).
+- [x] Effective permission formula `(roleClaims ∪ userGrants \ userDenies) ∩ activeModulePermissions`, dormant permission restoration, owner-reserved claim blocking, delegation ceiling, and last-owner protection verified.
+- [x] Non-owner staff device approval enforced before clinic operations and lifted immediately upon owner approval.
+- [x] Modular dashboard widgets return aggregate-only payloads with 366-day max range and per-widget error-tile isolation; Owner Portfolio runs per clinic under SQL Server RLS and returns 404 for unowned clinics.
+- [x] Clinic structure (rooms, doctors, weekly working hours, days off), clinic audit log viewer, and concurrency-safe atomic number blocks (`1..500`, `501..1000`) verified.
+- [x] Phase 0, Phase 1, Phase 2, Phase 3, and Phase 4 integration gates and all architecture sweeps pass 100% green.
