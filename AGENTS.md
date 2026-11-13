@@ -14,7 +14,7 @@ Read `docs/PLAN.md` first. It defines the phases, rules and tests. This file def
 4. **Do not change locked decisions** (PLAN.md section 1). If you think one is wrong, write the reason in `docs/DECISIONS.md` and ask Ahmed. Do not work around it.
 5. **Do not guess business rules.** If a rule is missing or unclear, add it to the open items in `docs/DECISIONS.md`, ask Ahmed one clear question, and continue with other work meanwhile.
 6. **Keep a log.** After each task update `docs/PROGRESS.md` (phase, task, status, tests added, what is left).
-7. **Small, reviewable commits.** One logical change per commit. Message format: `phase-N(module): short description`.
+7. **Branch per task/phase/edit and push.** For every new task, plan, phase, or code adjustment/edit, create a dedicated branch (e.g., `git checkout -b phase-N/<short-name>` or `fix/<short-name>`), commit with message format `phase-N(module): short description`, and push the branch to the remote (`git push -u origin <branch-name>`).
 8. **Never claim a test passes without running it.** Show the real command output summary in `docs/PROGRESS.md`.
 
 ---
