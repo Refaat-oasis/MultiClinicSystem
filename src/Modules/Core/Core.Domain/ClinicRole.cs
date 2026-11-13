@@ -80,3 +80,4 @@ public sealed class ClinicRole : ITenantEntity, ISoftDeletable
         VoidReason = reason;
     }
 }
+

@@ -11,3 +11,4 @@ public sealed record ModuleMenuItemResult(
     string Route,
     string RequiredPermission,
     int Order);
+

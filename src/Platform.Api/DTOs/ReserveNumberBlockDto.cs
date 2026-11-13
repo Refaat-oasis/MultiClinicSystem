@@ -6,3 +6,4 @@ public sealed class ReserveNumberBlockDto
     public string Kind { get; set; } = "Receipt";
     public int? BlockSize { get; set; }
 }
+

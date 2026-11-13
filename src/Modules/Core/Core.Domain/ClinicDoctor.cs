@@ -103,3 +103,4 @@ public sealed class ClinicDoctor : ITenantEntity, ISoftDeletable
         VoidReason = reason;
     }
 }
+

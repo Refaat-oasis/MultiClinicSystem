@@ -13,3 +13,4 @@ public sealed record StaffMemberViewModel(
     IReadOnlyList<string> EffectivePermissions,
     IReadOnlyList<string> DormantPermissions,
     IReadOnlyList<PermissionOverrideItemViewModel> Overrides);
+

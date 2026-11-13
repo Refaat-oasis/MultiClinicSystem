@@ -169,3 +169,4 @@ public interface IClinicStructureService
         string? deviceId,
         CancellationToken cancellationToken = default);
 }
+

@@ -7,3 +7,4 @@ public sealed class CreateClinicRoleDto
     public string? NameEn { get; set; }
     public List<string> Permissions { get; set; } = new();
 }
+

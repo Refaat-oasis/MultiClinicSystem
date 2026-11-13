@@ -12,3 +12,4 @@ public sealed record ClinicDeviceItemViewModel(
     DateTimeOffset? ApprovedAtUtc,
     DateTimeOffset? RevokedAtUtc,
     DateTimeOffset CreatedAtUtc);
+

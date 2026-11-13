@@ -11,3 +11,4 @@ public sealed record UserEffectivePermissionsResult(
     IReadOnlyList<string> EffectivePermissions,
     IReadOnlyList<string> DormantPermissions,
     IReadOnlyList<string> EnabledModules);
+

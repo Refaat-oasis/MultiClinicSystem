@@ -7,3 +7,4 @@ public sealed record ModuleToggleInput(
     string ModuleKey,
     bool Enabled,
     string? Note);
+

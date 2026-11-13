@@ -7,6 +7,7 @@ public sealed class PatientAccessLog
 {
     public Guid Id { get; private set; }
     public string ActorId { get; private set; }
+    public string ActorType { get; private set; }
     public string Reason { get; private set; }
     public DateTimeOffset TimestampUtc { get; private set; }
     public Guid? ClinicId { get; private set; }
@@ -15,10 +16,11 @@ public sealed class PatientAccessLog
     private PatientAccessLog()
     {
         ActorId = string.Empty;
+        ActorType = "SuperAdmin";
         Reason = string.Empty;
     }
 
-    public PatientAccessLog(Guid id, string actorId, string reason, DateTimeOffset timestampUtc, Guid? clinicId = null, string? details = null)
+    public PatientAccessLog(Guid id, string actorId, string reason, DateTimeOffset timestampUtc, Guid? clinicId = null, string? details = null, string actorType = "SuperAdmin")
     {
         if (id == Guid.Empty)
         {
@@ -37,6 +39,7 @@ public sealed class PatientAccessLog
 
         Id = id;
         ActorId = actorId.Trim();
+        ActorType = string.IsNullOrWhiteSpace(actorType) ? "SuperAdmin" : actorType.Trim();
         Reason = reason.Trim();
         TimestampUtc = timestampUtc;
         ClinicId = clinicId;

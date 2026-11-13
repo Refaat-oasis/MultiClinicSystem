@@ -77,3 +77,4 @@ public sealed class ClinicWorkingHour : ITenantEntity, ISoftDeletable
         VoidReason = reason;
     }
 }
+

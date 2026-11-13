@@ -6,3 +6,4 @@ public sealed class ModuleToggleItemDto
     public bool Enabled { get; set; }
     public string? Note { get; set; }
 }
+

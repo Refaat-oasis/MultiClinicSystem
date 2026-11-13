@@ -4,3 +4,4 @@ public sealed record DashboardWidgetCatalogViewModel(
     Guid ClinicId,
     IReadOnlyList<DashboardWidgetDefinitionViewModel> Widgets,
     IReadOnlyList<string> PinnedWidgetKeys);
+

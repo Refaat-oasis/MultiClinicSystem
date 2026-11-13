@@ -24,6 +24,8 @@ public sealed class Clinic
     public string? ContactEmail { get; private set; }
     public Guid? LogoAssetId { get; private set; }
     public bool HasFinancialEntries { get; private set; }
+    public bool ScopePatientsByDoctor { get; private set; }
+    public bool ScopePatientsBySpecialty { get; private set; }
     public DateTimeOffset? SubscriptionExpiryUtc { get; private set; }
     public int GraceDays { get; private set; }
     public bool IsActive { get; private set; }
@@ -266,5 +268,11 @@ public sealed class Clinic
     public void MarkHasFinancialEntries()
     {
         HasFinancialEntries = true;
+    }
+
+    public void SetPatientScoping(bool scopeByDoctor, bool scopeBySpecialty)
+    {
+        ScopePatientsByDoctor = scopeByDoctor;
+        ScopePatientsBySpecialty = scopeBySpecialty;
     }
 }

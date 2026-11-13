@@ -92,3 +92,4 @@ public sealed class ModuleDependencyTests
         result.IsSuccess.Should().BeTrue();
     }
 }
+

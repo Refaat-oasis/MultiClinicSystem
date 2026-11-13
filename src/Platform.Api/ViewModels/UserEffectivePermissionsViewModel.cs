@@ -8,3 +8,4 @@ public sealed record UserEffectivePermissionsViewModel(
     IReadOnlyList<string> EffectivePermissions,
     IReadOnlyList<string> DormantPermissions,
     IReadOnlyList<string> EnabledModules);
+

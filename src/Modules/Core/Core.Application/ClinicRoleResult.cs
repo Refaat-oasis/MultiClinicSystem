@@ -16,3 +16,4 @@ public sealed record ClinicRoleResult(
     IReadOnlyList<string> Permissions,
     IReadOnlyList<string> EffectivePermissions,
     IReadOnlyList<string> DormantPermissions);
+

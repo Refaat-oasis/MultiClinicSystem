@@ -17,10 +17,12 @@ namespace Platform.Api.Controllers;
 public sealed class PlatformClinicsController : ControllerBase
 {
     private readonly IPlatformAdminService _platformService;
+    private readonly IPatientService _patientService;
 
-    public PlatformClinicsController(IPlatformAdminService platformService)
+    public PlatformClinicsController(IPlatformAdminService platformService, IPatientService patientService)
     {
         _platformService = platformService ?? throw new ArgumentNullException(nameof(platformService));
+        _patientService = patientService ?? throw new ArgumentNullException(nameof(patientService));
     }
 
     [HttpGet]
@@ -214,6 +216,23 @@ public sealed class PlatformClinicsController : ControllerBase
         }
 
         return Ok(result.Value.Select(MapModuleViewModel).ToList());
+    }
+
+    [HttpGet("{clinicId:guid}/inspect/patients/{patientId:guid}")]
+    [ProducesResponseType(typeof(PatientDetailViewModel), StatusCodes.Status200OK)]
+    public async Task<IActionResult> InspectPatient(Guid clinicId, Guid patientId, [FromQuery] string reason, CancellationToken cancellationToken)
+    {
+        if (!TryGetAdminId(out Guid adminId))
+        {
+            return Unauthorized();
+        }
+
+        var result = await _patientService.InspectPatientAsSuperAdminAsync(
+            adminId.ToString(), clinicId, patientId, reason, cancellationToken);
+
+        return result.IsFailure
+            ? ProblemDetailsMapper.ToProblemDetails(result.Error)
+            : Ok(PatientViewModelMapper.MapDetail(result.Value));
     }
 
     [HttpPost("{clinicId:guid}/inspect/{*subpath}")]

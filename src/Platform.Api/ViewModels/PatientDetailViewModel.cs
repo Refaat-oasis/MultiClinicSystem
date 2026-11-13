@@ -1,0 +1,31 @@
+namespace Platform.Api.ViewModels;
+
+public sealed record PatientDetailViewModel(
+    Guid Id,
+    Guid ClinicId,
+    string FileNumber,
+    string FullName,
+    string Phone,
+    string? SecondaryPhone,
+    DateOnly? DateOfBirth,
+    int? ApproximateAgeYears,
+    int? AgeYears,
+    string Gender,
+    string? NationalId,
+    string? Address,
+    Guid? AssignedDoctorId,
+    string? PrimarySpecialtyCode,
+    bool IsMedicalHistoryEnabled,
+    bool IsMedicalHistoryReviewed,
+    string? MedicalHistorySummary,
+    IReadOnlyList<string> ChronicConditions,
+    IReadOnlyList<string> CurrentMedications,
+    IReadOnlyList<string> PastSurgeries,
+    IReadOnlyList<PatientAllergyItemViewModel> Allergies,
+    IReadOnlyList<PatientNoteItemViewModel> Notes,
+    bool IsAttachmentsEnabled,
+    IReadOnlyList<PatientAttachmentItemViewModel> Attachments,
+    IReadOnlyList<PatientDuplicateWarningViewModel> DuplicateWarnings,
+    DateTimeOffset CreatedAtUtc,
+    DateTimeOffset UpdatedAtUtc);
+

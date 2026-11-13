@@ -10,3 +10,4 @@ public sealed record ModuleDefinitionResult(
     string DescriptionAr,
     string DescriptionEn,
     IReadOnlyList<string> Prerequisites);
+

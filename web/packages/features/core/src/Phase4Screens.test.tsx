@@ -171,3 +171,4 @@ describe('Phase 4 Core UI Screens', () => {
     expect(screen.getByText('NumberBlockReserved')).toBeDefined();
   });
 });
+

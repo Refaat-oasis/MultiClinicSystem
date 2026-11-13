@@ -15,3 +15,4 @@ public sealed record ClinicDeviceItemResult(
     DateTimeOffset? ApprovedAtUtc,
     DateTimeOffset? RevokedAtUtc,
     DateTimeOffset CreatedAtUtc);
+

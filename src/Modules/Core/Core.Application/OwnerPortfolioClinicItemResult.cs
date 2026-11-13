@@ -13,3 +13,4 @@ public sealed record OwnerPortfolioClinicItemResult(
     int RoomsCount,
     int DoctorsCount,
     int EnabledModulesCount);
+

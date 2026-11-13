@@ -10,3 +10,4 @@ public sealed record NumberBlockViewModel(
     long NextNumber,
     string Status,
     DateTimeOffset CreatedAtUtc);
+

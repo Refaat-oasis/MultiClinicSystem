@@ -47,7 +47,8 @@ public static class ProblemDetailsMapper
                        c.Contains("LAST_OWNER_PROTECTED", StringComparison.OrdinalIgnoreCase) ||
                        c.Contains("ROOM_CODE_EXISTS", StringComparison.OrdinalIgnoreCase) ||
                        c.Contains("NUMBER_BLOCK_CONTENTION", StringComparison.OrdinalIgnoreCase) ||
-                       c.Contains("NUMBER_BLOCK_EXHAUSTED", StringComparison.OrdinalIgnoreCase) => StatusCodes.Status409Conflict,
+                       c.Contains("NUMBER_BLOCK_EXHAUSTED", StringComparison.OrdinalIgnoreCase) ||
+                       c.Contains("DUPLICATE", StringComparison.OrdinalIgnoreCase) => StatusCodes.Status409Conflict,
             _ => StatusCodes.Status400BadRequest
         };
 

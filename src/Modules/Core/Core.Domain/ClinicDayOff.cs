@@ -72,3 +72,4 @@ public sealed class ClinicDayOff : ITenantEntity, ISoftDeletable
         VoidReason = reason;
     }
 }
+

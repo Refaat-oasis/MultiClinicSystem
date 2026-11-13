@@ -19,3 +19,4 @@ public interface IModuleCatalogService
         IReadOnlySet<string> currentlyEnabledModules,
         IReadOnlyList<ModuleToggleInput> requestedChanges);
 }
+

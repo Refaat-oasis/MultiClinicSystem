@@ -16,3 +16,4 @@ public sealed record ModuleManifestEntry(
     IReadOnlyList<ModuleMenuItemResult> MenuItems,
     IReadOnlyList<SettingsSectionResult> SettingsSections,
     IReadOnlyList<DashboardWidgetDefinitionResult> DashboardWidgets) : IModuleManifest;
+

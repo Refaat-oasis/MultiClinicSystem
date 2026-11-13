@@ -10,3 +10,4 @@ public sealed class CreateClinicDoctorDto
     public List<Guid> AssignedRoomIds { get; set; } = new();
     public int SlotDurationMinutes { get; set; } = 20;
 }
+

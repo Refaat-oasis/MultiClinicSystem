@@ -187,6 +187,42 @@ public sealed class DashboardService : IDashboardService
                     breakdown["doctors"] = doctors;
                     break;
                 }
+                case "patients.summary":
+                {
+                    int totalPatients = await _dbContext.Patients.CountAsync(p => p.ClinicId == clinicId && !p.IsVoided, cancellationToken);
+                    int newPatients = await _dbContext.Patients.CountAsync(
+                        p => p.ClinicId == clinicId && !p.IsVoided && p.CreatedAtUtc >= start && p.CreatedAtUtc <= end,
+                        cancellationToken);
+                    primary = totalPatients;
+                    breakdown["total"] = totalPatients;
+                    breakdown["newInRange"] = newPatients;
+                    break;
+                }
+                case "patient-history.allergy-count":
+                {
+                    int totalAllergies = await _dbContext.PatientAllergies.CountAsync(a => a.ClinicId == clinicId && !a.IsVoided, cancellationToken);
+                    int severeAllergies = await _dbContext.PatientAllergies.CountAsync(
+                        a => a.ClinicId == clinicId && !a.IsVoided && a.Severity == "Severe",
+                        cancellationToken);
+                    primary = totalAllergies;
+                    breakdown["totalAllergies"] = totalAllergies;
+                    breakdown["severeAllergies"] = severeAllergies;
+                    break;
+                }
+                case "attachments.uploads-summary":
+                {
+                    int totalFiles = await _dbContext.PatientAttachments.CountAsync(
+                        a => a.ClinicId == clinicId && !a.IsVoided,
+                        cancellationToken);
+                    long totalBytes = await _dbContext.PatientAttachments
+                        .Where(a => a.ClinicId == clinicId && !a.IsVoided)
+                        .Select(a => (long?)a.SizeBytes)
+                        .SumAsync(cancellationToken) ?? 0L;
+                    primary = totalFiles;
+                    breakdown["files"] = totalFiles;
+                    breakdown["totalKilobytes"] = Math.Round(totalBytes / 1024m, 2);
+                    break;
+                }
                 default:
                 {
                     breakdown["configured"] = 1m;

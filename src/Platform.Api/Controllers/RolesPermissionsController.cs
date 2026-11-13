@@ -282,3 +282,4 @@ public sealed class RolesPermissionsController : ControllerBase
         s.IsOwner, s.IsActive, s.EmailConfirmed, s.EffectivePermissions, s.DormantPermissions,
         s.Overrides.Select(o => new PermissionOverrideItemViewModel(o.PermissionKey, o.Effect)).ToList());
 }
+

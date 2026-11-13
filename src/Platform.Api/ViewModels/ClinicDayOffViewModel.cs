@@ -9,3 +9,4 @@ public sealed record ClinicDayOffViewModel(
     string ReasonAr,
     string ReasonEn,
     DateTimeOffset CreatedAtUtc);
+

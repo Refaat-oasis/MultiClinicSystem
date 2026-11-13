@@ -11,3 +11,4 @@ public sealed record ClinicWorkingHourResult(
     string StartTime,
     string EndTime,
     bool IsClosed);
+

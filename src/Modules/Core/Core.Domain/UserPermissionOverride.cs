@@ -81,3 +81,4 @@ public sealed class UserPermissionOverride : ITenantEntity
         UpdatedAtUtc = updatedAtUtc;
     }
 }
+

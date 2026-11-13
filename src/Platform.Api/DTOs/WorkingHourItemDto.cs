@@ -7,3 +7,4 @@ public sealed class WorkingHourItemDto
     public string EndTime { get; set; } = "17:00";
     public bool IsClosed { get; set; }
 }
+

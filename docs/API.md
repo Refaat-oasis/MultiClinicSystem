@@ -316,3 +316,16 @@
 - `GET/POST/DELETE /api/v1/clinics/{clinicId}/days-off`: Clinic & per-doctor holidays/days off.
 - `GET /api/v1/clinics/{clinicId}/number-blocks` & `POST /api/v1/clinics/{clinicId}/number-blocks/reserve`: Concurrency-safe `Receipt` and `PatientFile` number block allocation using SQL Server `sp_getapplock` + `Serializable` transaction isolation.
 - `GET /api/v1/clinics/{clinicId}/audit`: Owner/auditor clinic-scoped audit log viewer (`audit.read`).
+
+## 7. Patients, Medical History, Attachments & Scoping (Phase 5)
+- `GET /api/v1/clinics/{clinicId}/patients`: Search clinic patients by Arabic-normalized name (`ArabicNormalizer`), phone, or file number; enforces doctor & specialty patient scoping (`404` out-of-scope).
+- `GET /api/v1/clinics/{clinicId}/patients/{patientId}`: Patient detail (`patients.read`) including allergies (`patient-history`), notes (filtering `IsDoctorPrivate` to authorized doctors/clinical staff), and attachments (`attachments`); degrades cleanly when optional modules are off.
+- `POST /api/v1/clinics/{clinicId}/patients/duplicates/check`: Check duplicate patient warnings by normalized name and phone (`409` or warning list).
+- `POST /api/v1/clinics/{clinicId}/patients`: Create patient with `OperationId` idempotency (`ProcessedOperations`), duplicate-warning confirmation flag, and atomic `PatientFile` number-block assignment (`sp_getapplock`).
+- `DELETE /api/v1/clinics/{clinicId}/patients/{patientId}`: Soft-void patient (`IsVoided = true`).
+- `GET/PUT /api/v1/clinics/{clinicId}/patients/scoping`: Configure per-clinic `ScopePatientsByDoctor` and `ScopePatientsBySpecialty` flags.
+- `PUT /api/v1/clinics/{clinicId}/patients/{patientId}/history`: Update chronic medical history (`patient-history`).
+- `POST /api/v1/clinics/{clinicId}/patients/{patientId}/allergies` & `DELETE /api/v1/clinics/{clinicId}/patients/{patientId}/allergies/{allergyId}`: Add or soft-void patient allergies (`patient-history`).
+- `POST /api/v1/clinics/{clinicId}/patients/{patientId}/notes`: Add patient clinical/shared or doctor-private note.
+- `POST /api/v1/clinics/{clinicId}/patients/{patientId}/attachments` & `GET /api/v1/clinics/{clinicId}/patients/{patientId}/attachments/{attachmentId}/download` & `DELETE .../{attachmentId}`: Upload/download/soft-void attachments (`attachments`) behind `IFileStorage` with magic-byte validation, SHA-256 hash, and image thumbnails.
+- `GET /api/v1/platform/clinics/{clinicId}/inspect/patients/{patientId}`: Super Admin read-only patient inspect endpoint logging `PatientAccessLog` via `IPlatformAccess`.

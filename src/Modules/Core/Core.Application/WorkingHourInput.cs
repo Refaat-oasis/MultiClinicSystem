@@ -8,3 +8,4 @@ public sealed record WorkingHourInput(
     string StartTime,
     string EndTime,
     bool IsClosed);
+

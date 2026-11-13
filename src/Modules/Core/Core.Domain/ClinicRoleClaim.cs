@@ -53,3 +53,4 @@ public sealed class ClinicRoleClaim : ITenantEntity
         CreatedAtUtc = createdAtUtc;
     }
 }
+

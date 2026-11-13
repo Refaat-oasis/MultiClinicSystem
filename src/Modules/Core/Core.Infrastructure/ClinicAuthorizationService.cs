@@ -932,7 +932,11 @@ public sealed class ClinicAuthorizationService : IClinicAuthorizationService
 
         string cleanTarget = targetDeviceId.Trim();
         var device = await _dbContext.AppDevices
-            .FirstOrDefaultAsync(d => d.DeviceId == cleanTarget && memberIds.Contains(d.UserId), cancellationToken);
+            .Where(d => d.DeviceId == cleanTarget && memberIds.Contains(d.UserId))
+            .OrderByDescending(d => d.UserId != userId)
+            .ThenBy(d => d.IsApproved)
+            .ThenByDescending(d => d.CreatedAtUtc)
+            .FirstOrDefaultAsync(cancellationToken);
 
         if (device == null)
         {

@@ -101,3 +101,4 @@ public sealed class EffectivePermissionsTests
         userGrantResult.Error.Code.Should().Be("DELEGATION_CEILING_EXCEEDED");
     }
 }
+

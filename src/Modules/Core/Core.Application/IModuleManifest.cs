@@ -16,3 +16,4 @@ public interface IModuleManifest
     IReadOnlyList<SettingsSectionResult> SettingsSections { get; }
     IReadOnlyList<DashboardWidgetDefinitionResult> DashboardWidgets { get; }
 }
+

@@ -39,6 +39,11 @@ public sealed class CoreDbContext : IdentityDbContext<AppUser, AppRole, Guid>
     public DbSet<ClinicWorkingHour> ClinicWorkingHours => Set<ClinicWorkingHour>();
     public DbSet<ClinicDayOff> ClinicDaysOff => Set<ClinicDayOff>();
     public DbSet<NumberBlock> NumberBlocks => Set<NumberBlock>();
+    public DbSet<ProcessedOperation> ProcessedOperations => Set<ProcessedOperation>();
+    public DbSet<Patient> Patients => Set<Patient>();
+    public DbSet<PatientAllergy> PatientAllergies => Set<PatientAllergy>();
+    public DbSet<PatientNote> PatientNotes => Set<PatientNote>();
+    public DbSet<PatientAttachment> PatientAttachments => Set<PatientAttachment>();
 
     public CoreDbContext(DbContextOptions<CoreDbContext> options, ICurrentClinic currentClinic)
         : base(options)
@@ -112,6 +117,8 @@ public sealed class CoreDbContext : IdentityDbContext<AppUser, AppRole, Guid>
             b.Property(c => c.ContactEmail).HasMaxLength(256);
             b.Property(c => c.LogoAssetId);
             b.Property(c => c.HasFinancialEntries).HasDefaultValue(false);
+            b.Property(c => c.ScopePatientsByDoctor).HasDefaultValue(false);
+            b.Property(c => c.ScopePatientsBySpecialty).HasDefaultValue(false);
             b.Property(c => c.RowVersion).IsRowVersion();
             b.HasIndex(c => c.Slug).IsUnique();
         });
@@ -226,6 +233,7 @@ public sealed class CoreDbContext : IdentityDbContext<AppUser, AppRole, Guid>
             b.ToTable("PatientAccessLogs", "core");
             b.HasKey(l => l.Id);
             b.Property(l => l.ActorId).IsRequired().HasMaxLength(150);
+            b.Property(l => l.ActorType).IsRequired().HasMaxLength(32).HasDefaultValue("SuperAdmin");
             b.Property(l => l.Reason).IsRequired().HasMaxLength(500);
         });
 
@@ -408,6 +416,84 @@ public sealed class CoreDbContext : IdentityDbContext<AppUser, AppRole, Guid>
             b.HasIndex(n => new { n.ClinicId, n.Kind, n.FromNumber }).IsUnique();
             b.HasQueryFilter(n => _currentClinic.IsPlatformAdmin || n.ClinicId == _currentClinic.ClinicId);
         });
+
+        // ProcessedOperations tenant table
+        builder.Entity<ProcessedOperation>(b =>
+        {
+            b.ToTable("ProcessedOperations", "core");
+            b.HasKey(o => o.Id);
+            b.Property(o => o.EntityName).IsRequired().HasMaxLength(80);
+            b.Property(o => o.RowVersion).IsRowVersion();
+            b.HasIndex(o => new { o.ClinicId, o.OperationId }).IsUnique();
+            b.HasQueryFilter(o => _currentClinic.IsPlatformAdmin || o.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // Patients tenant table (patients schema)
+        builder.Entity<Patient>(b =>
+        {
+            b.ToTable("Patients", "patients");
+            b.HasKey(p => p.Id);
+            b.Property(p => p.FileNumber).IsRequired().HasMaxLength(40);
+            b.Property(p => p.FullName).IsRequired().HasMaxLength(200);
+            b.Property(p => p.NormalizedName).IsRequired().HasMaxLength(200);
+            b.Property(p => p.Phone).IsRequired().HasMaxLength(40);
+            b.Property(p => p.NormalizedPhone).IsRequired().HasMaxLength(40);
+            b.Property(p => p.SecondaryPhone).HasMaxLength(40);
+            b.Property(p => p.Gender).IsRequired().HasMaxLength(20);
+            b.Property(p => p.NationalId).HasMaxLength(40);
+            b.Property(p => p.Address).HasMaxLength(400);
+            b.Property(p => p.PrimarySpecialtyCode).HasMaxLength(64);
+            b.Property(p => p.MedicalHistorySummary).HasMaxLength(2000);
+            b.Property(p => p.ChronicConditionsJson).IsRequired();
+            b.Property(p => p.CurrentMedicationsJson).IsRequired();
+            b.Property(p => p.PastSurgeriesJson).IsRequired();
+            b.Property(p => p.RowVersion).IsRowVersion();
+            b.HasIndex(p => new { p.ClinicId, p.FileNumber }).IsUnique();
+            b.HasIndex(p => new { p.ClinicId, p.NormalizedName });
+            b.HasIndex(p => new { p.ClinicId, p.NormalizedPhone });
+            b.HasQueryFilter(p => _currentClinic.IsPlatformAdmin || p.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // PatientAllergies tenant table (patients schema)
+        builder.Entity<PatientAllergy>(b =>
+        {
+            b.ToTable("PatientAllergies", "patients");
+            b.HasKey(a => a.Id);
+            b.Property(a => a.Allergen).IsRequired().HasMaxLength(200);
+            b.Property(a => a.Severity).IsRequired().HasMaxLength(20);
+            b.Property(a => a.Reaction).HasMaxLength(400);
+            b.Property(a => a.RowVersion).IsRowVersion();
+            b.HasIndex(a => new { a.ClinicId, a.PatientId });
+            b.HasQueryFilter(a => _currentClinic.IsPlatformAdmin || a.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // PatientNotes tenant table (patients schema)
+        builder.Entity<PatientNote>(b =>
+        {
+            b.ToTable("PatientNotes", "patients");
+            b.HasKey(n => n.Id);
+            b.Property(n => n.NoteText).IsRequired().HasMaxLength(2000);
+            b.Property(n => n.RowVersion).IsRowVersion();
+            b.HasIndex(n => new { n.ClinicId, n.PatientId });
+            b.HasQueryFilter(n => _currentClinic.IsPlatformAdmin || n.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // PatientAttachments tenant table (patients schema)
+        builder.Entity<PatientAttachment>(b =>
+        {
+            b.ToTable("PatientAttachments", "patients");
+            b.HasKey(a => a.Id);
+            b.Property(a => a.Category).IsRequired().HasMaxLength(60);
+            b.Property(a => a.FileName).IsRequired().HasMaxLength(255);
+            b.Property(a => a.ContentType).IsRequired().HasMaxLength(100);
+            b.Property(a => a.Sha256Hash).IsRequired().HasMaxLength(64);
+            b.Property(a => a.StorageKey).IsRequired().HasMaxLength(500);
+            b.Property(a => a.ThumbnailStorageKey).HasMaxLength(500);
+            b.Property(a => a.Notes).HasMaxLength(500);
+            b.Property(a => a.RowVersion).IsRowVersion();
+            b.HasIndex(a => new { a.ClinicId, a.PatientId });
+            b.HasQueryFilter(a => _currentClinic.IsPlatformAdmin || a.ClinicId == _currentClinic.ClinicId);
+        });
     }
 
     /// <summary>
@@ -466,7 +552,17 @@ public sealed class CoreDbContext : IdentityDbContext<AppUser, AppRole, Guid>
                 ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON core.ClinicDaysOff,
                 ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON core.ClinicDaysOff,
                 ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON core.NumberBlocks,
-                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON core.NumberBlocks
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON core.NumberBlocks,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON core.ProcessedOperations,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON core.ProcessedOperations,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON patients.Patients,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON patients.Patients,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON patients.PatientAllergies,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON patients.PatientAllergies,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON patients.PatientNotes,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON patients.PatientNotes,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON patients.PatientAttachments,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON patients.PatientAttachments
                 WITH (STATE = ON);
             ');
         ";

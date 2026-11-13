@@ -8,3 +8,4 @@ public sealed class CreateClinicRoomDto
     public string? SpecialtyCode { get; set; }
     public string? FloorOrLocation { get; set; }
 }
+

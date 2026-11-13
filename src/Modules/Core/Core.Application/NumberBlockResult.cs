@@ -13,3 +13,4 @@ public sealed record NumberBlockResult(
     long NextNumber,
     string Status,
     DateTimeOffset CreatedAtUtc);
+

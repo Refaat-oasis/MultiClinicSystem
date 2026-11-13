@@ -15,3 +15,4 @@ public sealed record ClinicDoctorResult(
     int SlotDurationMinutes,
     bool IsActive,
     DateTimeOffset CreatedAtUtc);
+

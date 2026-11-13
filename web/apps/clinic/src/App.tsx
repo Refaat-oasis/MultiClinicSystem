@@ -19,6 +19,10 @@ import {
   StaffDevicesScreen,
   ClinicStructureScreen,
   OwnerPortfolioAndWidgetsScreen,
+  Phase5PatientsScreen,
+  type PatientSummaryItem,
+  type PatientDetailData,
+  type PatientScopingSettings,
   type MyClinicCard,
   type OnboardingWizardState,
   type SpecialtyOption,
@@ -71,6 +75,7 @@ type ActiveTab =
   | 'roles'
   | 'staffDevices'
   | 'structure'
+  | 'patients'
   | 'portfolio'
   | 'profile'
   | 'health';
@@ -110,6 +115,12 @@ export const App: React.FC = () => {
   const [workingHours, setWorkingHours] = useState<WorkingHourItem[]>([]);
   const [daysOff, setDaysOff] = useState<DayOffItem[]>([]);
   const [numberBlocks, setNumberBlocks] = useState<NumberBlockItem[]>([]);
+  const [patients, setPatients] = useState<PatientSummaryItem[]>([]);
+  const [selectedPatient, setSelectedPatient] = useState<PatientDetailData | null>(null);
+  const [patientScoping, setPatientScoping] = useState<PatientScopingSettings>({
+    scopePatientsByDoctor: false,
+    scopePatientsBySpecialty: false,
+  });
 
   const activeClinic = clinics.find((c) => c.clinicId === activeClinicId) ?? clinics[0] ?? null;
 
@@ -417,6 +428,15 @@ export const App: React.FC = () => {
         </GlassButton>
 
         <GlassButton
+          aria-label="تبويب المرضى والملف الطبي"
+          variant={activeTab === 'patients' ? 'prominent' : 'default'}
+          onClick={() => setActiveTab('patients')}
+        >
+          <Users size={16} />
+          المرضى والملف الطبي
+        </GlassButton>
+
+        <GlassButton
           aria-label="تبويب المحفظة والمؤشرات"
           variant={activeTab === 'portfolio' ? 'prominent' : 'default'}
           onClick={() => setActiveTab('portfolio')}
@@ -683,6 +703,55 @@ export const App: React.FC = () => {
                 ];
               })
             }
+          />
+        )}
+
+        {activeTab === 'patients' && (
+          <Phase5PatientsScreen
+            patients={patients}
+            selectedPatient={selectedPatient}
+            scopingSettings={patientScoping}
+            onSaveScoping={(next) => setPatientScoping(next)}
+            onSelectPatient={(id) => {
+              const found = patients.find((p) => p.id === id);
+              if (found) {
+                setSelectedPatient({
+                  id: found.id,
+                  clinicId: activeClinic?.clinicId ?? '',
+                  fileNumber: found.fileNumber,
+                  fullName: found.fullName,
+                  phone: found.phone,
+                  ageYears: found.ageYears,
+                  gender: found.gender,
+                  isMedicalHistoryEnabled: true,
+                  isMedicalHistoryReviewed: false,
+                  chronicConditions: [],
+                  currentMedications: [],
+                  pastSurgeries: [],
+                  allergies: [],
+                  notes: [],
+                  isAttachmentsEnabled: true,
+                  attachments: [],
+                  duplicateWarnings: [],
+                });
+              }
+            }}
+            onCreatePatient={(payload) => {
+              const id = typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `pat-${Date.now()}`;
+              const fileNumber = `P-${String(patients.length + 1).padStart(6, '0')}`;
+              const summary: PatientSummaryItem = {
+                id,
+                fileNumber,
+                fullName: payload.fullName,
+                phone: payload.phone,
+                gender: payload.gender,
+                ageYears: payload.approximateAgeYears ?? 30,
+                primarySpecialtyCode: payload.primarySpecialtyCode ?? null,
+                allergyCount: 0,
+                hasSevereAllergy: false,
+              };
+              setPatients((prev) => [summary, ...prev]);
+            }}
           />
         )}
 

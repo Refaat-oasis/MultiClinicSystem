@@ -189,6 +189,12 @@ builder.Services.AddScoped<IClinicAuthorizationService, ClinicAuthorizationServi
 builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<IOwnerPortfolio, OwnerPortfolioService>();
 builder.Services.AddScoped<IClinicStructureService, ClinicStructureService>();
+builder.Services.AddScoped<IPatientService, PatientService>();
+builder.Services.AddScoped<IClinicAuthorizationService, ClinicAuthorizationService>();
+builder.Services.AddScoped<IDashboardService, DashboardService>();
+builder.Services.AddScoped<IOwnerPortfolio, OwnerPortfolioService>();
+builder.Services.AddScoped<IClinicStructureService, ClinicStructureService>();
+builder.Services.AddScoped<IPatientService, PatientService>();
 
 // Configure ProblemDetails and Controllers
 builder.Services.AddProblemDetails();

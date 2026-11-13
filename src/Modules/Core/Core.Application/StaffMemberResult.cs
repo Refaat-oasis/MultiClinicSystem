@@ -16,3 +16,4 @@ public sealed record StaffMemberResult(
     IReadOnlyList<string> EffectivePermissions,
     IReadOnlyList<string> DormantPermissions,
     IReadOnlyList<PermissionOverrideInput> Overrides);
+
