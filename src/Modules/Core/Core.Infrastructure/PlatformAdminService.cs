@@ -24,6 +24,8 @@ public sealed class PlatformAdminService : IPlatformAdminService
     private readonly IPlatformAdminAuthService _adminAuthService;
     private readonly IPlatformAccess _platformAccess;
     private readonly ITokenService _tokenService;
+    private readonly IModuleCatalogService _moduleCatalog;
+    private readonly IOutbox _outbox;
     private readonly IClock _clock;
     private readonly IAuditService _auditService;
 
@@ -35,6 +37,8 @@ public sealed class PlatformAdminService : IPlatformAdminService
         IPlatformAdminAuthService adminAuthService,
         IPlatformAccess platformAccess,
         ITokenService tokenService,
+        IModuleCatalogService moduleCatalog,
+        IOutbox outbox,
         IClock clock,
         IAuditService auditService)
     {
@@ -45,6 +49,8 @@ public sealed class PlatformAdminService : IPlatformAdminService
         _adminAuthService = adminAuthService ?? throw new ArgumentNullException(nameof(adminAuthService));
         _platformAccess = platformAccess ?? throw new ArgumentNullException(nameof(platformAccess));
         _tokenService = tokenService ?? throw new ArgumentNullException(nameof(tokenService));
+        _moduleCatalog = moduleCatalog ?? throw new ArgumentNullException(nameof(moduleCatalog));
+        _outbox = outbox ?? throw new ArgumentNullException(nameof(outbox));
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         _auditService = auditService ?? throw new ArgumentNullException(nameof(auditService));
     }
@@ -136,6 +142,18 @@ public sealed class PlatformAdminService : IPlatformAdminService
             .Where(c => c.OwnerId.HasValue && ownerIds.Contains(c.OwnerId.Value))
             .ToListAsync(cancellationToken);
 
+        var clinicIds = clinics.Select(c => c.Id).ToList();
+        var enabledModulesByClinic = await _platformAccess.ExecuteAsPlatformAdminAsync(async () =>
+        {
+            var rows = await _dbContext.ClinicModules
+                .Where(m => clinicIds.Contains(m.ClinicId) && m.Enabled)
+                .ToListAsync(cancellationToken);
+
+            return rows
+                .GroupBy(m => m.ClinicId)
+                .ToDictionary(g => g.Key, g => (IReadOnlyList<string>)g.Select(x => x.ModuleKey).OrderBy(k => k).ToList());
+        }, reason: "SuperAdmin List Clinic Modules", actorId: "platform-admin", cancellationToken: cancellationToken);
+
         string? term = string.IsNullOrWhiteSpace(search) ? null : search.Trim();
 
         var results = new List<OwnerSummaryResult>();
@@ -144,7 +162,7 @@ public sealed class PlatformAdminService : IPlatformAdminService
             users.TryGetValue(owner.UserId, out var user);
             var ownerClinics = clinics
                 .Where(c => c.OwnerId == owner.Id)
-                .Select(MapClinicSummary)
+                .Select(c => MapClinicSummary(c, enabledModulesByClinic.TryGetValue(c.Id, out var mods) ? mods : Array.Empty<string>()))
                 .ToList();
 
             if (term != null)
@@ -199,6 +217,18 @@ public sealed class PlatformAdminService : IPlatformAdminService
             .OrderBy(c => c.Name)
             .ToListAsync(cancellationToken);
 
+        var ownerClinicIds = clinics.Select(c => c.Id).ToList();
+        var enabledModulesByClinic = await _platformAccess.ExecuteAsPlatformAdminAsync(async () =>
+        {
+            var rows = await _dbContext.ClinicModules
+                .Where(m => ownerClinicIds.Contains(m.ClinicId) && m.Enabled)
+                .ToListAsync(cancellationToken);
+
+            return rows
+                .GroupBy(m => m.ClinicId)
+                .ToDictionary(g => g.Key, g => (IReadOnlyList<string>)g.Select(x => x.ModuleKey).OrderBy(k => k).ToList());
+        }, reason: "SuperAdmin Get Owner Detail Modules", actorId: "platform-admin", cancellationToken: cancellationToken);
+
         return Result<OwnerDetailResult>.Success(new OwnerDetailResult(
             OwnerId: owner.Id,
             UserId: owner.UserId,
@@ -209,7 +239,7 @@ public sealed class PlatformAdminService : IPlatformAdminService
             EmailConfirmed: user?.EmailConfirmed ?? false,
             MaxClinics: owner.MaxClinics,
             CreatedAtUtc: owner.CreatedAtUtc,
-            Clinics: clinics.Select(MapClinicSummary).ToList()));
+            Clinics: clinics.Select(c => MapClinicSummary(c, enabledModulesByClinic.TryGetValue(c.Id, out var mods) ? mods : Array.Empty<string>())).ToList()));
     }
 
     public async Task<Result> ResendOwnerInvitationCodeAsync(
@@ -613,7 +643,20 @@ public sealed class PlatformAdminService : IPlatformAdminService
         int totalClinics = clinics.Count;
         int activeClinics = clinics.Count(c => c.Status == "Active");
         int pendingOnboarding = clinics.Count(c => c.Status == "PendingOnboarding");
-        int awaitingModuleSetup = clinics.Count(c => c.IsActive && !string.Equals(c.Status, "Suspended", StringComparison.OrdinalIgnoreCase));
+        var clinicsWithEnabledModules = await _platformAccess.ExecuteAsPlatformAdminAsync(() =>
+            _dbContext.ClinicModules
+                .Where(m => m.Enabled)
+                .Select(m => m.ClinicId)
+                .Distinct()
+                .ToListAsync(cancellationToken),
+            reason: "SuperAdmin Dashboard Module Count",
+            actorId: "platform-admin",
+            cancellationToken: cancellationToken);
+        var configuredClinicSet = clinicsWithEnabledModules.ToHashSet();
+        int awaitingModuleSetup = clinics.Count(c =>
+            c.IsActive &&
+            !string.Equals(c.Status, "Suspended", StringComparison.OrdinalIgnoreCase) &&
+            !configuredClinicSet.Contains(c.Id));
         int readOnly = clinics.Count(c => c.Status == "ReadOnly");
         int suspended = clinics.Count(c => c.Status == "Suspended");
 
@@ -745,6 +788,178 @@ public sealed class PlatformAdminService : IPlatformAdminService
         return Result<IReadOnlyList<PatientAccessLogItemResult>>.Success(logs);
     }
 
+    public async Task<Result<IReadOnlyList<ClinicModuleStateResult>>> GetClinicModulesAsync(
+        Guid clinicId,
+        CancellationToken cancellationToken = default)
+    {
+        var clinic = await _dbContext.Clinics
+            .FirstOrDefaultAsync(c => c.Id == clinicId, cancellationToken);
+
+        if (clinic == null)
+        {
+            return Result<IReadOnlyList<ClinicModuleStateResult>>.Failure(
+                Error.NotFound("CLINIC_NOT_FOUND", "Clinic not found."));
+        }
+
+        var rows = await _platformAccess.ExecuteAsPlatformAdminAsync(() =>
+            _dbContext.ClinicModules
+                .Where(m => m.ClinicId == clinicId)
+                .ToListAsync(cancellationToken),
+            reason: "SuperAdmin Get Clinic Modules",
+            actorId: "platform-admin",
+            cancellationToken: cancellationToken);
+
+        return Result<IReadOnlyList<ClinicModuleStateResult>>.Success(BuildModuleStates(rows));
+    }
+
+    public async Task<Result<IReadOnlyList<ClinicModuleStateResult>>> UpdateClinicModulesAsync(
+        Guid adminId,
+        Guid clinicId,
+        IReadOnlyList<ModuleToggleInput> modules,
+        string? stepUpPassword,
+        string? ipAddress,
+        string? requestId,
+        CancellationToken cancellationToken = default)
+    {
+        var stepUp = await EnsureStepUpAsync(adminId, stepUpPassword, ipAddress, requestId, cancellationToken);
+        if (!stepUp.IsSuccess)
+        {
+            return Result<IReadOnlyList<ClinicModuleStateResult>>.Failure(stepUp.Error);
+        }
+
+        var clinic = await _dbContext.Clinics
+            .FirstOrDefaultAsync(c => c.Id == clinicId, cancellationToken);
+
+        if (clinic == null)
+        {
+            return Result<IReadOnlyList<ClinicModuleStateResult>>.Failure(
+                Error.NotFound("CLINIC_NOT_FOUND", "Clinic not found."));
+        }
+
+        var rows = await _platformAccess.ExecuteAsPlatformAdminAsync(() =>
+            _dbContext.ClinicModules
+                .Where(m => m.ClinicId == clinicId)
+                .ToListAsync(cancellationToken),
+            reason: "SuperAdmin Load Clinic Modules",
+            actorId: adminId.ToString(),
+            cancellationToken: cancellationToken);
+
+        var currentlyEnabled = rows
+            .Where(r => r.Enabled)
+            .Select(r => r.ModuleKey)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var validation = _moduleCatalog.ValidateModuleChanges(currentlyEnabled, modules);
+        if (validation.IsFailure)
+        {
+            return Result<IReadOnlyList<ClinicModuleStateResult>>.Failure(validation.Error);
+        }
+
+        var oldState = rows
+            .Where(r => r.Enabled)
+            .Select(r => r.ModuleKey)
+            .OrderBy(k => k)
+            .ToList();
+
+        DateTimeOffset now = _clock.UtcNow;
+        await _platformAccess.ExecuteAsPlatformAdminAsync(async () =>
+        {
+            var existingByKey = rows.ToDictionary(r => r.ModuleKey, StringComparer.OrdinalIgnoreCase);
+
+            foreach (var input in modules)
+            {
+                string key = input.ModuleKey.Trim().ToLowerInvariant();
+                if (existingByKey.TryGetValue(key, out var existing))
+                {
+                    existing.SetEnabled(input.Enabled, adminId, now, input.Note);
+                }
+                else
+                {
+                    var created = new ClinicModule(
+                        GuidV7.NewGuid(),
+                        clinicId,
+                        key,
+                        input.Enabled,
+                        adminId,
+                        now,
+                        input.Note);
+                    _dbContext.ClinicModules.Add(created);
+                    rows.Add(created);
+                }
+            }
+
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            return 0;
+        }, reason: "SuperAdmin Update Clinic Modules", actorId: adminId.ToString(), cancellationToken: cancellationToken);
+
+        var newState = rows
+            .Where(r => r.Enabled)
+            .Select(r => r.ModuleKey)
+            .OrderBy(k => k)
+            .ToList();
+
+        await _outbox.EnqueueAsync(
+            "ClinicModuleChanged",
+            JsonSerializer.Serialize(new
+            {
+                clinicId,
+                changedByAdminId = adminId,
+                enabledModules = newState,
+                changedAtUtc = now
+            }),
+            cancellationToken);
+
+        await _auditService.LogAsync(
+            action: "ClinicModulesUpdated",
+            entityName: "ClinicModule",
+            entityId: clinicId.ToString(),
+            oldValues: JsonSerializer.Serialize(new { enabledModules = oldState }),
+            newValues: JsonSerializer.Serialize(new { enabledModules = newState }),
+            userId: adminId,
+            clinicId: clinicId,
+            ipAddress: ipAddress,
+            requestId: requestId,
+            cancellationToken: cancellationToken);
+
+        return Result<IReadOnlyList<ClinicModuleStateResult>>.Success(BuildModuleStates(rows));
+    }
+
+    private List<ClinicModuleStateResult> BuildModuleStates(IReadOnlyList<ClinicModule> rows)
+    {
+        var rowByKey = rows.ToDictionary(r => r.ModuleKey, StringComparer.OrdinalIgnoreCase);
+        var enabledSet = rows
+            .Where(r => r.Enabled)
+            .Select(r => r.ModuleKey)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        return _moduleCatalog.GetSwitchableModules()
+            .Select(def =>
+            {
+                rowByKey.TryGetValue(def.ModuleKey, out var row);
+                bool enabled = row?.Enabled ?? false;
+                var missingPrereqs = def.Prerequisites
+                    .Where(p => !enabledSet.Contains(p))
+                    .ToList();
+                var enabledDependents = _moduleCatalog.GetDirectDependents(def.ModuleKey)
+                    .Where(d => enabledSet.Contains(d))
+                    .ToList();
+
+                return new ClinicModuleStateResult(
+                    ModuleKey: def.ModuleKey,
+                    TitleAr: def.TitleAr,
+                    TitleEn: def.TitleEn,
+                    DescriptionAr: def.DescriptionAr,
+                    DescriptionEn: def.DescriptionEn,
+                    Enabled: enabled,
+                    Prerequisites: def.Prerequisites,
+                    MissingPrerequisites: missingPrereqs,
+                    EnabledDependents: enabledDependents,
+                    ChangedAtUtc: row?.ChangedAtUtc,
+                    Note: row?.Note);
+            })
+            .ToList();
+    }
+
     private async Task<Result> EnsureStepUpAsync(
         Guid adminId,
         string? stepUpPassword,
@@ -768,7 +983,7 @@ public sealed class PlatformAdminService : IPlatformAdminService
         return Result.Failure(Error.Forbidden("STEP_UP_REQUIRED", "Step-up password confirmation is required for this sensitive action."));
     }
 
-    private static ClinicSummaryResult MapClinicSummary(Clinic clinic)
+    private static ClinicSummaryResult MapClinicSummary(Clinic clinic, IReadOnlyList<string> enabledModules)
     {
         return new ClinicSummaryResult(
             ClinicId: clinic.Id,
@@ -779,6 +994,6 @@ public sealed class PlatformAdminService : IPlatformAdminService
             GraceDays: clinic.GraceDays,
             IsActive: clinic.IsActive,
             CreatedAtUtc: clinic.CreatedAtUtc,
-            ModulesEnabled: Array.Empty<string>());
+            ModulesEnabled: enabledModules);
     }
 }

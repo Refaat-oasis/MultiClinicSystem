@@ -165,6 +165,57 @@ public sealed class PlatformClinicsController : ControllerBase
             v.ReadOnlyMode));
     }
 
+    [HttpGet("{clinicId:guid}/modules")]
+    [ProducesResponseType(typeof(IReadOnlyList<ClinicModuleStateViewModel>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetClinicModules(Guid clinicId, CancellationToken cancellationToken)
+    {
+        var result = await _platformService.GetClinicModulesAsync(clinicId, cancellationToken);
+        if (result.IsFailure)
+        {
+            return ProblemDetailsMapper.ToProblemDetails(result.Error);
+        }
+
+        return Ok(result.Value.Select(MapModuleViewModel).ToList());
+    }
+
+    [HttpPut("{clinicId:guid}/modules")]
+    [ProducesResponseType(typeof(IReadOnlyList<ClinicModuleStateViewModel>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> UpdateClinicModules(
+        Guid clinicId,
+        [FromBody] UpdateClinicModulesDto dto,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetAdminId(out Guid adminId))
+        {
+            return Unauthorized();
+        }
+
+        string? ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
+        string? requestId = HttpContext.Items["RequestId"]?.ToString();
+        var inputs = (dto.Modules ?? new List<ModuleToggleItemDto>())
+            .Select(m => new ModuleToggleInput(m.ModuleKey, m.Enabled, m.Note))
+            .ToList();
+
+        var result = await _platformService.UpdateClinicModulesAsync(
+            adminId,
+            clinicId,
+            inputs,
+            dto.StepUpPassword,
+            ipAddress,
+            requestId,
+            cancellationToken);
+
+        if (result.IsFailure)
+        {
+            return ProblemDetailsMapper.ToProblemDetails(result.Error);
+        }
+
+        return Ok(result.Value.Select(MapModuleViewModel).ToList());
+    }
+
     [HttpPost("{clinicId:guid}/inspect/{*subpath}")]
     [HttpPut("{clinicId:guid}/inspect/{*subpath}")]
     [HttpDelete("{clinicId:guid}/inspect/{*subpath}")]
@@ -184,5 +235,18 @@ public sealed class PlatformClinicsController : ControllerBase
         string? sub = User.FindFirstValue(ClaimTypes.NameIdentifier);
         return Guid.TryParse(sub, out adminId);
     }
+
+    private static ClinicModuleStateViewModel MapModuleViewModel(ClinicModuleStateResult m) => new(
+        m.ModuleKey,
+        m.TitleAr,
+        m.TitleEn,
+        m.DescriptionAr,
+        m.DescriptionEn,
+        m.Enabled,
+        m.Prerequisites,
+        m.MissingPrerequisites,
+        m.EnabledDependents,
+        m.ChangedAtUtc,
+        m.Note);
 }
 

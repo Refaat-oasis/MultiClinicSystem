@@ -100,5 +100,18 @@ public interface IPlatformAdminService
         Guid ownerUserId,
         Guid? clinicId,
         CancellationToken cancellationToken = default);
+
+    Task<Result<IReadOnlyList<ClinicModuleStateResult>>> GetClinicModulesAsync(
+        Guid clinicId,
+        CancellationToken cancellationToken = default);
+
+    Task<Result<IReadOnlyList<ClinicModuleStateResult>>> UpdateClinicModulesAsync(
+        Guid adminId,
+        Guid clinicId,
+        IReadOnlyList<ModuleToggleInput> modules,
+        string? stepUpPassword,
+        string? ipAddress,
+        string? requestId,
+        CancellationToken cancellationToken = default);
 }
 

@@ -14,11 +14,24 @@ import {
   OnboardingWizardScreen,
   ClinicSettingsScreen,
   UserProfileScreen,
+  MyFeaturesScreen,
+  RolesPermissionsScreen,
+  StaffDevicesScreen,
+  ClinicStructureScreen,
+  OwnerPortfolioAndWidgetsScreen,
   type MyClinicCard,
   type OnboardingWizardState,
   type SpecialtyOption,
   type ClinicSettingsData,
   type UserProfileData,
+  type ClinicRoleItem,
+  type StaffMemberItem,
+  type ClinicDeviceItem,
+  type ClinicRoomItem,
+  type ClinicDoctorItem,
+  type WorkingHourItem,
+  type DayOffItem,
+  type NumberBlockItem,
 } from '@clinic/feature-core';
 import {
   Activity,
@@ -33,6 +46,11 @@ import {
   Sparkles,
   Settings,
   User,
+  Blocks,
+  Shield,
+  Users,
+  DoorOpen,
+  BarChart3,
 } from 'lucide-react';
 
 interface HealthStatus {
@@ -49,6 +67,11 @@ type ActiveTab =
   | 'myClinics'
   | 'onboarding'
   | 'clinicSettings'
+  | 'features'
+  | 'roles'
+  | 'staffDevices'
+  | 'structure'
+  | 'portfolio'
   | 'profile'
   | 'health';
 
@@ -66,6 +89,27 @@ export const App: React.FC = () => {
   const [clinics, setClinics] = useState<MyClinicCard[]>([]);
   const [activeClinicId, setActiveClinicId] = useState<string | null>(null);
   const [clinicError, setClinicError] = useState<string | null>(null);
+  const [roles, setRoles] = useState<ClinicRoleItem[]>([
+    {
+      roleId: 'role-recep',
+      name: 'Receptionist',
+      nameAr: 'استقبال',
+      nameEn: 'Receptionist',
+      isSystemOwner: false,
+      isEditable: true,
+      assignedUsersCount: 0,
+      permissions: ['dashboard.view', 'patients.read'],
+      effectivePermissions: ['dashboard.view'],
+      dormantPermissions: ['patients.read'],
+    },
+  ]);
+  const [staffMembers, setStaffMembers] = useState<StaffMemberItem[]>([]);
+  const [clinicDevices, setClinicDevices] = useState<ClinicDeviceItem[]>([]);
+  const [rooms, setRooms] = useState<ClinicRoomItem[]>([]);
+  const [doctors, setDoctors] = useState<ClinicDoctorItem[]>([]);
+  const [workingHours, setWorkingHours] = useState<WorkingHourItem[]>([]);
+  const [daysOff, setDaysOff] = useState<DayOffItem[]>([]);
+  const [numberBlocks, setNumberBlocks] = useState<NumberBlockItem[]>([]);
 
   const activeClinic = clinics.find((c) => c.clinicId === activeClinicId) ?? clinics[0] ?? null;
 
@@ -337,6 +381,51 @@ export const App: React.FC = () => {
         </GlassButton>
 
         <GlassButton
+          aria-label="تبويب الميزات المفعلة"
+          variant={activeTab === 'features' ? 'prominent' : 'default'}
+          onClick={() => setActiveTab('features')}
+        >
+          <Blocks size={16} />
+          الميزات المفعلة
+        </GlassButton>
+
+        <GlassButton
+          aria-label="تبويب الأدوار والصلاحيات"
+          variant={activeTab === 'roles' ? 'prominent' : 'default'}
+          onClick={() => setActiveTab('roles')}
+        >
+          <Shield size={16} />
+          الأدوار والصلاحيات
+        </GlassButton>
+
+        <GlassButton
+          aria-label="تبويب الطاقم والأجهزة"
+          variant={activeTab === 'staffDevices' ? 'prominent' : 'default'}
+          onClick={() => setActiveTab('staffDevices')}
+        >
+          <Users size={16} />
+          الطاقم والأجهزة
+        </GlassButton>
+
+        <GlassButton
+          aria-label="تبويب هيكل العيادة"
+          variant={activeTab === 'structure' ? 'prominent' : 'default'}
+          onClick={() => setActiveTab('structure')}
+        >
+          <DoorOpen size={16} />
+          هيكل العيادة
+        </GlassButton>
+
+        <GlassButton
+          aria-label="تبويب المحفظة والمؤشرات"
+          variant={activeTab === 'portfolio' ? 'prominent' : 'default'}
+          onClick={() => setActiveTab('portfolio')}
+        >
+          <BarChart3 size={16} />
+          المحفظة والمؤشرات
+        </GlassButton>
+
+        <GlassButton
           aria-label="تبويب الملف الشخصي"
           variant={activeTab === 'profile' ? 'prominent' : 'default'}
           onClick={() => setActiveTab('profile')}
@@ -480,6 +569,147 @@ export const App: React.FC = () => {
                 )
               );
             }}
+          />
+        )}
+
+        {activeTab === 'features' && (
+          <MyFeaturesScreen
+            modules={[
+              {
+                moduleKey: 'patients',
+                titleAr: 'إدارة المرضى',
+                titleEn: 'Patients Registry',
+                descriptionAr: 'سجلات المرضى والبحث الذكي والملفات.',
+                descriptionEn: 'Patients Registry',
+                enabled: (activeClinic?.modulesEnabled ?? []).includes('patients'),
+                prerequisites: [],
+                missingPrerequisites: [],
+                enabledDependents: [],
+              },
+            ]}
+            menuItems={[]}
+            effectivePermissions={['dashboard.view', 'structure.manage', 'roles.manage', 'users.manage']}
+          />
+        )}
+
+        {activeTab === 'roles' && (
+          <RolesPermissionsScreen
+            roles={roles}
+            catalog={[
+              { key: 'dashboard.view', moduleKey: 'core', group: 'Core', titleAr: 'عرض لوحة التحكم', titleEn: 'View Dashboard', isReserved: false },
+              { key: 'patients.read', moduleKey: 'patients', group: 'Patients', titleAr: 'عرض المرضى', titleEn: 'Read Patients', isReserved: false },
+              { key: 'clinic.settings.edit', moduleKey: 'core', group: 'Core', titleAr: 'تعديل إعدادات العيادة', titleEn: 'Edit Settings', isReserved: true },
+            ]}
+            staff={staffMembers}
+            onCloneRole={(sourceRoleId, newName) => {
+              const source = roles.find((r) => r.roleId === sourceRoleId);
+              if (!source) return;
+              setRoles((prev) => [
+                ...prev,
+                {
+                  ...source,
+                  roleId: `role-${Date.now()}`,
+                  name: newName,
+                  nameAr: newName,
+                  nameEn: newName,
+                  assignedUsersCount: 0,
+                },
+              ]);
+            }}
+            onUpdateRolePermissions={(roleId, permissions) =>
+              setRoles((prev) => prev.map((r) => (r.roleId === roleId ? { ...r, permissions } : r)))
+            }
+            onSetUserOverrides={(staffUserId, overrides) =>
+              setStaffMembers((prev) => prev.map((s) => (s.userId === staffUserId ? { ...s, overrides } : s)))
+            }
+          />
+        )}
+
+        {activeTab === 'staffDevices' && (
+          <StaffDevicesScreen
+            staff={staffMembers}
+            roles={roles}
+            devices={clinicDevices}
+            onInviteStaff={({ fullName, email, roleName }) =>
+              setStaffMembers((prev) => [
+                ...prev,
+                {
+                  userId: `staff-${Date.now()}`,
+                  fullName,
+                  email,
+                  roleName,
+                  isOwner: false,
+                  isActive: false,
+                  effectivePermissions: [],
+                  dormantPermissions: [],
+                  overrides: [],
+                },
+              ])
+            }
+            onApproveDevice={(deviceId) =>
+              setClinicDevices((prev) => prev.map((d) => (d.deviceId === deviceId ? { ...d, isApproved: true } : d)))
+            }
+          />
+        )}
+
+        {activeTab === 'structure' && (
+          <ClinicStructureScreen
+            rooms={rooms}
+            doctors={doctors}
+            workingHours={workingHours}
+            daysOff={daysOff}
+            numberBlocks={numberBlocks}
+            onCreateRoom={({ code, nameAr, nameEn }) =>
+              setRooms((prev) => [...prev, { id: `room-${Date.now()}`, roomCode: code, nameAr, nameEn, isActive: true }])
+            }
+            onCreateDoctor={({ fullName, titleAr, slotDurationMinutes }) =>
+              setDoctors((prev) => [
+                ...prev,
+                { id: `doc-${Date.now()}`, fullName, titleAr, titleEn: titleAr, specialtyCodes: [], assignedRoomIds: [], slotDurationMinutes, isActive: true },
+              ])
+            }
+            onSaveDefaultHours={(items) => setWorkingHours(items)}
+            onCreateDayOff={({ startDate, endDate, reasonAr }) =>
+              setDaysOff((prev) => [...prev, { id: `off-${Date.now()}`, startDate, endDate, reasonAr, reasonEn: reasonAr }])
+            }
+            onReserveBlock={(kind) =>
+              setNumberBlocks((prev) => {
+                const maxTo = prev.filter((b) => b.kind === kind).reduce((m, b) => Math.max(m, b.toNumber), 0);
+                const fromNumber = maxTo + 1;
+                const toNumber = fromNumber + 499;
+                return [
+                  ...prev,
+                  { id: `blk-${Date.now()}`, deviceId: 'web-browser', kind, fromNumber, toNumber, nextNumber: fromNumber, status: 'Active' },
+                ];
+              })
+            }
+          />
+        )}
+
+        {activeTab === 'portfolio' && (
+          <OwnerPortfolioAndWidgetsScreen
+            widgets={[
+              { widgetKey: 'core.rooms-count', moduleKey: 'core', titleAr: 'الغرف النشطة', titleEn: 'Rooms', primaryValue: rooms.length, unitLabel: 'count' },
+              { widgetKey: 'core.doctors-count', moduleKey: 'core', titleAr: 'الأطباء المسجلون', titleEn: 'Doctors', primaryValue: doctors.length, unitLabel: 'count' },
+            ]}
+            portfolio={{
+              ownerId: user?.id ?? 'owner',
+              totalClinics: clinics.length,
+              activeClinics: clinics.length,
+              totalStaffAcrossClinics: staffMembers.length,
+              totalDoctorsAcrossClinics: doctors.length,
+              clinics: clinics.map((c) => ({
+                clinicId: c.clinicId,
+                name: c.name,
+                slug: c.slug,
+                status: c.status,
+                staffCount: staffMembers.length,
+                roomsCount: rooms.length,
+                doctorsCount: doctors.length,
+                enabledModulesCount: c.modulesEnabled.length,
+              })),
+            }}
+            auditLogs={[]}
           />
         )}
 

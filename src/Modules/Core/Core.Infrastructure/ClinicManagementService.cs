@@ -78,12 +78,22 @@ public sealed class ClinicManagementService : IClinicManagementService
         var cards = new List<MyClinicCardResult>(clinics.Count);
         foreach (var clinic in clinics)
         {
-            var steps = await ExecuteForClinicAsync(clinic.Id, () =>
-                _dbContext.OnboardingProgresses
+            var (steps, enabledModules) = await ExecuteForClinicAsync(clinic.Id, async () =>
+            {
+                var stepList = await _dbContext.OnboardingProgresses
                     .Where(p => p.ClinicId == clinic.Id)
                     .OrderBy(p => p.CompletedAtUtc)
                     .Select(p => p.StepKey)
-                    .ToListAsync(cancellationToken));
+                    .ToListAsync(cancellationToken);
+
+                var moduleList = await _dbContext.ClinicModules
+                    .Where(m => m.ClinicId == clinic.Id && m.Enabled)
+                    .OrderBy(m => m.ModuleKey)
+                    .Select(m => m.ModuleKey)
+                    .ToListAsync(cancellationToken);
+
+                return (stepList, moduleList);
+            });
 
             cards.Add(new MyClinicCardResult(
                 ClinicId: clinic.Id,
@@ -95,7 +105,7 @@ public sealed class ClinicManagementService : IClinicManagementService
                 Currency: clinic.Currency,
                 RoundingRule: clinic.RoundingRule,
                 LogoAssetId: clinic.LogoAssetId,
-                ModulesEnabled: Array.Empty<string>(),
+                ModulesEnabled: enabledModules,
                 CompletedSteps: steps,
                 WelcomeSeen: owner?.WelcomeSeen ?? false));
         }
@@ -1057,10 +1067,17 @@ public sealed class ClinicManagementService : IClinicManagementService
         Clinic clinic,
         CancellationToken cancellationToken)
     {
-        int specialtiesCount = await ExecuteForClinicAsync(clinic.Id, () =>
-            _dbContext.ClinicSpecialties.CountAsync(s => s.ClinicId == clinic.Id && !s.IsVoided, cancellationToken));
+        var (specialtiesCount, modulesEnabled) = await ExecuteForClinicAsync(clinic.Id, async () =>
+        {
+            int specs = await _dbContext.ClinicSpecialties.CountAsync(s => s.ClinicId == clinic.Id && !s.IsVoided, cancellationToken);
+            var mods = await _dbContext.ClinicModules
+                .Where(m => m.ClinicId == clinic.Id && m.Enabled)
+                .OrderBy(m => m.ModuleKey)
+                .Select(m => m.ModuleKey)
+                .ToArrayAsync(cancellationToken);
+            return (specs, mods);
+        });
 
-        string[] modulesEnabled = Array.Empty<string>();
         bool awaitingSetup = modulesEnabled.Length == 0;
 
         return Result<ClinicDashboardResult>.Success(new ClinicDashboardResult(
@@ -1090,8 +1107,9 @@ public sealed class ClinicManagementService : IClinicManagementService
         Clinic clinic,
         CancellationToken cancellationToken)
     {
-        var specialties = await ExecuteForClinicAsync(clinic.Id, () =>
-            _dbContext.ClinicSpecialties
+        var (specialties, enabledModules) = await ExecuteForClinicAsync(clinic.Id, async () =>
+        {
+            var specs = await _dbContext.ClinicSpecialties
                 .Where(s => s.ClinicId == clinic.Id && !s.IsVoided)
                 .OrderBy(s => s.CreatedAtUtc)
                 .Select(s => new ClinicSpecialtyItemResult(
@@ -1102,9 +1120,17 @@ public sealed class ClinicManagementService : IClinicManagementService
                     s.HasDentalPlugin,
                     s.DefaultFormSchemaJson,
                     s.DefaultAppointmentCategoriesJson))
-                .ToListAsync(cancellationToken));
+                .ToListAsync(cancellationToken);
 
-        var sections = _settingsSectionRegistry.GetAvailableSections(Array.Empty<string>());
+            var mods = await _dbContext.ClinicModules
+                .Where(m => m.ClinicId == clinic.Id && m.Enabled)
+                .Select(m => m.ModuleKey)
+                .ToListAsync(cancellationToken);
+
+            return (specs, mods);
+        });
+
+        var sections = _settingsSectionRegistry.GetAvailableSections(enabledModules);
 
         return new ClinicSettingsResult(
             ClinicId: clinic.Id,

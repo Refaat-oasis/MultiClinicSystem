@@ -52,4 +52,12 @@ describe('Admin App Shell & Phase 2 Super Admin Views', () => {
     expect(screen.getByText(/PatientAccessLog/)).toBeDefined();
     expect(screen.getByText(/Writes Disabled in Inspect Mode/)).toBeDefined();
   });
+
+  it('renders clinic directory screen with step-up password input for module control and transfers', () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole('button', { name: /العيادات/ }));
+
+    expect(screen.getByText(/دليل العيادات ونقل الملكية/)).toBeDefined();
+    expect(screen.getByLabelText(/كلمة مرور التحقق الإضافي/)).toBeDefined();
+  });
 });

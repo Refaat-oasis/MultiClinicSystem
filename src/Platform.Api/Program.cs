@@ -171,6 +171,7 @@ builder.Services.AddAuthorization(options =>
 builder.Services.AddSingleton<IFileStorage, LocalFileStorage>();
 builder.Services.AddSingleton<IEmailSender, FakeEmailSender>();
 builder.Services.AddSingleton<ISpecialtyCatalog, SpecialtyCatalog>();
+builder.Services.AddSingleton<IModuleCatalogService, ModuleCatalogService>();
 builder.Services.AddSingleton<ISettingsSectionRegistry, SettingsSectionRegistry>();
 builder.Services.AddScoped<IOutbox, OutboxService>();
 builder.Services.AddScoped<OutboxService>();
@@ -184,6 +185,10 @@ builder.Services.AddScoped<IPlatformAdminAuthService, PlatformAdminAuthService>(
 builder.Services.AddScoped<IPlatformAdminService, PlatformAdminService>();
 builder.Services.AddScoped<IClinicManagementService, ClinicManagementService>();
 builder.Services.AddScoped<IProfileService, ProfileService>();
+builder.Services.AddScoped<IClinicAuthorizationService, ClinicAuthorizationService>();
+builder.Services.AddScoped<IDashboardService, DashboardService>();
+builder.Services.AddScoped<IOwnerPortfolio, OwnerPortfolioService>();
+builder.Services.AddScoped<IClinicStructureService, ClinicStructureService>();
 
 // Configure ProblemDetails and Controllers
 builder.Services.AddProblemDetails();

@@ -28,7 +28,11 @@ public static class ProblemDetailsMapper
                        c.Contains("STEP_UP_REQUIRED", StringComparison.OrdinalIgnoreCase) ||
                        c.Contains("INSPECT_MODE_READ_ONLY", StringComparison.OrdinalIgnoreCase) ||
                        c.Contains("CLINIC_SUSPENDED", StringComparison.OrdinalIgnoreCase) ||
-                       c.Contains("OWNER_DEACTIVATED", StringComparison.OrdinalIgnoreCase) => StatusCodes.Status403Forbidden,
+                       c.Contains("OWNER_DEACTIVATED", StringComparison.OrdinalIgnoreCase) ||
+                       c.Contains("DEVICE_APPROVAL_REQUIRED", StringComparison.OrdinalIgnoreCase) ||
+                       c.Contains("MODULE_DISABLED", StringComparison.OrdinalIgnoreCase) ||
+                       c.Contains("DELEGATION_CEILING_EXCEEDED", StringComparison.OrdinalIgnoreCase) ||
+                       c.Contains("SYSTEM_ROLE_PROTECTED", StringComparison.OrdinalIgnoreCase) => StatusCodes.Status403Forbidden,
             var c when c.Contains("NOT_FOUND", StringComparison.OrdinalIgnoreCase) => StatusCodes.Status404NotFound,
             var c when c.Contains("CONFLICT", StringComparison.OrdinalIgnoreCase) ||
                        c.Contains("ALREADY_EXISTS", StringComparison.OrdinalIgnoreCase) ||
@@ -36,7 +40,14 @@ public static class ProblemDetailsMapper
                        c.Contains("CLINIC_QUOTA_REACHED", StringComparison.OrdinalIgnoreCase) ||
                        c.Contains("ONBOARDING_REQUIRED", StringComparison.OrdinalIgnoreCase) ||
                        c.Contains("SLUG_TAKEN", StringComparison.OrdinalIgnoreCase) ||
-                       c.Contains("FINANCIAL_SETTINGS_LOCKED", StringComparison.OrdinalIgnoreCase) => StatusCodes.Status409Conflict,
+                       c.Contains("FINANCIAL_SETTINGS_LOCKED", StringComparison.OrdinalIgnoreCase) ||
+                       c.Contains("MODULE_PREREQUISITE_OFF", StringComparison.OrdinalIgnoreCase) ||
+                       c.Contains("MODULE_HAS_DEPENDENTS", StringComparison.OrdinalIgnoreCase) ||
+                       c.Contains("ROLE_IN_USE", StringComparison.OrdinalIgnoreCase) ||
+                       c.Contains("LAST_OWNER_PROTECTED", StringComparison.OrdinalIgnoreCase) ||
+                       c.Contains("ROOM_CODE_EXISTS", StringComparison.OrdinalIgnoreCase) ||
+                       c.Contains("NUMBER_BLOCK_CONTENTION", StringComparison.OrdinalIgnoreCase) ||
+                       c.Contains("NUMBER_BLOCK_EXHAUSTED", StringComparison.OrdinalIgnoreCase) => StatusCodes.Status409Conflict,
             _ => StatusCodes.Status400BadRequest
         };
 
