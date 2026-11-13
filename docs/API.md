@@ -463,3 +463,10 @@ Requires `"offline-sync"` module enabled, staff clinic membership, and non-revok
 - `POST /api/v1/clinics/{clinicId}/sync/conflicts/{conflictId}/resolve` (`offline_sync.resolve`): Resolves or dismisses an open sync conflict with optional `resolutionNote` (audited).
 - `GET /api/v1/clinics/{clinicId}/sync/devices` (`offline_sync.use`): Lists tracked device sync cursors, max clock skew observed, pending counts, and revocation state.
 - `GET /api/v1/platform/clinics/{clinicId}/inspect/offline-sync` (`PlatformAdmin`, admin host only): Super Admin read-only offline sync devices, conflicts, number blocks, and settings snapshot (`PatientAccessLog` via `IPlatformAccess`).
+
+---
+
+## 18. Phase 16: Security Hardening & Clinic Data Export
+
+- **Global Security Headers (`SecurityHeadersMiddleware`)**: Every HTTP response attaches `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, `Permissions-Policy: geolocation=(), microphone=(), camera=(self)`, strict `Content-Security-Policy`, `Strict-Transport-Security` outside `Development`, and `Cache-Control: no-store` on `/api/**` & `/c/**`.
+- `GET /api/v1/clinics/{clinicId}/export` (`clinic.export`, owner-reserved, online-only): Exports a tenant-isolated ZIP archive (`manifest.json`, `clinic.json`, `patients.json`, `appointments.json`, `visits.json`, `charges.json`, `payments.json`, `treatment_plans.json`, `inventory_items.json`, `fixed_costs.json`, `employees.json`) with zero credentials or secrets and writes a `ClinicDataExported` audit record. Rejects `X-Offline-Sync: true` (`ONLINE_ONLY_ACTION_FORBIDDEN`) and returns `404` across clinics.

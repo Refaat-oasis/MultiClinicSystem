@@ -564,3 +564,30 @@ Status: 0 Errors, Clean Build
 - [x] Clinic B isolation (`404`), portal booking precedence, online-only enforcement (`ONLINE_ONLY_ACTION_FORBIDDEN`), and revoked-device IndexedDB wipe (`DEVICE_REVOKED`) verified.
 - [x] Service Worker caches clinic shell cleanly while never caching patient portal routes or endpoints.
 - [x] Phases 0 to 15 cumulative gates, SQL Server RLS/architecture sweeps, Vitest, lint/build, and Playwright offline E2E pass 100% green.
+
+---
+
+## Phase 16 — Hardening, Security Audit & Release
+
+| Task | Status | Notes |
+|---|---|---|
+| Security Headers & Cache-Control Middleware (`SecurityHeadersMiddleware`) | Done | Added `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, `Permissions-Policy`, strict `Content-Security-Policy`, non-Development `Strict-Transport-Security`, and `Cache-Control: no-store` / `Pragma: no-cache` on `/api/` and `/c/`. Registered cleanly in `Platform.Api/Program.cs`. |
+| Owner-Only Full Clinic ZIP Export (`clinic.export`) | Done | Added owner-reserved `clinic.export` permission to `EffectivePermissionsEvaluator.ReservedOwnerPermissions` and `ModuleCatalogService` `"core"` manifest. Implemented `IClinicExportService` / `ClinicExportService` (`ClinicExportPackageResult`) and `ClinicExportController` (`GET /api/v1/clinic/export`) with `ClinicTenantScopeHelper.ExecuteForClinicAsync`, `JavaScriptEncoder.UnsafeRelaxedJsonEscaping` for Arabic UTF-8 fidelity, zero secret fields (`PasswordHash`, `SecurityStamp`, tokens, codes), and `ClinicDataExported` audit logging. Enforces `ONLINE_ONLY_ACTION_FORBIDDEN` for offline sync calls. |
+| Operations Runbook & Final Release Verification | Done | Added `docs/OPERATIONS_RUNBOOK.md` covering TLS, backup/restore drills, log retention, monitoring alerts, and incident response, plus Section 18 in `docs/API.md`. |
+| Phase 16 Tests & Gate (`UnitTests`, `IntegrationTests`, `Gates`, Playwright) | Done | Added `Phase16HardeningUnitTests.cs` (reserved owner permission & ZIP archive integrity/no-secrets), `Phase16HardeningTests.cs` (SQL Server ZIP isolation, audit logging, `sys.indexes` verification across all 31 tenant tables, and `<2000ms` dashboard widget performance check), `Phase16Gate.cs` (Production HSTS, security headers, `no-store`, ZIP isolation, and 33-route automated cross-tenant `404` fuzzer), and `web/e2e/hardening-regression.spec.ts`. |
+
+### Verification Output (`phase-16/hardening-release`)
+- `dotnet test tests/UnitTests/UnitTests.csproj --no-restore`: `Passed! - Failed: 0, Passed: 196, Skipped: 0, Total: 196, Duration: 397 ms`
+- `dotnet test tests/ArchitectureTests/ArchitectureTests.csproj --no-restore`: `Passed! - Failed: 0, Passed: 15, Skipped: 0, Total: 15, Duration: 563 ms`
+- `dotnet test tests/IntegrationTests/IntegrationTests.csproj --no-restore`: `Passed! - Failed: 0, Passed: 36, Skipped: 0, Total: 36, Duration: 1 m 20 s`
+- `dotnet test tests/Gates/Gates.csproj --no-restore`: `Passed! - Failed: 0, Passed: 29, Skipped: 0, Total: 29, Duration: 52 s`
+- `npm --prefix web test`: `65 passed` (`admin-app`: 7, `clinic-app`: 5, `api-client`: 7, `ui`: 3, `feature-core`: 43)
+- `npm --prefix web run lint`: `0 errors` across all 5 workspaces
+- `npm --prefix web run build`: `admin-app` and `clinic-app` built cleanly (`dist/sw.js` generated)
+- `npx --prefix web playwright test --config=web/playwright.config.ts`: `2 passed (7.7s)` (`offline-sync.spec.ts`, `hardening-regression.spec.ts`)
+
+### Phase 16 Exit Checklist
+- [x] Security headers (`nosniff`, `DENY`, `CSP`, `no-referrer`, `Permissions-Policy`, Production `HSTS`) and `no-store` headers verified on `/api/**` and `/c/**`.
+- [x] Owner-only `clinic.export` ZIP package exports strictly the active clinic's data via RLS with Arabic UTF-8 encoding, zero secrets, and audit logging.
+- [x] Automated 33-route cross-tenant `404` fuzzer, `sys.indexes` tenant index sweep, and widget latency check (`<2000ms`) pass.
+- [x] `docs/OPERATIONS_RUNBOOK.md` and `docs/API.md` (Section 18) published, and Phases 0 to 16 cumulative gates + Playwright pass green.
