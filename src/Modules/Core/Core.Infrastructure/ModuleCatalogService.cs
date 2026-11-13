@@ -363,7 +363,11 @@ public sealed class ModuleCatalogService : IModuleCatalogService
                 [
                     new("billing.read", "billing", "Billing", "عرض الفواتير", "View Invoices", false),
                     new("billing.write", "billing", "Billing", "إصدار الفواتير والتحصيل", "Create Invoices & Payments", false),
-                    new("billing.discount", "billing", "Billing", "تطبيق الخصومات والمرتجعات", "Apply Discounts & Refunds", false)
+                    new("billing.discount", "billing", "Billing", "تطبيق الخصومات", "Apply Discounts", false),
+                    new("billing.free_session", "billing", "Billing", "جلسات مجانية", "Authorize Free Sessions", false),
+                    new("billing.custom_price", "billing", "Billing", "تعديل سعر الجلسة", "Override Session Price", false),
+                    new("billing.extra_charge", "billing", "Billing", "إضافة رسوم إضافية", "Add Extra Charges", false),
+                    new("billing.refund", "billing", "Billing", "إصدار المرتجعات", "Issue Refunds", false)
                 ],
                 MenuItems:
                 [
@@ -375,7 +379,9 @@ public sealed class ModuleCatalogService : IModuleCatalogService
                 ],
                 DashboardWidgets:
                 [
-                    new("billing.revenue-summary", "billing", "billing.read", "Clinic", "ملخص التحصيل", "Billing Revenue Summary")
+                    new("billing.revenue-summary", "billing", "billing.read", "Clinic", "ملخص التحصيل", "Billing Revenue Summary"),
+                    new("billing.outstanding-debts", "billing", "billing.read", "Clinic", "المديونيات المستحقة", "Outstanding Debts"),
+                    new("billing.refunds-discounts", "billing", "billing.read", "Clinic", "الخصومات والمرتجعات", "Refunds & Discounts")
                 ]),
 
             new ModuleManifestEntry(
@@ -388,8 +394,9 @@ public sealed class ModuleCatalogService : IModuleCatalogService
                 Permissions:
                 [
                     new("finance.read", "finance", "Finance", "عرض الخزينة والمصروفات", "View Cashbook & Expenses", false),
-                    new("finance.write", "finance", "Finance", "تسجيل المصروفات والقيود", "Record Expenses & Entries", false),
-                    new("finance.close_day", "finance", "Finance", "إغلاق وإعادة فتح اليوم", "Close & Reopen Day", false)
+                    new("finance.write", "finance", "Finance", "تسجيل المصروفات والموردين", "Record Expenses & Suppliers", false),
+                    new("finance.close_day", "finance", "Finance", "إغلاق اليوم", "Close Day", false),
+                    new("finance.reopen_day", "finance", "Finance", "إعادة فتح اليوم المغلق", "Reopen Closed Day", false)
                 ],
                 MenuItems:
                 [
@@ -398,7 +405,8 @@ public sealed class ModuleCatalogService : IModuleCatalogService
                 SettingsSections: Array.Empty<SettingsSectionResult>(),
                 DashboardWidgets:
                 [
-                    new("finance.cash-summary", "finance", "finance.read", "Clinic", "رصيد الخزينة", "Cash Summary")
+                    new("finance.cash-summary", "finance", "finance.read", "Clinic", "رصيد الخزينة", "Cash Summary"),
+                    new("finance.closing-status", "finance", "finance.read", "Clinic", "حالة إغلاق اليوم", "Daily Closing Status")
                 ]),
 
             new ModuleManifestEntry(

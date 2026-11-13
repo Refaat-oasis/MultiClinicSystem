@@ -364,6 +364,103 @@ public sealed class DashboardService : IDashboardService
 
                     break;
                 }
+                case "billing.revenue-summary":
+                {
+                    unit = "amount";
+                    List<Payment> payments = await _dbContext.Payments
+                        .AsNoTracking()
+                        .Where(p => p.ClinicId == clinicId && p.PaidAtUtc >= start && p.PaidAtUtc <= end)
+                        .ToListAsync(cancellationToken);
+
+                    decimal totalCollected = Math.Round(payments.Sum(p => p.Amount), 2);
+                    primary = totalCollected;
+                    breakdown["cash"] = Math.Round(payments.Where(p => p.Method == PaymentMethod.Cash).Sum(p => p.Amount), 2);
+                    breakdown["visa"] = Math.Round(payments.Where(p => p.Method == PaymentMethod.Visa).Sum(p => p.Amount), 2);
+                    breakdown["instapay"] = Math.Round(payments.Where(p => p.Method == PaymentMethod.InstaPay).Sum(p => p.Amount), 2);
+                    breakdown["wallet"] = Math.Round(payments.Where(p => p.Method == PaymentMethod.Wallet).Sum(p => p.Amount), 2);
+                    breakdown["receiptCount"] = payments.Count;
+                    break;
+                }
+                case "billing.outstanding-debts":
+                {
+                    unit = "amount";
+                    List<Charge> postedCharges = await _dbContext.Charges
+                        .AsNoTracking()
+                        .Where(c => c.ClinicId == clinicId && !c.IsVoided && c.Status == ChargeStatus.Posted)
+                        .ToListAsync(cancellationToken);
+
+                    List<Charge> withDebt = postedCharges.Where(c => c.GetRemainingDueAmount() > 0m).ToList();
+                    decimal totalDue = Math.Round(withDebt.Sum(c => c.GetRemainingDueAmount()), 2);
+                    DateTimeOffset overdueCutoff = _clock.UtcNow.AddDays(-7);
+                    primary = totalDue;
+                    breakdown["openChargesCount"] = withDebt.Count;
+                    breakdown["overdueChargesCount"] = withDebt.Count(c => c.CreatedAtUtc <= overdueCutoff);
+                    break;
+                }
+                case "billing.refunds-discounts":
+                {
+                    unit = "amount";
+                    List<Refund> refunds = await _dbContext.Refunds
+                        .AsNoTracking()
+                        .Where(r => r.ClinicId == clinicId && r.RefundedAtUtc >= start && r.RefundedAtUtc <= end)
+                        .ToListAsync(cancellationToken);
+                    List<Charge> charges = await _dbContext.Charges
+                        .AsNoTracking()
+                        .Where(c => c.ClinicId == clinicId && !c.IsVoided && c.CreatedAtUtc >= start && c.CreatedAtUtc <= end)
+                        .ToListAsync(cancellationToken);
+
+                    decimal refundsTotal = Math.Round(refunds.Sum(r => r.Amount), 2);
+                    decimal discountsTotal = Math.Round(charges.Sum(c => c.DiscountAmount), 2);
+                    primary = Math.Round(refundsTotal + discountsTotal, 2);
+                    breakdown["refundsTotal"] = refundsTotal;
+                    breakdown["refundCount"] = refunds.Count;
+                    breakdown["discountsTotal"] = discountsTotal;
+                    breakdown["freeSessionsCount"] = charges.Count(c => c.IsFreeSession);
+                    break;
+                }
+                case "finance.cash-summary":
+                {
+                    unit = "amount";
+                    decimal cashIn = await _dbContext.Payments
+                        .AsNoTracking()
+                        .Where(p => p.ClinicId == clinicId && p.Method == PaymentMethod.Cash && p.PaidAtUtc >= start && p.PaidAtUtc <= end)
+                        .SumAsync(p => (decimal?)p.Amount, cancellationToken) ?? 0m;
+                    decimal cashRefund = await _dbContext.Refunds
+                        .AsNoTracking()
+                        .Where(r => r.ClinicId == clinicId && r.Method == PaymentMethod.Cash && r.RefundedAtUtc >= start && r.RefundedAtUtc <= end)
+                        .SumAsync(r => (decimal?)r.Amount, cancellationToken) ?? 0m;
+                    decimal cashExpenses = await _dbContext.Expenses
+                        .AsNoTracking()
+                        .Where(e => e.ClinicId == clinicId && !e.IsVoided && e.CountsAsCashOut && e.Method == PaymentMethod.Cash && e.OccurredAtUtc >= start && e.OccurredAtUtc <= end)
+                        .SumAsync(e => (decimal?)e.Amount, cancellationToken) ?? 0m;
+                    decimal cashSupplierPayments = await _dbContext.SupplierPayments
+                        .AsNoTracking()
+                        .Where(sp => sp.ClinicId == clinicId && sp.Method == PaymentMethod.Cash && sp.PaidAtUtc >= start && sp.PaidAtUtc <= end)
+                        .SumAsync(sp => (decimal?)sp.Amount, cancellationToken) ?? 0m;
+
+                    decimal netCash = Math.Round(cashIn - cashRefund - cashExpenses - cashSupplierPayments, 2);
+                    primary = netCash;
+                    breakdown["cashIn"] = Math.Round(cashIn, 2);
+                    breakdown["cashRefunds"] = Math.Round(cashRefund, 2);
+                    breakdown["cashExpenses"] = Math.Round(cashExpenses + cashSupplierPayments, 2);
+                    break;
+                }
+                case "finance.closing-status":
+                {
+                    unit = "closings";
+                    List<DailyClosing> closings = await _dbContext.DailyClosings
+                        .AsNoTracking()
+                        .Where(dc => dc.ClinicId == clinicId)
+                        .OrderByDescending(dc => dc.ClosingDate)
+                        .Take(30)
+                        .ToListAsync(cancellationToken);
+
+                    primary = closings.Count(dc => dc.Status == DailyClosingStatus.Closed);
+                    breakdown["closedDays"] = closings.Count(dc => dc.Status == DailyClosingStatus.Closed);
+                    breakdown["reopenedDays"] = closings.Count(dc => dc.Status == DailyClosingStatus.Reopened);
+                    breakdown["totalVariance"] = Math.Round(closings.Sum(dc => dc.TotalVarianceAmount), 2);
+                    break;
+                }
                 default:
                 {
                     breakdown["configured"] = 1m;

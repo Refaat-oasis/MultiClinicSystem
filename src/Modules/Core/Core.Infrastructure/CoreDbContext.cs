@@ -61,6 +61,20 @@ public sealed class CoreDbContext : IdentityDbContext<AppUser, AppRole, Guid>
     public DbSet<ClinicalForm> ClinicalForms => Set<ClinicalForm>();
     public DbSet<VisitFormData> VisitFormData => Set<VisitFormData>();
     public DbSet<ToothRecord> ToothRecords => Set<ToothRecord>();
+    public DbSet<PriceListItem> PriceListItems => Set<PriceListItem>();
+    public DbSet<Charge> Charges => Set<Charge>();
+    public DbSet<ChargeLine> ChargeLines => Set<ChargeLine>();
+    public DbSet<LedgerEntry> LedgerEntries => Set<LedgerEntry>();
+    public DbSet<Payment> Payments => Set<Payment>();
+    public DbSet<PaymentAllocation> PaymentAllocations => Set<PaymentAllocation>();
+    public DbSet<Refund> Refunds => Set<Refund>();
+    public DbSet<SkippedReceiptNumber> SkippedReceiptNumbers => Set<SkippedReceiptNumber>();
+    public DbSet<LabWorkOrder> LabWorkOrders => Set<LabWorkOrder>();
+    public DbSet<Supplier> Suppliers => Set<Supplier>();
+    public DbSet<SupplierPayment> SupplierPayments => Set<SupplierPayment>();
+    public DbSet<Expense> Expenses => Set<Expense>();
+    public DbSet<DailyClosing> DailyClosings => Set<DailyClosing>();
+    public DbSet<ClosingMethodTotal> ClosingMethodTotals => Set<ClosingMethodTotal>();
 
     public CoreDbContext(DbContextOptions<CoreDbContext> options, ICurrentClinic currentClinic)
         : base(options)
@@ -749,6 +763,261 @@ public sealed class CoreDbContext : IdentityDbContext<AppUser, AppRole, Guid>
             b.HasIndex(t => new { t.ClinicId, t.PatientId, t.FdiToothNumber, t.RecordedAtUtc });
             b.HasQueryFilter(t => _currentClinic.IsPlatformAdmin || t.ClinicId == _currentClinic.ClinicId);
         });
+
+        // PriceListItems tenant table (billing schema)
+        builder.Entity<PriceListItem>(b =>
+        {
+            b.ToTable("PriceListItems", "billing");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.PriceCode).HasMaxLength(64).IsRequired();
+            b.Property(x => x.NameAr).HasMaxLength(200).IsRequired();
+            b.Property(x => x.NameEn).HasMaxLength(200).IsRequired();
+            b.Property(x => x.Kind).HasConversion<string>().HasMaxLength(32).IsRequired();
+            b.Property(x => x.UnitCostAmount).HasPrecision(18, 2);
+            b.Property(x => x.DefaultPriceAmount).HasPrecision(18, 2);
+            b.Property(x => x.Currency).HasMaxLength(8).IsRequired();
+            b.Property(x => x.VoidedBy).HasMaxLength(128);
+            b.Property(x => x.VoidReason).HasMaxLength(500);
+            b.Property(x => x.RowVersion).IsRowVersion();
+            b.HasIndex(x => new { x.ClinicId, x.PriceCode });
+            b.HasQueryFilter(x => _currentClinic.IsPlatformAdmin || x.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // Charges tenant table (billing schema)
+        builder.Entity<Charge>(b =>
+        {
+            b.ToTable("Charges", "billing");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.Status).HasConversion<string>().HasMaxLength(32).IsRequired();
+            b.Property(x => x.StandardSessionPriceAmount).HasPrecision(18, 2);
+            b.Property(x => x.FreeSessionReason).HasMaxLength(500);
+            b.Property(x => x.CustomSessionPriceAmount).HasPrecision(18, 2);
+            b.Property(x => x.CustomPriceReason).HasMaxLength(500);
+            b.Property(x => x.BaseSessionPriceAmount).HasPrecision(18, 2);
+            b.Property(x => x.ToolsTotalCostAmount).HasPrecision(18, 2);
+            b.Property(x => x.ToolsTotalChargedAmount).HasPrecision(18, 2);
+            b.Property(x => x.ToolsMarkupAmount).HasPrecision(18, 2);
+            b.Property(x => x.ExtraChargesAmount).HasPrecision(18, 2);
+            b.Property(x => x.ExtraChargeReason).HasMaxLength(500);
+            b.Property(x => x.GrossSubtotalAmount).HasPrecision(18, 2);
+            b.Property(x => x.DiscountPercent).HasPrecision(9, 4);
+            b.Property(x => x.DiscountFixedAmount).HasPrecision(18, 2);
+            b.Property(x => x.DiscountAmount).HasPrecision(18, 2);
+            b.Property(x => x.DiscountReason).HasMaxLength(500);
+            b.Property(x => x.UnroundedNetTotalAmount).HasPrecision(18, 2);
+            b.Property(x => x.NetTotalAmount).HasPrecision(18, 2);
+            b.Property(x => x.Currency).HasMaxLength(8).IsRequired();
+            b.Property(x => x.RoundingRuleApplied).HasMaxLength(32).IsRequired();
+            b.Property(x => x.PaidAmount).HasPrecision(18, 2);
+            b.Property(x => x.RefundedAmount).HasPrecision(18, 2);
+            b.Property(x => x.Notes).HasMaxLength(1000);
+            b.Property(x => x.CreatedByUserId).HasMaxLength(128).IsRequired();
+            b.Property(x => x.VoidedBy).HasMaxLength(128);
+            b.Property(x => x.VoidReason).HasMaxLength(500);
+            b.Property(x => x.RowVersion).IsRowVersion();
+            b.HasIndex(x => new { x.ClinicId, x.PatientId, x.CreatedAtUtc });
+            b.HasIndex(x => new { x.ClinicId, x.VisitId });
+            b.HasQueryFilter(x => _currentClinic.IsPlatformAdmin || x.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // ChargeLines tenant table (billing schema)
+        builder.Entity<ChargeLine>(b =>
+        {
+            b.ToTable("ChargeLines", "billing");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.Kind).HasConversion<string>().HasMaxLength(32).IsRequired();
+            b.Property(x => x.Description).HasMaxLength(300).IsRequired();
+            b.Property(x => x.Quantity).HasPrecision(18, 2);
+            b.Property(x => x.UnitCostAmount).HasPrecision(18, 2);
+            b.Property(x => x.UnitChargedPriceAmount).HasPrecision(18, 2);
+            b.Property(x => x.LineCostAmount).HasPrecision(18, 2);
+            b.Property(x => x.LineTotalAmount).HasPrecision(18, 2);
+            b.Property(x => x.MarkupAmount).HasPrecision(18, 2);
+            b.Property(x => x.Currency).HasMaxLength(8).IsRequired();
+            b.Property(x => x.RowVersion).IsRowVersion();
+            b.HasIndex(x => new { x.ClinicId, x.ChargeId });
+            b.HasQueryFilter(x => _currentClinic.IsPlatformAdmin || x.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // LedgerEntries tenant table (billing schema, append-only)
+        builder.Entity<LedgerEntry>(b =>
+        {
+            b.ToTable("LedgerEntries", "billing");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.EntryType).HasConversion<string>().HasMaxLength(32).IsRequired();
+            b.Property(x => x.ReferenceKind).HasMaxLength(64).IsRequired();
+            b.Property(x => x.SignedAmount).HasPrecision(18, 2);
+            b.Property(x => x.Currency).HasMaxLength(8).IsRequired();
+            b.Property(x => x.Method).HasConversion<string>().HasMaxLength(32);
+            b.Property(x => x.Description).HasMaxLength(300).IsRequired();
+            b.Property(x => x.ActorUserId).HasMaxLength(128).IsRequired();
+            b.Property(x => x.RowVersion).IsRowVersion();
+            b.HasIndex(x => new { x.ClinicId, x.PatientId, x.OccurredAtUtc });
+            b.HasQueryFilter(x => _currentClinic.IsPlatformAdmin || x.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // Payments tenant table (billing schema, append-only)
+        builder.Entity<Payment>(b =>
+        {
+            b.ToTable("Payments", "billing");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.ReceiptNumber).HasMaxLength(64).IsRequired();
+            b.Property(x => x.Method).HasConversion<string>().HasMaxLength(32).IsRequired();
+            b.Property(x => x.Amount).HasPrecision(18, 2);
+            b.Property(x => x.Currency).HasMaxLength(8).IsRequired();
+            b.Property(x => x.Notes).HasMaxLength(500);
+            b.Property(x => x.CollectedByUserId).HasMaxLength(128).IsRequired();
+            b.Property(x => x.RowVersion).IsRowVersion();
+            b.HasIndex(x => new { x.ClinicId, x.ReceiptNumber }).IsUnique();
+            b.HasIndex(x => new { x.ClinicId, x.PatientId, x.PaidAtUtc });
+            b.HasQueryFilter(x => _currentClinic.IsPlatformAdmin || x.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // PaymentAllocations tenant table (billing schema)
+        builder.Entity<PaymentAllocation>(b =>
+        {
+            b.ToTable("PaymentAllocations", "billing");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.AllocatedAmount).HasPrecision(18, 2);
+            b.Property(x => x.Currency).HasMaxLength(8).IsRequired();
+            b.Property(x => x.RowVersion).IsRowVersion();
+            b.HasIndex(x => new { x.ClinicId, x.PaymentId });
+            b.HasIndex(x => new { x.ClinicId, x.ChargeId });
+            b.HasQueryFilter(x => _currentClinic.IsPlatformAdmin || x.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // Refunds tenant table (billing schema, append-only)
+        builder.Entity<Refund>(b =>
+        {
+            b.ToTable("Refunds", "billing");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.Method).HasConversion<string>().HasMaxLength(32).IsRequired();
+            b.Property(x => x.Amount).HasPrecision(18, 2);
+            b.Property(x => x.Currency).HasMaxLength(8).IsRequired();
+            b.Property(x => x.Reason).HasMaxLength(500).IsRequired();
+            b.Property(x => x.ReceiptNumber).HasMaxLength(64);
+            b.Property(x => x.IssuedByUserId).HasMaxLength(128).IsRequired();
+            b.Property(x => x.RowVersion).IsRowVersion();
+            b.HasIndex(x => new { x.ClinicId, x.PatientId, x.RefundedAtUtc });
+            b.HasQueryFilter(x => _currentClinic.IsPlatformAdmin || x.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // SkippedReceiptNumbers tenant table (billing schema)
+        builder.Entity<SkippedReceiptNumber>(b =>
+        {
+            b.ToTable("SkippedReceiptNumbers", "billing");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.ReceiptNumber).HasMaxLength(64).IsRequired();
+            b.Property(x => x.Reason).HasMaxLength(500).IsRequired();
+            b.Property(x => x.RecordedByUserId).HasMaxLength(128).IsRequired();
+            b.Property(x => x.RowVersion).IsRowVersion();
+            b.HasIndex(x => new { x.ClinicId, x.ReceiptNumber }).IsUnique();
+            b.HasQueryFilter(x => _currentClinic.IsPlatformAdmin || x.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // LabWorkOrders tenant table (billing schema)
+        builder.Entity<LabWorkOrder>(b =>
+        {
+            b.ToTable("LabWorkOrders", "billing");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.LabName).HasMaxLength(200).IsRequired();
+            b.Property(x => x.WorkDescription).HasMaxLength(500).IsRequired();
+            b.Property(x => x.ToothReference).HasMaxLength(64);
+            b.Property(x => x.LabCostAmount).HasPrecision(18, 2);
+            b.Property(x => x.PatientPriceAmount).HasPrecision(18, 2);
+            b.Property(x => x.Currency).HasMaxLength(8).IsRequired();
+            b.Property(x => x.VoidedBy).HasMaxLength(128);
+            b.Property(x => x.VoidReason).HasMaxLength(500);
+            b.Property(x => x.RowVersion).IsRowVersion();
+            b.HasIndex(x => new { x.ClinicId, x.PatientId, x.CreatedAtUtc });
+            b.HasQueryFilter(x => _currentClinic.IsPlatformAdmin || x.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // Suppliers tenant table (finance schema)
+        builder.Entity<Supplier>(b =>
+        {
+            b.ToTable("Suppliers", "finance");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            b.Property(x => x.Type).HasConversion<string>().HasMaxLength(32).IsRequired();
+            b.Property(x => x.Phone).HasMaxLength(32);
+            b.Property(x => x.Notes).HasMaxLength(1000);
+            b.Property(x => x.VoidedBy).HasMaxLength(128);
+            b.Property(x => x.VoidReason).HasMaxLength(500);
+            b.Property(x => x.RowVersion).IsRowVersion();
+            b.HasIndex(x => new { x.ClinicId, x.Name });
+            b.HasQueryFilter(x => _currentClinic.IsPlatformAdmin || x.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // SupplierPayments tenant table (finance schema, append-only)
+        builder.Entity<SupplierPayment>(b =>
+        {
+            b.ToTable("SupplierPayments", "finance");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.Method).HasConversion<string>().HasMaxLength(32).IsRequired();
+            b.Property(x => x.Amount).HasPrecision(18, 2);
+            b.Property(x => x.Currency).HasMaxLength(8).IsRequired();
+            b.Property(x => x.ReferenceNote).HasMaxLength(500);
+            b.Property(x => x.PaidByUserId).HasMaxLength(128).IsRequired();
+            b.Property(x => x.RowVersion).IsRowVersion();
+            b.HasIndex(x => new { x.ClinicId, x.SupplierId, x.PaidAtUtc });
+            b.HasQueryFilter(x => _currentClinic.IsPlatformAdmin || x.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // Expenses tenant table (finance schema)
+        builder.Entity<Expense>(b =>
+        {
+            b.ToTable("Expenses", "finance");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.Category).HasMaxLength(100).IsRequired();
+            b.Property(x => x.Description).HasMaxLength(500).IsRequired();
+            b.Property(x => x.Method).HasConversion<string>().HasMaxLength(32);
+            b.Property(x => x.Amount).HasPrecision(18, 2);
+            b.Property(x => x.Currency).HasMaxLength(8).IsRequired();
+            b.Property(x => x.RecordedByUserId).HasMaxLength(128).IsRequired();
+            b.Property(x => x.VoidedBy).HasMaxLength(128);
+            b.Property(x => x.VoidReason).HasMaxLength(500);
+            b.Property(x => x.RowVersion).IsRowVersion();
+            b.HasIndex(x => new { x.ClinicId, x.OccurredAtUtc });
+            b.HasQueryFilter(x => _currentClinic.IsPlatformAdmin || x.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // DailyClosings tenant table (finance schema)
+        builder.Entity<DailyClosing>(b =>
+        {
+            b.ToTable("DailyClosings", "finance");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.Status).HasConversion<string>().HasMaxLength(32).IsRequired();
+            b.Property(x => x.TotalExpectedAmount).HasPrecision(18, 2);
+            b.Property(x => x.TotalCountedAmount).HasPrecision(18, 2);
+            b.Property(x => x.TotalVarianceAmount).HasPrecision(18, 2);
+            b.Property(x => x.Currency).HasMaxLength(8).IsRequired();
+            b.Property(x => x.ClosedByUserId).HasMaxLength(128).IsRequired();
+            b.Property(x => x.CloseNotes).HasMaxLength(1000);
+            b.Property(x => x.ReopenedByUserId).HasMaxLength(128);
+            b.Property(x => x.ReopenReason).HasMaxLength(500);
+            b.Property(x => x.RowVersion).IsRowVersion();
+            b.HasIndex(x => new { x.ClinicId, x.ClosingDate }).IsUnique();
+            b.HasQueryFilter(x => _currentClinic.IsPlatformAdmin || x.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // ClosingMethodTotals tenant table (finance schema)
+        builder.Entity<ClosingMethodTotal>(b =>
+        {
+            b.ToTable("ClosingMethodTotals", "finance");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.Method).HasConversion<string>().HasMaxLength(32).IsRequired();
+            b.Property(x => x.PaymentsTotal).HasPrecision(18, 2);
+            b.Property(x => x.RefundsTotal).HasPrecision(18, 2);
+            b.Property(x => x.ExpensesTotal).HasPrecision(18, 2);
+            b.Property(x => x.ExpectedTotal).HasPrecision(18, 2);
+            b.Property(x => x.CountedTotal).HasPrecision(18, 2);
+            b.Property(x => x.VarianceAmount).HasPrecision(18, 2);
+            b.Property(x => x.Currency).HasMaxLength(8).IsRequired();
+            b.Property(x => x.RowVersion).IsRowVersion();
+            b.HasIndex(x => new { x.ClinicId, x.DailyClosingId, x.Method }).IsUnique();
+            b.HasQueryFilter(x => _currentClinic.IsPlatformAdmin || x.ClinicId == _currentClinic.ClinicId);
+        });
     }
 
     /// <summary>
@@ -851,7 +1120,35 @@ public sealed class CoreDbContext : IdentityDbContext<AppUser, AppRole, Guid>
                 ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON clinical.VisitFormData,
                 ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON clinical.VisitFormData,
                 ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON clinical.ToothRecords,
-                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON clinical.ToothRecords
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON clinical.ToothRecords,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON billing.PriceListItems,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON billing.PriceListItems,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON billing.Charges,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON billing.Charges,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON billing.ChargeLines,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON billing.ChargeLines,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON billing.LedgerEntries,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON billing.LedgerEntries,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON billing.Payments,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON billing.Payments,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON billing.PaymentAllocations,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON billing.PaymentAllocations,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON billing.Refunds,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON billing.Refunds,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON billing.SkippedReceiptNumbers,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON billing.SkippedReceiptNumbers,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON billing.LabWorkOrders,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON billing.LabWorkOrders,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON finance.Suppliers,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON finance.Suppliers,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON finance.SupplierPayments,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON finance.SupplierPayments,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON finance.Expenses,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON finance.Expenses,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON finance.DailyClosings,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON finance.DailyClosings,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON finance.ClosingMethodTotals,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON finance.ClosingMethodTotals
                 WITH (STATE = ON);
             ');
         ";

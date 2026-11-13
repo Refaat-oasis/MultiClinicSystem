@@ -5,11 +5,14 @@ import { apiClient } from '@clinic/api-client';
 import {
   Phase6SchedulingScreen,
   Phase7ClinicalScreen,
+  Phase8BillingScreen,
   type AppointmentItem,
   type QueueEntryItem,
   type WaitingListItem,
   type ClinicalVisitSessionData,
   type ClinicalSpecialtyFormDefinition,
+  type BillingChargeData,
+  type BillingDailyClosingData,
 } from '@clinic/feature-core';
 
 interface InspectClinicScheduleSnapshot {
@@ -23,6 +26,12 @@ interface InspectClinicClinicalSnapshot {
   clinicId: string;
   visits: ClinicalVisitSessionData[];
   forms: ClinicalSpecialtyFormDefinition[];
+}
+
+interface InspectClinicBillingSnapshot {
+  clinicId: string;
+  recentCharges: BillingChargeData[];
+  recentClosings: BillingDailyClosingData[];
 }
 import { Eye, Lock } from 'lucide-react';
 
@@ -62,6 +71,13 @@ export const InspectClinicShell: React.FC<InspectClinicShellProps> = ({ clinicId
   const { data: clinicalSnapshot } = useQuery<InspectClinicClinicalSnapshot>({
     queryKey: ['platform-inspect-clinical', clinicId],
     queryFn: () => apiClient.get<InspectClinicClinicalSnapshot>(`/platform/clinics/${clinicId}/inspect/clinical`),
+    enabled: Boolean(clinicId),
+    retry: false,
+  });
+
+  const { data: billingSnapshot } = useQuery<InspectClinicBillingSnapshot>({
+    queryKey: ['platform-inspect-billing', clinicId],
+    queryFn: () => apiClient.get<InspectClinicBillingSnapshot>(`/platform/clinics/${clinicId}/inspect/billing`),
     enabled: Boolean(clinicId),
     retry: false,
   });
@@ -148,6 +164,17 @@ export const InspectClinicShell: React.FC<InspectClinicShellProps> = ({ clinicId
           initialVisit={clinicalSnapshot.visits[0]}
           specialtyForms={clinicalSnapshot.forms}
           readOnlyInspectMode={true}
+        />
+      )}
+
+      {clinicId && billingSnapshot && (
+        <Phase8BillingScreen
+          clinicId={clinicId}
+          readOnlyInspectMode={true}
+          initialSnapshot={{
+            charges: billingSnapshot.recentCharges,
+            dailyClosing: billingSnapshot.recentClosings[0] ?? null,
+          }}
         />
       )}
     </div>
