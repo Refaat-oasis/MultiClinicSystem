@@ -226,3 +226,41 @@ Status: 0 Errors, Clean Build
 - [x] Host isolation (`AdminHostSweepTests`) and cross-clinic 404 enforcement verified.
 - [x] Admin React app built and tested with Arabic RTL + English and Light + Dark themes.
 - [x] Phase 0, Phase 1, and Phase 2 integration gates pass 100% green.
+
+
+---
+
+## Phase 3 — Owner Adds Clinics, Onboarding Wizard, Clinic Settings, and User Profile
+
+**Status:** COMPLETE  
+**Date:** 2026-11-13  
+
+### Tasks Completed
+- **Domain & Storage Primitives (`Core.Domain` & `BuildingBlocks`):**
+  - Updated [`Clinic.cs`](file:///c:/Users/ahta6/OneDrive/Desktop/Clinic/src/Modules/Core/Core.Domain/Clinic.cs), [`Owner.cs`](file:///c:/Users/ahta6/OneDrive/Desktop/Clinic/src/Modules/Core/Core.Domain/Owner.cs), and [`AppUser.cs`](file:///c:/Users/ahta6/OneDrive/Desktop/Clinic/src/Modules/Core/Core.Domain/AppUser.cs) with onboarding state machine (`NotStarted`/`InProgress`/`Completed`), general settings, financial lock (`HasFinancialEntries`), `WelcomeSeen`, and `AvatarAssetId`.
+  - Added single-type domain entities & helpers: [`OnboardingProgress.cs`](file:///c:/Users/ahta6/OneDrive/Desktop/Clinic/src/Modules/Core/Core.Domain/OnboardingProgress.cs), [`ClinicSlugHistory.cs`](file:///c:/Users/ahta6/OneDrive/Desktop/Clinic/src/Modules/Core/Core.Domain/ClinicSlugHistory.cs), [`ClinicSpecialty.cs`](file:///c:/Users/ahta6/OneDrive/Desktop/Clinic/src/Modules/Core/Core.Domain/ClinicSpecialty.cs), [`ClinicAsset.cs`](file:///c:/Users/ahta6/OneDrive/Desktop/Clinic/src/Modules/Core/Core.Domain/ClinicAsset.cs), [`SlugGenerator.cs`](file:///c:/Users/ahta6/OneDrive/Desktop/Clinic/src/Modules/Core/Core.Domain/SlugGenerator.cs), [`PhoneNormalizer.cs`](file:///c:/Users/ahta6/OneDrive/Desktop/Clinic/src/Modules/Core/Core.Domain/PhoneNormalizer.cs), [`LogoSanitizeResult.cs`](file:///c:/Users/ahta6/OneDrive/Desktop/Clinic/src/Modules/Core/Core.Domain/LogoSanitizeResult.cs), and [`LogoImageProcessor.cs`](file:///c:/Users/ahta6/OneDrive/Desktop/Clinic/src/Modules/Core/Core.Domain/LogoImageProcessor.cs).
+  - Added [`IFileStorage.cs`](file:///c:/Users/ahta6/OneDrive/Desktop/Clinic/src/BuildingBlocks/Application/IFileStorage.cs) & [`LocalFileStorage.cs`](file:///c:/Users/ahta6/OneDrive/Desktop/Clinic/src/BuildingBlocks/Infrastructure/LocalFileStorage.cs) keeping logo assets outside SQL.
+- **EF Core & SQL Server RLS (`Core.Infrastructure`):**
+  - Updated [`CoreDbContext.cs`](file:///c:/Users/ahta6/OneDrive/Desktop/Clinic/src/Modules/Core/Core.Infrastructure/CoreDbContext.cs) with global query filters and SQL Server Row-Level Security policies for `OnboardingProgress`, `ClinicSpecialties`, and `ClinicAssets`.
+  - Implemented [`ClinicManagementService.cs`](file:///c:/Users/ahta6/OneDrive/Desktop/Clinic/src/Modules/Core/Core.Infrastructure/ClinicManagementService.cs), [`ProfileService.cs`](file:///c:/Users/ahta6/OneDrive/Desktop/Clinic/src/Modules/Core/Core.Infrastructure/ProfileService.cs), [`SpecialtyCatalog.cs`](file:///c:/Users/ahta6/OneDrive/Desktop/Clinic/src/Modules/Core/Core.Infrastructure/SpecialtyCatalog.cs), and [`SettingsSectionRegistry.cs`](file:///c:/Users/ahta6/OneDrive/Desktop/Clinic/src/Modules/Core/Core.Infrastructure/SettingsSectionRegistry.cs), executing multi-tenant writes under `ExecuteForClinicAsync`.
+- **Thin API Controllers & Strict DTO / ViewModel Separation (`Platform.Api`):**
+  - Added [`ClinicsController.cs`](file:///c:/Users/ahta6/OneDrive/Desktop/Clinic/src/Platform.Api/Controllers/ClinicsController.cs), [`PublicClinicDirectoryController.cs`](file:///c:/Users/ahta6/OneDrive/Desktop/Clinic/src/Platform.Api/Controllers/PublicClinicDirectoryController.cs), and [`ProfileController.cs`](file:///c:/Users/ahta6/OneDrive/Desktop/Clinic/src/Platform.Api/Controllers/ProfileController.cs), updated [`HostRoutingMiddleware.cs`](file:///c:/Users/ahta6/OneDrive/Desktop/Clinic/src/Platform.Api/Middleware/HostRoutingMiddleware.cs), [`ProblemDetailsMapper.cs`](file:///c:/Users/ahta6/OneDrive/Desktop/Clinic/src/Platform.Api/Controllers/ProblemDetailsMapper.cs), [`Program.cs`](file:///c:/Users/ahta6/OneDrive/Desktop/Clinic/src/Platform.Api/Program.cs), and single-type DTOs/ViewModels.
+- **Frontend Clinic Screens (`web/packages/features/core` & `web/apps/clinic`):**
+  - Added [`ClinicSwitcher.tsx`](file:///c:/Users/ahta6/OneDrive/Desktop/Clinic/web/packages/features/core/src/ClinicSwitcher.tsx) (`ClinicSwitcher` + `MyClinicsScreen`), [`OnboardingWizardScreen.tsx`](file:///c:/Users/ahta6/OneDrive/Desktop/Clinic/web/packages/features/core/src/OnboardingWizardScreen.tsx), [`ClinicSettingsScreen.tsx`](file:///c:/Users/ahta6/OneDrive/Desktop/Clinic/web/packages/features/core/src/ClinicSettingsScreen.tsx), and [`UserProfileScreen.tsx`](file:///c:/Users/ahta6/OneDrive/Desktop/Clinic/web/packages/features/core/src/UserProfileScreen.tsx), wired them into [`App.tsx`](file:///c:/Users/ahta6/OneDrive/Desktop/Clinic/web/apps/clinic/src/App.tsx), and added Vitest coverage in [`Phase3Screens.test.tsx`](file:///c:/Users/ahta6/OneDrive/Desktop/Clinic/web/packages/features/core/src/Phase3Screens.test.tsx).
+
+### Verification Results (Phase 3 Integration Gate + Cumulative Regression)
+- `dotnet test tests/UnitTests/UnitTests.csproj`: `Passed! - Failed: 0, Passed: 78, Skipped: 0, Total: 78, Duration: 314 ms`
+- `dotnet test tests/ArchitectureTests/ArchitectureTests.csproj`: `Passed! - Failed: 0, Passed: 7, Skipped: 0, Total: 7, Duration: 541 ms`
+- `dotnet test tests/IntegrationTests/IntegrationTests.csproj`: `Passed! - Failed: 0, Passed: 21, Skipped: 0, Total: 21, Duration: 11 s`
+- `dotnet test tests/Gates/Gates.csproj`: `Passed! - Failed: 0, Passed: 16, Skipped: 0, Total: 16, Duration: 13 s` (Phase 0 + Phase 1 + Phase 2 + Phase 3 gates all green)
+- `npm --prefix web test`: All 5 workspaces passed (`@clinic/admin-app`: 6/6, `@clinic/clinic-app`: 2/2, `@clinic/api-client`: 3/3, `@clinic/ui`: 3/3, `@clinic/feature-core`: 9/9) — Total: 23 passed
+- `npm --prefix web run lint`: `tsc --noEmit` passed across all 5 workspaces (0 errors)
+- `npm --prefix web run build`: `@clinic/admin-app` built in `4.08s`; `@clinic/clinic-app` built in `3.77s`
+
+### Phase 3 Exit Checklist
+- [x] Owner adds clinics within `MaxClinics` quota; `PendingOnboarding` blocks clinic dashboard/settings (`ONBOARDING_REQUIRED`).
+- [x] 5-step resumable onboarding wizard, phone normalization, SVG rejection, image metadata stripping via `IFileStorage`, and specialty plugin flags (`dental` vs non-dental) implemented and verified.
+- [x] Unique public slug reservation and permanent redirect history on slug change verified.
+- [x] Owner-only clinic settings editing, financial lock (`TimeZone`, `Currency`, `RoundingRule`) after first financial entry, and Super Admin owner/clinic dashboard aggregates verified.
+- [x] Self-service user profile updates, 6-digit email change confirmation + old-email security alert, password change, and `SecurityStamp` token invalidation verified.
+- [x] Phase 0, Phase 1, Phase 2, and Phase 3 integration gates pass 100% green.

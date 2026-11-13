@@ -34,7 +34,8 @@ public sealed class HostRoutingMiddleware
         bool isClinicOnlyRoute = path.StartsWith("/c/", StringComparison.OrdinalIgnoreCase) ||
                                  path.StartsWith("/api/v1/c/", StringComparison.OrdinalIgnoreCase) ||
                                  path.StartsWith("/api/v1/auth", StringComparison.OrdinalIgnoreCase) ||
-                                 path.StartsWith("/api/v1/clinics", StringComparison.OrdinalIgnoreCase);
+                                 path.StartsWith("/api/v1/clinics", StringComparison.OrdinalIgnoreCase) ||
+                                 path.StartsWith("/api/v1/profile", StringComparison.OrdinalIgnoreCase);
 
         if (isPlatformRoute && !isAdminHost)
         {

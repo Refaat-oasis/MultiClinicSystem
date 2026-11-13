@@ -98,9 +98,14 @@ public static class TestServiceFactory
         }
 
         services.AddScoped<IPlatformAccess, PlatformAccessService>();
+        services.AddSingleton<IFileStorage, LocalFileStorage>();
+        services.AddSingleton<ISpecialtyCatalog, SpecialtyCatalog>();
+        services.AddSingleton<ISettingsSectionRegistry, SettingsSectionRegistry>();
         services.AddScoped<IHourlyTotpService, HourlyTotpService>();
         services.AddScoped<IPlatformAdminAuthService, PlatformAdminAuthService>();
         services.AddScoped<IPlatformAdminService, PlatformAdminService>();
+        services.AddScoped<IClinicManagementService, ClinicManagementService>();
+        services.AddScoped<IProfileService, ProfileService>();
 
         var provider = services.BuildServiceProvider();
         return (provider, emailSender);
