@@ -197,6 +197,8 @@ builder.Services.AddSingleton<ISpecialtyPlugin, DentalSpecialtyPlugin>();
 builder.Services.AddSingleton<ISpecialtyPlugin, OphthalmologySpecialtyPlugin>();
 builder.Services.AddScoped<IBillingService, BillingService>();
 builder.Services.AddScoped<IBillingPortalQueries>(sp => (BillingService)sp.GetRequiredService<IBillingService>());
+builder.Services.AddScoped<ITreatmentPlanService, TreatmentPlanService>();
+builder.Services.AddScoped<ITreatmentPlanPortalQueries>(sp => (TreatmentPlanService)sp.GetRequiredService<ITreatmentPlanService>());
 builder.Services.AddScoped<IClinicalService, ClinicalService>();
 builder.Services.AddScoped<IClinicalPortalQueries>(sp => (ClinicalService)sp.GetRequiredService<IClinicalService>());
 builder.Services.AddScoped<IScheduleRealtimeNotifier, Platform.Api.Hubs.SignalRScheduleRealtimeNotifier>();

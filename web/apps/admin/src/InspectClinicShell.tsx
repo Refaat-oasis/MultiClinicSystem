@@ -6,6 +6,7 @@ import {
   Phase6SchedulingScreen,
   Phase7ClinicalScreen,
   Phase8BillingScreen,
+  Phase9TreatmentPlansScreen,
   type AppointmentItem,
   type QueueEntryItem,
   type WaitingListItem,
@@ -13,6 +14,7 @@ import {
   type ClinicalSpecialtyFormDefinition,
   type BillingChargeData,
   type BillingDailyClosingData,
+  type TreatmentPlanData,
 } from '@clinic/feature-core';
 
 interface InspectClinicScheduleSnapshot {
@@ -32,6 +34,14 @@ interface InspectClinicBillingSnapshot {
   clinicId: string;
   recentCharges: BillingChargeData[];
   recentClosings: BillingDailyClosingData[];
+}
+interface InspectClinicTreatmentPlansSnapshot {
+  clinicId: string;
+  totalPlansCount: number;
+  activePlansCount: number;
+  completedPlansCount: number;
+  delayedSessionsCount: number;
+  recentPlans: TreatmentPlanData[];
 }
 import { Eye, Lock } from 'lucide-react';
 
@@ -78,6 +88,13 @@ export const InspectClinicShell: React.FC<InspectClinicShellProps> = ({ clinicId
   const { data: billingSnapshot } = useQuery<InspectClinicBillingSnapshot>({
     queryKey: ['platform-inspect-billing', clinicId],
     queryFn: () => apiClient.get<InspectClinicBillingSnapshot>(`/platform/clinics/${clinicId}/inspect/billing`),
+    enabled: Boolean(clinicId),
+    retry: false,
+  });
+
+  const { data: treatmentPlansSnapshot } = useQuery<InspectClinicTreatmentPlansSnapshot>({
+    queryKey: ['platform-inspect-treatment-plans', clinicId],
+    queryFn: () => apiClient.get<InspectClinicTreatmentPlansSnapshot>(`/platform/clinics/${clinicId}/inspect/treatment-plans`),
     enabled: Boolean(clinicId),
     retry: false,
   });
@@ -175,6 +192,13 @@ export const InspectClinicShell: React.FC<InspectClinicShellProps> = ({ clinicId
             charges: billingSnapshot.recentCharges,
             dailyClosing: billingSnapshot.recentClosings[0] ?? null,
           }}
+        />
+      )}
+      {clinicId && treatmentPlansSnapshot && (
+        <Phase9TreatmentPlansScreen
+          clinicId={clinicId}
+          readOnlyInspectMode={true}
+          initialPlans={treatmentPlansSnapshot.recentPlans}
         />
       )}
     </div>

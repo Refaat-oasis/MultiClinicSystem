@@ -461,6 +461,84 @@ public sealed class DashboardService : IDashboardService
                     breakdown["totalVariance"] = Math.Round(closings.Sum(dc => dc.TotalVarianceAmount), 2);
                     break;
                 }
+                case "treatment-plans.active-plans":
+                {
+                    unit = "plans";
+                    List<TreatmentPlan> plans = await _dbContext.TreatmentPlans
+                        .AsNoTracking()
+                        .Where(tp => tp.ClinicId == clinicId && !tp.IsVoided)
+                        .ToListAsync(cancellationToken);
+
+                    int activeCount = plans.Count(p => p.Status == TreatmentPlanStatus.Active);
+                    primary = activeCount;
+                    breakdown["activePlans"] = activeCount;
+                    breakdown["completedPlans"] = plans.Count(p => p.Status == TreatmentPlanStatus.Completed);
+                    breakdown["totalPlans"] = plans.Count;
+                    break;
+                }
+                case "treatment-plans.completion-rate":
+                {
+                    unit = "percent";
+                    List<TreatmentPlan> plans = await _dbContext.TreatmentPlans
+                        .AsNoTracking()
+                        .Where(tp => tp.ClinicId == clinicId && !tp.IsVoided)
+                        .ToListAsync(cancellationToken);
+
+                    decimal avgCompletion = plans.Count == 0
+                        ? 0m
+                        : Math.Round(plans.Average(p => p.GetCompletionPercentage()), 2);
+                    primary = avgCompletion;
+                    breakdown["plansEvaluated"] = plans.Count;
+                    breakdown["completedSessions"] = plans.Sum(p => p.CompletedSessionsCount);
+                    breakdown["totalSessions"] = plans.Sum(p => p.TotalSessionsCount);
+                    break;
+                }
+                case "treatment-plans.delayed-sessions":
+                {
+                    unit = "sessions";
+                    DateOnly today = DateOnly.FromDateTime(_clock.UtcNow.UtcDateTime);
+                    List<PlanSession> sessions = await _dbContext.PlanSessions
+                        .AsNoTracking()
+                        .Where(s => s.ClinicId == clinicId && !s.IsVoided && s.Status != PlanSessionStatus.Completed && s.Status != PlanSessionStatus.Cancelled)
+                        .ToListAsync(cancellationToken);
+
+                    int delayedCount = sessions.Count(s => s.Status == PlanSessionStatus.Delayed || s.TargetDate < today);
+                    primary = delayedCount;
+                    breakdown["delayedOrPastTarget"] = delayedCount;
+                    breakdown["openSessions"] = sessions.Count;
+                    break;
+                }
+                case "treatment-plans.installments-due":
+                {
+                    unit = "amount";
+                    DateOnly today = DateOnly.FromDateTime(_clock.UtcNow.UtcDateTime);
+                    List<PlanPaymentScheduleItem> items = await _dbContext.PlanPaymentScheduleItems
+                        .AsNoTracking()
+                        .Where(i => i.ClinicId == clinicId && !i.IsVoided && i.Status != PlanInstallmentStatus.Paid && i.Status != PlanInstallmentStatus.Refunded)
+                        .ToListAsync(cancellationToken);
+
+                    decimal dueAmount = Math.Round(items.Sum(i => i.GetRemainingAmount()), 2);
+                    decimal overdueAmount = Math.Round(items.Where(i => i.DueDate < today || i.Status == PlanInstallmentStatus.Overdue).Sum(i => i.GetRemainingAmount()), 2);
+                    primary = dueAmount;
+                    breakdown["dueAmount"] = dueAmount;
+                    breakdown["overdueAmount"] = overdueAmount;
+                    breakdown["openItemsCount"] = items.Count;
+                    break;
+                }
+                case "treatment-plans.plan-revenue":
+                {
+                    unit = "amount";
+                    List<TreatmentPlan> plans = await _dbContext.TreatmentPlans
+                        .AsNoTracking()
+                        .Where(tp => tp.ClinicId == clinicId && !tp.IsVoided)
+                        .ToListAsync(cancellationToken);
+
+                    decimal netCollected = Math.Round(plans.Sum(p => p.PaidAmount - p.RefundedAmount), 2);
+                    primary = netCollected;
+                    breakdown["totalPaid"] = Math.Round(plans.Sum(p => p.PaidAmount), 2);
+                    breakdown["totalRefunded"] = Math.Round(plans.Sum(p => p.RefundedAmount), 2);
+                    break;
+                }
                 default:
                 {
                     breakdown["configured"] = 1m;

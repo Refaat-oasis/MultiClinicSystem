@@ -120,6 +120,8 @@ public static class TestServiceFactory
         services.AddSingleton<ISpecialtyPlugin, OphthalmologySpecialtyPlugin>();
         services.AddScoped<IBillingService, BillingService>();
         services.AddScoped<IBillingPortalQueries>(sp => (BillingService)sp.GetRequiredService<IBillingService>());
+        services.AddScoped<ITreatmentPlanService, TreatmentPlanService>();
+        services.AddScoped<ITreatmentPlanPortalQueries>(sp => (TreatmentPlanService)sp.GetRequiredService<ITreatmentPlanService>());
         services.AddScoped<IClinicalService, ClinicalService>();
         services.AddScoped<IClinicalPortalQueries>(sp => (ClinicalService)sp.GetRequiredService<IClinicalService>());
 
