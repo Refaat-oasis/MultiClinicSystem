@@ -102,3 +102,8 @@ $RECYCLE.BIN/
 frontend
 backend
 .agents/
+
+# Graphify local machine cache & interpreter pointers (keep graph.json, GRAPH_REPORT.md, graph.html, manifest.json, cost.json tracked)
+graphify-out/.graphify_python
+graphify-out/.graphify_root
+graphify-out/cache/

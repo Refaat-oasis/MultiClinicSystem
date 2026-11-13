@@ -591,3 +591,12 @@ Status: 0 Errors, Clean Build
 - [x] Owner-only `clinic.export` ZIP package exports strictly the active clinic's data via RLS with Arabic UTF-8 encoding, zero secrets, and audit logging.
 - [x] Automated 33-route cross-tenant `404` fuzzer, `sys.indexes` tenant index sweep, and widget latency check (`<2000ms`) pass.
 - [x] `docs/OPERATIONS_RUNBOOK.md` and `docs/API.md` (Section 18) published, and Phases 0 to 16 cumulative gates + Playwright pass green.
+
+---
+
+## Documentation & Knowledge Graph (`/graphify`)
+
+| Artifact | Status | Notes |
+|---|---|---|
+| Full System Documentation (`docs/SYSTEM_DOCUMENTATION.md`) | Done | Documented full solution topology, 16-module DAG, 14 SQL schemas, 3 isolated auth realms, effective-permission formula, security headers, 28 controllers, offline PWA sync, ZIP export, and verification pyramid across Phases 0–16. |
+| Repository Knowledge Graph (`graphify-out/`) | Done | Built full AST + semantic documentation graph (`6,919` nodes, `24,790` edges, `260` labeled communities, `0` import cycles) producing `graphify-out/graph.json`, `graphify-out/GRAPH_REPORT.md`, aggregated `graphify-out/graph.html`, `manifest.json`, and `cost.json`. |
