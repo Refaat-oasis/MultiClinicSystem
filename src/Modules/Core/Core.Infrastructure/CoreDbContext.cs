@@ -101,6 +101,10 @@ public sealed class CoreDbContext : IdentityDbContext<AppUser, AppRole, Guid>
     public DbSet<ReportExportLog> ReportExportLogs => Set<ReportExportLog>();
     public DbSet<ScheduledReportConfig> ScheduledReportConfigs => Set<ScheduledReportConfig>();
     public DbSet<ImportBatchLog> ImportBatchLogs => Set<ImportBatchLog>();
+    public DbSet<SyncDeviceState> SyncDeviceStates => Set<SyncDeviceState>();
+    public DbSet<SyncOperationLog> SyncOperationLogs => Set<SyncOperationLog>();
+    public DbSet<SyncConflict> SyncConflicts => Set<SyncConflict>();
+    public DbSet<ClinicSyncSetting> ClinicSyncSettings => Set<ClinicSyncSetting>();
 
     public CoreDbContext(DbContextOptions<CoreDbContext> options, ICurrentClinic currentClinic)
         : base(options)
@@ -1493,6 +1497,65 @@ public sealed class CoreDbContext : IdentityDbContext<AppUser, AppRole, Guid>
             b.HasIndex(x => new { x.ClinicId, x.ExecutedAtUtc });
             b.HasQueryFilter(x => _currentClinic.IsPlatformAdmin || x.ClinicId == _currentClinic.ClinicId);
         });
+
+        // SyncDeviceStates tenant table (sync schema)
+        builder.Entity<SyncDeviceState>(b =>
+        {
+            b.ToTable("SyncDeviceStates", "sync");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.DeviceId).HasMaxLength(128).IsRequired();
+            b.Property(x => x.RowVersion).IsRowVersion();
+            b.HasIndex(x => new { x.ClinicId, x.DeviceId }).IsUnique();
+            b.HasQueryFilter(x => _currentClinic.IsPlatformAdmin || x.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // SyncOperationLogs tenant table (sync schema)
+        builder.Entity<SyncOperationLog>(b =>
+        {
+            b.ToTable("SyncOperationLogs", "sync");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.DeviceId).HasMaxLength(128).IsRequired();
+            b.Property(x => x.ActionType).HasMaxLength(80).IsRequired();
+            b.Property(x => x.EntityType).HasMaxLength(80).IsRequired();
+            b.Property(x => x.Status).HasConversion<string>().HasMaxLength(32).IsRequired();
+            b.Property(x => x.ErrorCode).HasMaxLength(64);
+            b.Property(x => x.ErrorMessage).HasMaxLength(500);
+            b.Property(x => x.PayloadJson).HasMaxLength(8000).IsRequired();
+            b.Property(x => x.RowVersion).IsRowVersion();
+            b.HasIndex(x => new { x.ClinicId, x.CursorSequence });
+            b.HasIndex(x => new { x.ClinicId, x.OperationId }).IsUnique();
+            b.HasQueryFilter(x => _currentClinic.IsPlatformAdmin || x.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // SyncConflicts tenant table (sync schema)
+        builder.Entity<SyncConflict>(b =>
+        {
+            b.ToTable("SyncConflicts", "sync");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.DeviceId).HasMaxLength(128).IsRequired();
+            b.Property(x => x.EntityType).HasMaxLength(80).IsRequired();
+            b.Property(x => x.ConflictClass).HasConversion<string>().HasMaxLength(32).IsRequired();
+            b.Property(x => x.ConflictCode).HasMaxLength(64).IsRequired();
+            b.Property(x => x.Reason).HasMaxLength(500).IsRequired();
+            b.Property(x => x.ClientPayloadJson).HasMaxLength(8000).IsRequired();
+            b.Property(x => x.ServerSnapshotJson).HasMaxLength(8000).IsRequired();
+            b.Property(x => x.Status).HasConversion<string>().HasMaxLength(32).IsRequired();
+            b.Property(x => x.ResolvedByUserId).HasMaxLength(128);
+            b.Property(x => x.ResolutionNote).HasMaxLength(500);
+            b.Property(x => x.RowVersion).IsRowVersion();
+            b.HasIndex(x => new { x.ClinicId, x.Status, x.CreatedAtUtc });
+            b.HasQueryFilter(x => _currentClinic.IsPlatformAdmin || x.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // ClinicSyncSettings tenant table (sync schema)
+        builder.Entity<ClinicSyncSetting>(b =>
+        {
+            b.ToTable("ClinicSyncSettings", "sync");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.RowVersion).IsRowVersion();
+            b.HasIndex(x => x.ClinicId).IsUnique();
+            b.HasQueryFilter(x => _currentClinic.IsPlatformAdmin || x.ClinicId == _currentClinic.ClinicId);
+        });
     }
 
     /// <summary>
@@ -1675,7 +1738,15 @@ public sealed class CoreDbContext : IdentityDbContext<AppUser, AppRole, Guid>
                 ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON reports.ScheduledReportConfigs,
                 ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON reports.ScheduledReportConfigs,
                 ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON import.ImportBatchLogs,
-                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON import.ImportBatchLogs
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON import.ImportBatchLogs,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON sync.SyncDeviceStates,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON sync.SyncDeviceStates,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON sync.SyncOperationLogs,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON sync.SyncOperationLogs,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON sync.SyncConflicts,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON sync.SyncConflicts,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON sync.ClinicSyncSettings,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON sync.ClinicSyncSettings
                 WITH (STATE = ON);
             ');
         ";

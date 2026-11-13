@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { wipeAllLocalData } from '@clinic/api-client';
 
 export interface AuthUserState {
   id: string;
@@ -27,12 +28,14 @@ export const useAuthStore = create<AuthStore>((set) => ({
       accessToken: token,
       isAuthenticated: true,
     }),
-  logout: () =>
+  logout: () => {
+    void wipeAllLocalData();
     set({
       user: null,
       accessToken: null,
       isAuthenticated: false,
-    }),
+    });
+  },
   setClinic: (clinicId) =>
     set((state) => ({
       user: state.user ? { ...state.user, clinicId } : null,
