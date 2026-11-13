@@ -7,3 +7,4 @@ public sealed record PermissionDefinitionViewModel(
     string TitleAr,
     string TitleEn,
     bool IsReserved);
+

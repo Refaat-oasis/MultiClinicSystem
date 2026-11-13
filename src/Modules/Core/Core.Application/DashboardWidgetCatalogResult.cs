@@ -7,3 +7,4 @@ public sealed record DashboardWidgetCatalogResult(
     Guid ClinicId,
     IReadOnlyList<DashboardWidgetDefinitionResult> Widgets,
     IReadOnlyList<string> PinnedWidgetKeys);
+

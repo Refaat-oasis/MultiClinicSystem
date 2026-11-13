@@ -9,3 +9,4 @@ public sealed class UpdateClinicRoomDto
     public string? FloorOrLocation { get; set; }
     public bool IsActive { get; set; } = true;
 }
+

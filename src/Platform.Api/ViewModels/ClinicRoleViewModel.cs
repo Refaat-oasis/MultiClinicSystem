@@ -13,3 +13,4 @@ public sealed record ClinicRoleViewModel(
     IReadOnlyList<string> Permissions,
     IReadOnlyList<string> EffectivePermissions,
     IReadOnlyList<string> DormantPermissions);
+

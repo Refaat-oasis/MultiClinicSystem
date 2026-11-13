@@ -10,3 +10,4 @@ public sealed record DashboardWidgetDefinitionResult(
     string AllowedScope,
     string TitleAr,
     string TitleEn);
+

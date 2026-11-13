@@ -6,3 +6,4 @@ namespace Core.Application;
 public sealed record PermissionOverrideInput(
     string PermissionKey,
     string Effect);
+

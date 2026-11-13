@@ -8,3 +8,4 @@ public sealed class CreateClinicDayOffDto
     public string ReasonAr { get; set; } = string.Empty;
     public string ReasonEn { get; set; } = string.Empty;
 }
+

@@ -15,3 +15,4 @@ public sealed record ClinicModuleStateResult(
     IReadOnlyList<string> EnabledDependents,
     DateTimeOffset? ChangedAtUtc,
     string? Note);
+

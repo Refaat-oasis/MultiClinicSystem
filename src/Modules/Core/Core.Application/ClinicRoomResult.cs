@@ -13,3 +13,4 @@ public sealed record ClinicRoomResult(
     string? FloorOrLocation,
     bool IsActive,
     DateTimeOffset CreatedAtUtc);
+

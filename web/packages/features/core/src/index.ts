@@ -9,5 +9,6 @@ export * from './OnboardingWizardScreen';
 export * from './ClinicSettingsScreen';
 export * from './UserProfileScreen';
 export * from './Phase4Screens';
+export * from './Phase5PatientsScreen';
 
 

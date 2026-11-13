@@ -10,3 +10,4 @@ public sealed record OwnerPortfolioResult(
     int TotalStaffAcrossClinics,
     int TotalDoctorsAcrossClinics,
     IReadOnlyList<OwnerPortfolioClinicItemResult> Clinics);
+

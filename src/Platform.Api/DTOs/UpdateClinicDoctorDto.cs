@@ -11,3 +11,4 @@ public sealed class UpdateClinicDoctorDto
     public int SlotDurationMinutes { get; set; } = 20;
     public bool IsActive { get; set; } = true;
 }
+

@@ -92,3 +92,4 @@ public sealed class NumberBlock : ITenantEntity
         return Result<long>.Success(allocated);
     }
 }
+

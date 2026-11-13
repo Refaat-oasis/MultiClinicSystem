@@ -47,3 +47,4 @@ public sealed class NumberBlockTests
         r4.Error.Code.Should().Be("NUMBER_BLOCK_EXHAUSTED");
     }
 }
+

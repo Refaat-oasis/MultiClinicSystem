@@ -7,3 +7,4 @@ public sealed record OwnerPortfolioViewModel(
     int TotalStaffAcrossClinics,
     int TotalDoctorsAcrossClinics,
     IReadOnlyList<OwnerPortfolioClinicItemViewModel> Clinics);
+

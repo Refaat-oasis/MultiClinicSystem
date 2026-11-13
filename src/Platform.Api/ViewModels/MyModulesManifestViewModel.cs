@@ -6,3 +6,4 @@ public sealed record MyModulesManifestViewModel(
     IReadOnlyList<ModuleMenuItemViewModel> MenuItems,
     IReadOnlyList<SettingsSectionViewModel> SettingsSections,
     IReadOnlyList<string> EffectivePermissions);
+

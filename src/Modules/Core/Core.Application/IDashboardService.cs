@@ -30,3 +30,4 @@ public interface IDashboardService
         string? deviceId,
         CancellationToken cancellationToken = default);
 }
+

@@ -4,3 +4,4 @@ public sealed class SetUserPermissionOverridesDto
 {
     public List<PermissionOverrideItemDto> Overrides { get; set; } = new();
 }
+

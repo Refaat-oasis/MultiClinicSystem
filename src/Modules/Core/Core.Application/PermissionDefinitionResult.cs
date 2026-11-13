@@ -10,3 +10,4 @@ public sealed record PermissionDefinitionResult(
     string TitleAr,
     string TitleEn,
     bool IsReserved);
+

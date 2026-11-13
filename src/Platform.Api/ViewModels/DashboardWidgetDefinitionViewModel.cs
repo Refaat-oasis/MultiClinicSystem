@@ -7,3 +7,4 @@ public sealed record DashboardWidgetDefinitionViewModel(
     string AllowedScope,
     string TitleAr,
     string TitleEn);
+

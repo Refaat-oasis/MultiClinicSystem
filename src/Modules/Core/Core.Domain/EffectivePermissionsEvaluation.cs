@@ -6,3 +6,4 @@ namespace Core.Domain;
 public sealed record EffectivePermissionsEvaluation(
     IReadOnlyList<string> EffectivePermissions,
     IReadOnlyList<string> DormantPermissions);
+

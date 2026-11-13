@@ -12,3 +12,4 @@ public sealed record ClinicDayOffResult(
     string ReasonAr,
     string ReasonEn,
     DateTimeOffset CreatedAtUtc);
+

@@ -14,3 +14,4 @@ public interface IOwnerPortfolio
         DateTimeOffset? toUtc,
         CancellationToken cancellationToken = default);
 }
+

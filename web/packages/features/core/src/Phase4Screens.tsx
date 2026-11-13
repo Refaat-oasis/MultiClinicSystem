@@ -852,3 +852,4 @@ export const OwnerPortfolioAndWidgetsScreen: React.FC<OwnerPortfolioAndWidgetsSc
     </div>
   );
 };
+

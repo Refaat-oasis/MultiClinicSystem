@@ -8,3 +8,4 @@ public sealed record ModuleMenuItemViewModel(
     string Route,
     string RequiredPermission,
     int Order);
+

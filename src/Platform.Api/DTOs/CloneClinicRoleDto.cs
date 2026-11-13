@@ -6,3 +6,4 @@ public sealed class CloneClinicRoleDto
     public string? NewNameAr { get; set; }
     public string? NewNameEn { get; set; }
 }
+

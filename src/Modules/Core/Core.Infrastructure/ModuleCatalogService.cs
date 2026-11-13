@@ -224,7 +224,10 @@ public sealed class ModuleCatalogService : IModuleCatalogService
                 [
                     new("patients.list", "patients", "المرضى", "Patients", "/patients", "patients.read", 110)
                 ],
-                SettingsSections: Array.Empty<SettingsSectionResult>(),
+                SettingsSections:
+                [
+                    new("patients.scoping", "نطاق عرض المرضى", "Patient Scoping", "patients.write", "patients")
+                ],
                 DashboardWidgets:
                 [
                     new("patients.summary", "patients", "patients.read", "Clinic", "ملخص المرضى", "Patients Summary")
@@ -247,7 +250,10 @@ public sealed class ModuleCatalogService : IModuleCatalogService
                     new("patient-history.alerts", "patient-history", "تنبيهات الحساسية", "Allergy Alerts", "/patients/history", "patients.history.read", 120)
                 ],
                 SettingsSections: Array.Empty<SettingsSectionResult>(),
-                DashboardWidgets: Array.Empty<DashboardWidgetDefinitionResult>()),
+                DashboardWidgets:
+                [
+                    new("patient-history.allergy-count", "patient-history", "patients.history.read", "Clinic", "تنبيهات الحساسية", "Active Allergies")
+                ]),
 
             new ModuleManifestEntry(
                 ModuleKey: "attachments",
@@ -266,7 +272,10 @@ public sealed class ModuleCatalogService : IModuleCatalogService
                     new("attachments.library", "attachments", "المرفقات", "Attachments", "/attachments", "attachments.read", 130)
                 ],
                 SettingsSections: Array.Empty<SettingsSectionResult>(),
-                DashboardWidgets: Array.Empty<DashboardWidgetDefinitionResult>()),
+                DashboardWidgets:
+                [
+                    new("attachments.uploads-summary", "attachments", "attachments.read", "Clinic", "ملخص المرفقات", "Attachments Summary")
+                ]),
 
             new ModuleManifestEntry(
                 ModuleKey: "scheduling",

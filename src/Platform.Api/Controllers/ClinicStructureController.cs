@@ -325,3 +325,4 @@ public sealed class ClinicStructureController : ControllerBase
     private static NumberBlockViewModel MapBlock(NumberBlockResult n) => new(
         n.Id, n.ClinicId, n.DeviceId, n.Kind, n.FromNumber, n.ToNumber, n.NextNumber, n.Status, n.CreatedAtUtc);
 }
+

@@ -8,3 +8,4 @@ public sealed record ClinicWorkingHourViewModel(
     string StartTime,
     string EndTime,
     bool IsClosed);
+

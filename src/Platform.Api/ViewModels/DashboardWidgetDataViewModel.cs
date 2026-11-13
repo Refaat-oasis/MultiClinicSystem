@@ -11,3 +11,4 @@ public sealed record DashboardWidgetDataViewModel(
     decimal PrimaryValue,
     string UnitLabel,
     IReadOnlyDictionary<string, decimal> Breakdown);
+

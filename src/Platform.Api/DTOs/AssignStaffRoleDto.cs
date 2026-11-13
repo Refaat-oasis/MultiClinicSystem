@@ -4,3 +4,4 @@ public sealed class AssignStaffRoleDto
 {
     public string RoleName { get; set; } = string.Empty;
 }
+

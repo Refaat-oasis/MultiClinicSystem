@@ -111,6 +111,7 @@ public static class TestServiceFactory
         services.AddScoped<IDashboardService, DashboardService>();
         services.AddScoped<IOwnerPortfolio, OwnerPortfolioService>();
         services.AddScoped<IClinicStructureService, ClinicStructureService>();
+        services.AddScoped<IPatientService, PatientService>();
 
         var provider = services.BuildServiceProvider();
         return (provider, emailSender);

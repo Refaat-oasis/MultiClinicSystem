@@ -138,3 +138,4 @@ public interface IClinicAuthorizationService
         string? requestId,
         CancellationToken cancellationToken = default);
 }
+

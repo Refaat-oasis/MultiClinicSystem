@@ -305,3 +305,25 @@ Status: 0 Errors, Clean Build
 - [x] Modular dashboard widgets return aggregate-only payloads with 366-day max range and per-widget error-tile isolation; Owner Portfolio runs per clinic under SQL Server RLS and returns 404 for unowned clinics.
 - [x] Clinic structure (rooms, doctors, weekly working hours, days off), clinic audit log viewer, and concurrency-safe atomic number blocks (`1..500`, `501..1000`) verified.
 - [x] Phase 0, Phase 1, Phase 2, Phase 3, and Phase 4 integration gates and all architecture sweeps pass 100% green.
+
+---
+
+## Phase 5: Patients, Medical History, and Attachments (DONE)
+- **Branch**: `phase-5/patients-history-attachments`
+- **Completed Tasks**:
+  - **Domain (`src/Modules/Core/Core.Domain/`)**: Added `ArabicNormalizer`, `PatientAgeCalculator`, `PatientDuplicateDetector` (+ candidate/match value objects), `Patient`, `PatientAllergy`, `PatientNote`, `PatientAttachment`, and `ProcessedOperation`; extended `Clinic` (`ScopePatientsByDoctor`, `ScopePatientsBySpecialty`, `SetPatientScoping`) and `PatientAccessLog` (`ActorType`).
+  - **Application & Infrastructure**: Added `IPatientService` + Phase 5 input/result records, `PatientService`, `CoreDbContext` (`patients` schema + `core.ProcessedOperations`, EF global query filters, SQL Server RLS filter+block predicates), atomic `PatientFile` number-block allocation (`sp_getapplock`), duplicate detection (`409` unless confirmed), doctor/specialty patient scoping (`404` out-of-scope), optional-module degradation (`patient-history`, `attachments`), magic-byte/SHA-256/thumbnail handling behind `IFileStorage`, and `ModuleCatalogService` + `DashboardService` real aggregate widgets. Also tightened deterministic device lookup ordering in `ClinicAuthorizationService`.
+  - **API (`src/Platform.Api/`)**: Added `PatientsController` (thin controller + dedicated DTOs/ViewModels + `PatientViewModelMapper`), Super Admin inspect endpoint on `PlatformClinicsController` (`PatientAccessLog`), and `ProblemDetailsMapper` `409 DUPLICATE_*` handling.
+  - **Frontend (`web/`)**: Added `Phase5PatientsScreen` + `Phase5PatientsScreen.test.tsx`, wired into `@clinic/feature-core` and `web/apps/clinic/src/App.tsx`.
+- **Verification Output Summary**:
+  - `dotnet test tests/UnitTests`: `Passed! - Failed: 0, Passed: 102, Skipped: 0, Total: 102`
+  - `dotnet test tests/ArchitectureTests`: `Passed! - Failed: 0, Passed: 12, Skipped: 0, Total: 12`
+  - `dotnet test tests/IntegrationTests`: `Passed! - Failed: 0, Passed: 25, Skipped: 0, Total: 25`
+  - `dotnet test tests/Gates` (Phases 0–5 cumulative): `Passed! - Failed: 0, Passed: 18, Skipped: 0, Total: 18`
+  - Frontend `npm --prefix web test; lint; build`: `32/32` Vitest tests passed across workspaces (`admin-app`: 7, `clinic-app`: 2, `api-client`: 3, `ui`: 3, `feature-core`: 17), `tsc --noEmit` passed, `vite build` succeeded.
+
+### Phase 5 Exit Checklist
+- [x] Patient registry with concurrency-safe `PatientFile` number blocks, `OperationId` idempotency (`ProcessedOperations`), Arabic normalization search, and duplicate-warning enforcement.
+- [x] Chronic medical history, allergy tracking (with UI allergy banner), doctor-private notes isolation, and SHA-256 deduplicated attachments behind `IFileStorage` with thumbnails.
+- [x] Per-clinic doctor & specialty scoping returning `404`, clean degradation when `patient-history` or `attachments` is off, and Super Admin read-only inspect logging `PatientAccessLog`.
+- [x] Phases 0 to 5 integration gates, architecture sweeps, and frontend test/lint/build pass 100% green.
