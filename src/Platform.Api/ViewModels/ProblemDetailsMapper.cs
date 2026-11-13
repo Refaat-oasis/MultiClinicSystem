@@ -35,6 +35,7 @@ public static class ProblemDetailsMapper
                        c.Contains("DEVICE_APPROVAL_REQUIRED", StringComparison.OrdinalIgnoreCase) ||
                        c.Contains("MODULE_DISABLED", StringComparison.OrdinalIgnoreCase) ||
                        c.Contains("DELEGATION_CEILING_EXCEEDED", StringComparison.OrdinalIgnoreCase) ||
+                       c.Contains("PATIENT_ONLINE_BOOKING_BLOCKED", StringComparison.OrdinalIgnoreCase) ||
                        c.Contains("SYSTEM_ROLE_PROTECTED", StringComparison.OrdinalIgnoreCase) => StatusCodes.Status403Forbidden,
             var c when c.Contains("NOT_FOUND", StringComparison.OrdinalIgnoreCase) => StatusCodes.Status404NotFound,
             var c when c.Contains("CONFLICT", StringComparison.OrdinalIgnoreCase) ||
@@ -47,6 +48,8 @@ public static class ProblemDetailsMapper
                        c.Contains("CLINIC_QUOTA_REACHED", StringComparison.OrdinalIgnoreCase) ||
                        c.Contains("ONBOARDING_REQUIRED", StringComparison.OrdinalIgnoreCase) ||
                        c.Contains("SLUG_TAKEN", StringComparison.OrdinalIgnoreCase) ||
+                       c.Contains("SLOT_TAKEN", StringComparison.OrdinalIgnoreCase) ||
+                       c.Contains("REQUEST_EXPIRED", StringComparison.OrdinalIgnoreCase) ||
                        c.Contains("FINANCIAL_SETTINGS_LOCKED", StringComparison.OrdinalIgnoreCase) ||
                        c.Contains("MODULE_PREREQUISITE_OFF", StringComparison.OrdinalIgnoreCase) ||
                        c.Contains("MODULE_HAS_DEPENDENTS", StringComparison.OrdinalIgnoreCase) ||

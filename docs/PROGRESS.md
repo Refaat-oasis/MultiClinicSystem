@@ -445,3 +445,27 @@ Status: 0 Errors, Clean Build
 - [x] Portal cookie/JWT realm (`__Host-Portal-Token`) is strictly isolated from staff/admin tokens, responses include `no-store` & `noindex`, signed download URLs expire cleanly, and hidden visits/private doctor notes/internal costs never leak.
 - [x] Turning `portal` or optional section modules (`treatment-plans`, etc.) off disables only those portal sections with `MODULE_DISABLED`, while `ReadOnly` clinics preserve read access and `Suspended` returns 404.
 - [x] Phases 0 to 10 cumulative gates, portal isolation & architecture sweeps, and frontend test/lint/build pass 100% green.
+
+---
+
+## Phase 11: Patient Portal — Self-Booking and Cancellation (DONE)
+- **Branch**: `phase-11/patient-portal-booking`
+- **Completed Tasks**:
+  - **Domain (`src/Modules/Core/Core.Domain/`)**: Added `PortalBookingMode` (`AutoConfirm`, `RequiresApproval`) and `ClinicPortalBookingSetting` (`portal` schema, `ITenantEntity`, `ISoftDeletable`), extended `AppointmentStatus` (`Requested = 7`, `Declined = 8`) & `AppointmentStateMachine` (approval lifecycle + expired hold slot release), extended `Appointment` (`ApprovalExpiresAtUtc`, `ReviewedByUserId`, `ReviewedAtUtc`, `ReviewNotes`, `MarkAsPendingPortalRequest`, `ApprovePortalRequest`, `DeclinePortalRequest`) and `PatientAccount` (`NoShowCount`, `NoShowsSinceUnblock`, `IsOnlineBookingBlocked`, `OnlineBookingBlockReason`, `RecordNoShow`, `BlockOnlineBooking`, `UnblockOnlineBooking`), and added 10 unit tests in `PortalBookingDomainTests`.
+  - **Application & Infrastructure**: Added `ClinicPortalBookingSettingResult`, `UpdateClinicPortalBookingSettingInput`, `PortalAvailabilityResult` + category/doctor/slot results, `PortalBookAppointmentInput`, `PortalBookingRequestItemResult`, `ClinicPortalBookingInspectResult`; implemented `GetPortalAvailabilityAsync`, `BookAppointmentFromPortalAsync`, `CancelAppointmentFromPortalAsync`, `ApprovePortalBookingRequestAsync`, `DeclinePortalBookingRequestAsync`, `ExpireStalePortalBookingRequestsAsync`, and `SetPatientOnlineBookingBlockAsync` inside `SchedulingService`, `AvailabilityQueriesService`, `QueueWorkflowHelper`, `PortalBookingHelper`, and `PatientPortalService` (enforcing `Serializable` + `sp_getapplock`, `409 SLOT_TAKEN`, `409 REQUEST_EXPIRED`, `CANCELLATION_CUTOFF_PASSED`, automatic `WaitingList` `SlotOffer` triggering on portal cancel, and `403 PATIENT_ONLINE_BOOKING_BLOCKED` after `NoShowCount` threshold); registered `"portal-booking"` manifest and 6 live `portal-booking.*` widgets in `ModuleCatalogService` & `DashboardService`; added SQL Server RLS policies on `portal.ClinicPortalBookingSettings` in `CoreDbContext`.
+  - **API & Architecture Sweeps**: Extended `PatientPortalController` (`/api/v1/c/{slug}/portal/availability`, `POST appointments`, `POST appointments/{appointmentId}/cancel`), `StaffPortalManagementController` (`/booking-settings`, `/booking-requests`, `/approve`, `/decline`, `/expire-stale`, `/booking-block`), `PlatformClinicsController.InspectPortalBooking`, `ProblemDetailsMapper` (`SLOT_TAKEN`, `REQUEST_EXPIRED`, `PATIENT_ONLINE_BOOKING_BLOCKED`), single-type DTOs/ViewModels, and `PortalIsolationSweepTests`.
+  - **Frontend (`web/`)**: Extended lazy-loaded `web/apps/clinic/src/portal/PortalApp.tsx` + `PortalApp.test.tsx` with self-booking (`حجز موعد أونلاين`), doctor/category filters, slot picker, booking mode & cutoff display, blocked warning, `ONLINE_REQUIRED` offline check, `OperationId` payload generation, and upcoming cancellation; added `Phase11PortalBookingScreen.tsx` + `Phase11PortalBookingScreen.test.tsx` mounted in `web/apps/clinic/src/App.tsx` (`portalBooking` tab) and `web/apps/admin/src/InspectClinicShell.tsx` (`readOnlyInspectMode`).
+- **Verification Output Summary**:
+  - `dotnet test tests/UnitTests/UnitTests.csproj --no-restore`: `Passed! - Failed: 0, Passed: 153, Skipped: 0, Total: 153`
+  - `dotnet test tests/ArchitectureTests/ArchitectureTests.csproj --no-restore`: `Passed! - Failed: 0, Passed: 15, Skipped: 0, Total: 15`
+  - `dotnet test tests/IntegrationTests/IntegrationTests.csproj --no-restore`: `Passed! - Failed: 0, Passed: 31, Skipped: 0, Total: 31`
+  - `dotnet test tests/Gates/Gates.csproj --no-build` (Phases 0–11 cumulative): `Passed! - Failed: 0, Passed: 24, Skipped: 0, Total: 24`
+  - Frontend `npm --prefix web test; npm --prefix web run lint; npm --prefix web run build`: `51/51` Vitest tests passed (`admin-app`: 7, `clinic-app`: 5, `api-client`: 3, `ui`: 3, `feature-core`: 33), `tsc --noEmit` 0 errors, Vite production builds succeeded for both apps (`PortalApp` emitted as lazy chunk).
+
+### Phase 11 Exit Checklist
+- [x] Portal availability respects `BookableOnline`, `AcceptsOnlineBooking`, lead time, max days ahead, active future caps, daily caps, and no-show block state while emitting `Cache-Control: no-store`.
+- [x] `AutoConfirm` and `RequiresApproval` workflows (`Requested` -> `Booked`/`Declined`/`Expired`) hold slots cleanly and prevent `409 SLOT_TAKEN` race collisions under `Serializable` + `sp_getapplock`.
+- [x] Portal cancellation enforces `CancellationCutoffHours` and automatically offers freed slots to `WaitingList` patients.
+- [x] Three `NoShow` transitions automatically block online booking (`PATIENT_ONLINE_BOOKING_BLOCKED`) until reception unblocks; turning `portal-booking` off returns `MODULE_DISABLED` without affecting staff scheduling.
+- [x] Phases 0 to 11 cumulative gates, portal isolation & architecture sweeps, and frontend test/lint/build pass 100% green.
+

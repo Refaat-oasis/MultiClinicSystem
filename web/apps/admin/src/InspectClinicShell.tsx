@@ -8,6 +8,7 @@ import {
   Phase8BillingScreen,
   Phase9TreatmentPlansScreen,
   Phase10PortalScreen,
+  Phase11PortalBookingScreen,
   type AppointmentItem,
   type QueueEntryItem,
   type WaitingListItem,
@@ -17,6 +18,7 @@ import {
   type BillingDailyClosingData,
   type TreatmentPlanData,
   type ClinicPortalInspectData,
+  type ClinicPortalBookingInspectData,
 } from '@clinic/feature-core';
 
 interface InspectClinicScheduleSnapshot {
@@ -104,6 +106,13 @@ export const InspectClinicShell: React.FC<InspectClinicShellProps> = ({ clinicId
   const { data: portalSnapshot } = useQuery<ClinicPortalInspectData>({
     queryKey: ['platform-inspect-portal', clinicId],
     queryFn: () => apiClient.get<ClinicPortalInspectData>(`/platform/clinics/${clinicId}/inspect/portal`),
+    enabled: Boolean(clinicId),
+    retry: false,
+  });
+
+  const { data: portalBookingSnapshot } = useQuery<ClinicPortalBookingInspectData>({
+    queryKey: ['platform-inspect-portal-booking', clinicId],
+    queryFn: () => apiClient.get<ClinicPortalBookingInspectData>(`/platform/clinics/${clinicId}/inspect/portal-booking`),
     enabled: Boolean(clinicId),
     retry: false,
   });
@@ -215,6 +224,13 @@ export const InspectClinicShell: React.FC<InspectClinicShellProps> = ({ clinicId
           clinicId={clinicId}
           readOnlyInspectMode={true}
           initialInspectSnapshot={portalSnapshot}
+        />
+      )}
+      {clinicId && portalBookingSnapshot && (
+        <Phase11PortalBookingScreen
+          clinicId={clinicId}
+          readOnlyInspectMode={true}
+          initialInspectSnapshot={portalBookingSnapshot}
         />
       )}
     </div>

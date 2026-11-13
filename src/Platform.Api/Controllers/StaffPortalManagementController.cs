@@ -283,6 +283,159 @@ public sealed class StaffPortalManagementController : ControllerBase
             : Ok(result.Value.Select(PatientPortalViewModelMapper.ToViewModel).ToList());
     }
 
+    [HttpGet("booking-settings")]
+    [ProducesResponseType(typeof(ClinicPortalBookingSettingViewModel), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetBookingSettings(Guid clinicId, CancellationToken cancellationToken)
+    {
+        if (!TryGetStaffUserId(out Guid staffUserId))
+        {
+            return Unauthorized();
+        }
+
+        var result = await _portalService.GetClinicPortalBookingSettingsAsync(
+            staffUserId, clinicId, GetDeviceId(), cancellationToken);
+
+        return result.IsFailure
+            ? ProblemDetailsMapper.ToProblemDetails(result.Error)
+            : Ok(PatientPortalViewModelMapper.ToViewModel(result.Value));
+    }
+
+    [HttpPut("booking-settings")]
+    [ProducesResponseType(typeof(ClinicPortalBookingSettingViewModel), StatusCodes.Status200OK)]
+    public async Task<IActionResult> UpdateBookingSettings(
+        Guid clinicId,
+        [FromBody] UpdateClinicPortalBookingSettingDto dto,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetStaffUserId(out Guid staffUserId))
+        {
+            return Unauthorized();
+        }
+
+        var result = await _portalService.UpdateClinicPortalBookingSettingsAsync(
+            staffUserId,
+            clinicId,
+            new UpdateClinicPortalBookingSettingInput(
+                dto.Mode,
+                dto.MinLeadTimeMinutes,
+                dto.MaxDaysAhead,
+                dto.SlotStepMinutes,
+                dto.MaxActiveFutureBookingsPerPatient,
+                dto.MaxBookingsPerDay,
+                dto.CancellationCutoffHours,
+                dto.AutoBlockAfterNoShows,
+                dto.ApprovalHoldHours,
+                dto.ShowPricesWhenAvailable),
+            GetDeviceId(),
+            GetIp(),
+            GetRequestId(),
+            cancellationToken);
+
+        return result.IsFailure
+            ? ProblemDetailsMapper.ToProblemDetails(result.Error)
+            : Ok(PatientPortalViewModelMapper.ToViewModel(result.Value));
+    }
+
+    [HttpGet("booking-requests")]
+    [ProducesResponseType(typeof(IReadOnlyList<PortalBookingRequestItemViewModel>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ListBookingRequests(
+        Guid clinicId,
+        [FromQuery] string? status,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetStaffUserId(out Guid staffUserId))
+        {
+            return Unauthorized();
+        }
+
+        var result = await _portalService.ListPortalBookingRequestsAsync(
+            staffUserId, clinicId, status, GetDeviceId(), cancellationToken);
+
+        return result.IsFailure
+            ? ProblemDetailsMapper.ToProblemDetails(result.Error)
+            : Ok(result.Value.Select(PatientPortalViewModelMapper.ToViewModel).ToList());
+    }
+
+    [HttpPost("booking-requests/{appointmentId:guid}/approve")]
+    [ProducesResponseType(typeof(PortalBookingRequestItemViewModel), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ApproveBookingRequest(
+        Guid clinicId,
+        Guid appointmentId,
+        [FromBody] ReviewPortalBookingRequestDto? dto,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetStaffUserId(out Guid staffUserId))
+        {
+            return Unauthorized();
+        }
+
+        var result = await _portalService.ApprovePortalBookingRequestAsync(
+            staffUserId, clinicId, appointmentId, dto?.ReviewNotes, GetDeviceId(), GetIp(), GetRequestId(), cancellationToken);
+
+        return result.IsFailure
+            ? ProblemDetailsMapper.ToProblemDetails(result.Error)
+            : Ok(PatientPortalViewModelMapper.ToViewModel(result.Value));
+    }
+
+    [HttpPost("booking-requests/{appointmentId:guid}/decline")]
+    [ProducesResponseType(typeof(PortalBookingRequestItemViewModel), StatusCodes.Status200OK)]
+    public async Task<IActionResult> DeclineBookingRequest(
+        Guid clinicId,
+        Guid appointmentId,
+        [FromBody] ReviewPortalBookingRequestDto? dto,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetStaffUserId(out Guid staffUserId))
+        {
+            return Unauthorized();
+        }
+
+        var result = await _portalService.DeclinePortalBookingRequestAsync(
+            staffUserId, clinicId, appointmentId, dto?.ReviewNotes, GetDeviceId(), GetIp(), GetRequestId(), cancellationToken);
+
+        return result.IsFailure
+            ? ProblemDetailsMapper.ToProblemDetails(result.Error)
+            : Ok(PatientPortalViewModelMapper.ToViewModel(result.Value));
+    }
+
+    [HttpPost("booking-requests/expire-stale")]
+    [ProducesResponseType(typeof(PortalExpiredRequestsViewModel), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ExpireStaleBookingRequests(Guid clinicId, CancellationToken cancellationToken)
+    {
+        if (!TryGetStaffUserId(out Guid staffUserId))
+        {
+            return Unauthorized();
+        }
+
+        var result = await _portalService.ExpireStalePortalBookingRequestsAsync(
+            staffUserId, clinicId, GetDeviceId(), cancellationToken);
+
+        return result.IsFailure
+            ? ProblemDetailsMapper.ToProblemDetails(result.Error)
+            : Ok(new PortalExpiredRequestsViewModel(result.Value));
+    }
+
+    [HttpPut("patients/{patientId:guid}/booking-block")]
+    [ProducesResponseType(typeof(PatientPortalAdminStatusViewModel), StatusCodes.Status200OK)]
+    public async Task<IActionResult> SetPatientBookingBlock(
+        Guid clinicId,
+        Guid patientId,
+        [FromBody] SetPatientOnlineBookingBlockDto dto,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetStaffUserId(out Guid staffUserId))
+        {
+            return Unauthorized();
+        }
+
+        var result = await _portalService.SetPatientOnlineBookingBlockAsync(
+            staffUserId, clinicId, patientId, dto.Blocked, dto.Reason, GetDeviceId(), GetIp(), GetRequestId(), cancellationToken);
+
+        return result.IsFailure
+            ? ProblemDetailsMapper.ToProblemDetails(result.Error)
+            : Ok(PatientPortalViewModelMapper.ToViewModel(result.Value));
+    }
+
     private bool TryGetStaffUserId(out Guid userId)
     {
         userId = Guid.Empty;

@@ -406,28 +406,34 @@ public sealed class SchedulingService : ISchedulingService, IPortalBooking, ISch
         Guid? operationId,
         CancellationToken cancellationToken = default)
     {
-        bool schedulingEnabled = await _dbContext.ClinicModules
-            .AsNoTracking()
-            .AnyAsync(m => m.ClinicId == clinicId && m.ModuleKey == "scheduling" && m.Enabled, cancellationToken);
-        if (!schedulingEnabled)
+        return await ExecuteForClinicAsync(clinicId, async () =>
         {
-            return Result<AppointmentItemResult>.Failure(Error.Forbidden("MODULE_DISABLED", "Scheduling module is not enabled for this clinic."));
-        }
+            List<string> enabled = await _dbContext.ClinicModules
+                .AsNoTracking()
+                .Where(m => m.ClinicId == clinicId && m.Enabled)
+                .Select(m => m.ModuleKey)
+                .ToListAsync(cancellationToken);
+            if (!enabled.Contains("scheduling", StringComparer.OrdinalIgnoreCase)
+                || !enabled.Contains("portal-booking", StringComparer.OrdinalIgnoreCase))
+            {
+                return Result<AppointmentItemResult>.Failure(Error.Forbidden("MODULE_DISABLED", "Portal booking or scheduling module is not enabled for this clinic."));
+            }
 
-        var input = new BookAppointmentInput(
-            null,
-            patientId,
-            doctorId,
-            null,
-            categoryId,
-            startUtc,
-            null,
-            AppointmentPriority.Normal.ToString(),
-            null,
-            notes,
-            operationId);
+            var input = new BookAppointmentInput(
+                null,
+                patientId,
+                doctorId,
+                null,
+                categoryId,
+                startUtc,
+                null,
+                AppointmentPriority.Normal.ToString(),
+                null,
+                notes,
+                operationId);
 
-        return await BookInternalAsync(clinicId, null, AppointmentSource.Portal, input, null, null, cancellationToken);
+            return await BookInternalAsync(clinicId, null, AppointmentSource.Portal, input, null, null, cancellationToken);
+        });
     }
 
     public async Task<Result<AppointmentItemResult>> CancelPortalAppointmentAsync(
@@ -439,6 +445,17 @@ public sealed class SchedulingService : ISchedulingService, IPortalBooking, ISch
     {
         return await ExecuteForClinicAsync(clinicId, async () =>
         {
+            List<string> enabled = await _dbContext.ClinicModules
+                .AsNoTracking()
+                .Where(m => m.ClinicId == clinicId && m.Enabled)
+                .Select(m => m.ModuleKey)
+                .ToListAsync(cancellationToken);
+            if (!enabled.Contains("scheduling", StringComparer.OrdinalIgnoreCase)
+                || !enabled.Contains("portal-booking", StringComparer.OrdinalIgnoreCase))
+            {
+                return Result<AppointmentItemResult>.Failure(Error.Forbidden("MODULE_DISABLED", "Portal booking or scheduling module is not enabled for this clinic."));
+            }
+
             Appointment? appt = await _dbContext.Appointments
                 .FirstOrDefaultAsync(a => a.ClinicId == clinicId && a.Id == appointmentId && !a.IsVoided, cancellationToken);
             if (appt == null || appt.PatientId != patientId)
@@ -446,7 +463,171 @@ public sealed class SchedulingService : ISchedulingService, IPortalBooking, ISch
                 return Result<AppointmentItemResult>.Failure(Error.NotFound("APPOINTMENT_NOT_FOUND", "Appointment was not found."));
             }
 
+            DateTimeOffset now = _clock.UtcNow;
+            if (appt.Status != AppointmentStatus.Requested)
+            {
+                ClinicPortalBookingSetting bookingSettings = await PortalBookingHelper.GetOrBuildDefaultBookingSettingsAsync(
+                    _dbContext, clinicId, now, cancellationToken);
+                if (bookingSettings.CancellationCutoffHours > 0
+                    && appt.StartUtc < now.AddHours(bookingSettings.CancellationCutoffHours))
+                {
+                    return Result<AppointmentItemResult>.Failure(Error.Validation(
+                        "CANCELLATION_CUTOFF_PASSED",
+                        $"Online cancellation is closed within {bookingSettings.CancellationCutoffHours} hours of the appointment."));
+                }
+            }
+
             return await ApplyTransitionInternalAsync(clinicId, null, appt, AppointmentStatus.Cancelled, reason ?? "Cancelled via portal", null, null, cancellationToken);
+        });
+    }
+
+    public async Task<Result<AppointmentItemResult>> ApprovePortalBookingRequestAsync(
+        Guid staffUserId,
+        Guid clinicId,
+        Guid appointmentId,
+        string? reviewNotes,
+        string? ipAddress,
+        string? requestId,
+        CancellationToken cancellationToken = default)
+    {
+        return await ExecuteForClinicAsync(clinicId, async () =>
+        {
+            await using var tx = await _dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+            await AcquireClinicScheduleLockAsync(clinicId, cancellationToken);
+
+            Appointment? appt = await _dbContext.Appointments
+                .FirstOrDefaultAsync(a => a.ClinicId == clinicId && a.Id == appointmentId && !a.IsVoided, cancellationToken);
+            if (appt == null || appt.Source != AppointmentSource.Portal)
+            {
+                return Result<AppointmentItemResult>.Failure(Error.NotFound("BOOKING_REQUEST_NOT_FOUND", "Portal booking request was not found."));
+            }
+
+            DateTimeOffset now = _clock.UtcNow;
+            if (appt.IsPortalRequestExpired(now))
+            {
+                appt.DeclinePortalRequest(staffUserId, "RequestHoldExpired", now);
+                await _dbContext.SaveChangesAsync(cancellationToken);
+                await tx.CommitAsync(cancellationToken);
+                return Result<AppointmentItemResult>.Failure(Error.Conflict("REQUEST_EXPIRED", "Portal booking request hold has expired."));
+            }
+
+            if (!appt.ApprovePortalRequest(staffUserId, reviewNotes, now))
+            {
+                return Result<AppointmentItemResult>.Failure(Error.Validation("REQUEST_NOT_PENDING", "Only pending portal booking requests can be approved."));
+            }
+
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            await tx.CommitAsync(cancellationToken);
+
+            await _auditService.LogAsync(
+                "portal.booking.request.approve",
+                nameof(Appointment),
+                appt.Id.ToString(),
+                AppointmentStatus.Requested.ToString(),
+                JsonSerializer.Serialize(new { Status = AppointmentStatus.Booked.ToString(), ReviewNotes = reviewNotes }),
+                staffUserId,
+                clinicId,
+                ipAddress,
+                requestId,
+                cancellationToken);
+
+            await _realtimeNotifier.NotifyClinicAsync(
+                new ScheduleRealtimeEvent(clinicId, "PortalBookingApproved", appt.Id, appt.DoctorId, now, "Portal booking request approved."),
+                cancellationToken);
+
+            List<AppointmentItemResult> hydrated = await SchedulingProjectionHelper.HydrateAppointmentsAsync(_dbContext, clinicId, [appt], cancellationToken);
+            return Result<AppointmentItemResult>.Success(hydrated[0]);
+        });
+    }
+
+    public async Task<Result<AppointmentItemResult>> DeclinePortalBookingRequestAsync(
+        Guid staffUserId,
+        Guid clinicId,
+        Guid appointmentId,
+        string? reviewNotes,
+        string? ipAddress,
+        string? requestId,
+        CancellationToken cancellationToken = default)
+    {
+        return await ExecuteForClinicAsync(clinicId, async () =>
+        {
+            Appointment? appt = await _dbContext.Appointments
+                .FirstOrDefaultAsync(a => a.ClinicId == clinicId && a.Id == appointmentId && !a.IsVoided, cancellationToken);
+            if (appt == null || appt.Source != AppointmentSource.Portal)
+            {
+                return Result<AppointmentItemResult>.Failure(Error.NotFound("BOOKING_REQUEST_NOT_FOUND", "Portal booking request was not found."));
+            }
+
+            DateTimeOffset now = _clock.UtcNow;
+            if (!appt.DeclinePortalRequest(staffUserId, reviewNotes, now))
+            {
+                return Result<AppointmentItemResult>.Failure(Error.Validation("REQUEST_NOT_PENDING", "Only pending portal booking requests can be declined."));
+            }
+
+            await _dbContext.SaveChangesAsync(cancellationToken);
+
+            await _auditService.LogAsync(
+                "portal.booking.request.decline",
+                nameof(Appointment),
+                appt.Id.ToString(),
+                AppointmentStatus.Requested.ToString(),
+                JsonSerializer.Serialize(new { Status = AppointmentStatus.Declined.ToString(), ReviewNotes = reviewNotes }),
+                staffUserId,
+                clinicId,
+                ipAddress,
+                requestId,
+                cancellationToken);
+
+            await _realtimeNotifier.NotifyClinicAsync(
+                new ScheduleRealtimeEvent(clinicId, "PortalBookingDeclined", appt.Id, appt.DoctorId, now, "Portal booking request declined."),
+                cancellationToken);
+
+            List<AppointmentItemResult> hydrated = await SchedulingProjectionHelper.HydrateAppointmentsAsync(_dbContext, clinicId, [appt], cancellationToken);
+            return Result<AppointmentItemResult>.Success(hydrated[0]);
+        });
+    }
+
+    public async Task<Result<int>> ExpireStalePortalBookingRequestsAsync(
+        Guid clinicId,
+        Guid? actorUserId,
+        CancellationToken cancellationToken = default)
+    {
+        return await ExecuteForClinicAsync(clinicId, async () =>
+        {
+            DateTimeOffset now = _clock.UtcNow;
+            List<Appointment> stale = await _dbContext.Appointments
+                .Where(a => a.ClinicId == clinicId
+                            && !a.IsVoided
+                            && a.Status == AppointmentStatus.Requested
+                            && a.ApprovalExpiresAtUtc.HasValue
+                            && a.ApprovalExpiresAtUtc.Value <= now)
+                .ToListAsync(cancellationToken);
+
+            if (stale.Count == 0)
+            {
+                return Result<int>.Success(0);
+            }
+
+            foreach (Appointment item in stale)
+            {
+                item.DeclinePortalRequest(actorUserId, "RequestHoldExpired", now);
+            }
+
+            await _dbContext.SaveChangesAsync(cancellationToken);
+
+            await _auditService.LogAsync(
+                "portal.booking.requests.expire",
+                nameof(Appointment),
+                clinicId.ToString(),
+                null,
+                JsonSerializer.Serialize(new { ExpiredCount = stale.Count }),
+                actorUserId,
+                clinicId,
+                null,
+                null,
+                cancellationToken);
+
+            return Result<int>.Success(stale.Count);
         });
     }
 
@@ -645,9 +826,10 @@ public sealed class SchedulingService : ISchedulingService, IPortalBooking, ISch
                 .OrderBy(a => a.StartUtc)
                 .ToListAsync(cancellationToken);
 
+            DateTimeOffset nowUtc = _clock.UtcNow;
             List<Appointment> affected = candidates.Where(a =>
             {
-                if (!AppointmentStateMachine.IsOccupyingStatus(a.Status) || a.Status == AppointmentStatus.Completed)
+                if (!AppointmentStateMachine.IsOccupying(a, nowUtc) || a.Status == AppointmentStatus.Completed)
                 {
                     return false;
                 }
@@ -1188,12 +1370,24 @@ public sealed class SchedulingService : ISchedulingService, IPortalBooking, ISch
                 return Result<AppointmentItemResult>.Failure(Error.NotFound("BOOKING_REFERENCE_NOT_FOUND", "Clinic, patient, doctor, or category was not found."));
             }
 
+            DoctorBookingSetting? portalDocSetting = null;
+            ClinicPortalBookingSetting? portalBookingSetting = null;
             if (source == AppointmentSource.Portal)
             {
-                DoctorBookingSetting? docSetting = await _dbContext.DoctorBookingSettings
+                PatientAccount? portalAccount = await _dbContext.PatientAccounts
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(a => a.ClinicId == clinicId && a.PatientId == patient.Id && !a.IsVoided, cancellationToken);
+                if (portalAccount is { IsOnlineBookingBlocked: true })
+                {
+                    return Result<AppointmentItemResult>.Failure(Error.Forbidden(
+                        "PATIENT_ONLINE_BOOKING_BLOCKED",
+                        "Online booking is currently blocked for this patient."));
+                }
+
+                portalDocSetting = await _dbContext.DoctorBookingSettings
                     .AsNoTracking()
                     .FirstOrDefaultAsync(s => s.ClinicId == clinicId && s.DoctorId == doctor.Id && !s.IsVoided, cancellationToken);
-                if (!category.BookableOnline || docSetting is not { AcceptsOnlineBooking: true })
+                if (!category.BookableOnline || portalDocSetting is not { AcceptsOnlineBooking: true })
                 {
                     return Result<AppointmentItemResult>.Failure(Error.Forbidden("ONLINE_BOOKING_DISABLED", "Selected doctor or category does not accept online booking."));
                 }
@@ -1217,9 +1411,22 @@ public sealed class SchedulingService : ISchedulingService, IPortalBooking, ISch
 
             DateTimeOffset now = _clock.UtcNow;
             ClinicSchedulingSetting settings = await SchedulingProjectionHelper.GetOrCreateDefaultSettingsAsync(_dbContext, clinicId, now, cancellationToken);
-            if (settings.MinBookingLeadMinutes > 0 && input.StartUtc < now.AddMinutes(settings.MinBookingLeadMinutes))
+            int effectiveMinLeadMinutes = settings.MinBookingLeadMinutes;
+            if (source == AppointmentSource.Portal)
             {
-                return Result<AppointmentItemResult>.Failure(Error.Validation("LEAD_TIME_NOT_MET", $"Bookings require at least {settings.MinBookingLeadMinutes} minutes lead time."));
+                portalBookingSetting = await PortalBookingHelper.GetOrBuildDefaultBookingSettingsAsync(_dbContext, clinicId, now, cancellationToken);
+                effectiveMinLeadMinutes = Math.Max(settings.MinBookingLeadMinutes, portalBookingSetting.MinLeadTimeMinutes);
+                if (input.StartUtc > now.AddDays(portalBookingSetting.MaxDaysAhead))
+                {
+                    return Result<AppointmentItemResult>.Failure(Error.Validation(
+                        "BOOKING_HORIZON_EXCEEDED",
+                        $"Portal bookings cannot be more than {portalBookingSetting.MaxDaysAhead} days in advance."));
+                }
+            }
+
+            if (effectiveMinLeadMinutes > 0 && input.StartUtc < now.AddMinutes(effectiveMinLeadMinutes))
+            {
+                return Result<AppointmentItemResult>.Failure(Error.Validation("LEAD_TIME_NOT_MET", $"Bookings require at least {effectiveMinLeadMinutes} minutes lead time."));
             }
 
             AppointmentPriority priority = Enum.TryParse<AppointmentPriority>(input.Priority, true, out AppointmentPriority p) ? p : AppointmentPriority.Normal;
@@ -1228,15 +1435,77 @@ public sealed class SchedulingService : ISchedulingService, IPortalBooking, ISch
             await using var tx = await _dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
             await AcquireClinicScheduleLockAsync(clinicId, cancellationToken);
 
+            if (source == AppointmentSource.Portal && portalBookingSetting != null)
+            {
+                List<Appointment> futurePortalAppts = await _dbContext.Appointments
+                    .AsNoTracking()
+                    .Where(a => a.ClinicId == clinicId
+                                && !a.IsVoided
+                                && a.PatientId == patient.Id
+                                && a.Source == AppointmentSource.Portal
+                                && a.StartUtc >= now)
+                    .ToListAsync(cancellationToken);
+
+                int activeFutureCount = futurePortalAppts.Count(a => AppointmentStateMachine.IsOccupying(a, now));
+                if (activeFutureCount >= portalBookingSetting.MaxActiveFutureBookingsPerPatient)
+                {
+                    return Result<AppointmentItemResult>.Failure(Error.Validation(
+                        "MAX_ACTIVE_FUTURE_BOOKINGS_REACHED",
+                        $"Patients may hold at most {portalBookingSetting.MaxActiveFutureBookingsPerPatient} active upcoming online bookings."));
+                }
+
+                TimeZoneInfo clinicTz = ClinicTimeZoneResolver.Resolve(clinic.TimeZone);
+                DateTimeOffset localStart = TimeZoneInfo.ConvertTime(input.StartUtc, clinicTz);
+                DateTime localDayStartUnspecified = new(localStart.Year, localStart.Month, localStart.Day, 0, 0, 0, DateTimeKind.Unspecified);
+                DateTimeOffset dayStartUtc = new DateTimeOffset(localDayStartUnspecified, clinicTz.GetUtcOffset(localDayStartUnspecified)).ToUniversalTime();
+                DateTimeOffset dayEndUtc = new DateTimeOffset(localDayStartUnspecified.AddDays(1), clinicTz.GetUtcOffset(localDayStartUnspecified.AddDays(1))).ToUniversalTime();
+
+                List<Appointment> dayPortalAppts = await _dbContext.Appointments
+                    .AsNoTracking()
+                    .Where(a => a.ClinicId == clinicId
+                                && !a.IsVoided
+                                && a.Source == AppointmentSource.Portal
+                                && a.StartUtc >= dayStartUtc
+                                && a.StartUtc < dayEndUtc)
+                    .ToListAsync(cancellationToken);
+
+                int occupyingClinicDayCount = dayPortalAppts.Count(a => AppointmentStateMachine.IsOccupying(a, now));
+                if (occupyingClinicDayCount >= portalBookingSetting.MaxBookingsPerDay)
+                {
+                    return Result<AppointmentItemResult>.Failure(Error.Validation(
+                        "DAILY_PORTAL_BOOKING_LIMIT_REACHED",
+                        "Daily online booking limit for this clinic has been reached."));
+                }
+
+                if (portalDocSetting?.MaxDailyOnlineBookings is int maxDocDaily)
+                {
+                    int doctorDayCount = dayPortalAppts.Count(a => a.DoctorId == doctor.Id && AppointmentStateMachine.IsOccupying(a, now));
+                    if (doctorDayCount >= maxDocDaily)
+                    {
+                        return Result<AppointmentItemResult>.Failure(Error.Validation(
+                            "DOCTOR_DAILY_ONLINE_LIMIT_REACHED",
+                            "Doctor daily online booking limit has been reached."));
+                    }
+                }
+            }
+
             Result<bool> valid = await ValidateSlotInsideClinicScheduleAsync(clinicId, doctor.Id, effectiveRoomId, input.StartUtc, endUtc, clinic.TimeZone, null, cancellationToken);
             if (valid.IsFailure)
             {
-                return Result<AppointmentItemResult>.Failure(valid.Error);
+                Error slotError = source == AppointmentSource.Portal && string.Equals(valid.Error.Code, "APPOINTMENT_CONFLICT", StringComparison.Ordinal)
+                    ? Error.Conflict("SLOT_TAKEN", "Selected slot is no longer available.")
+                    : valid.Error;
+                return Result<AppointmentItemResult>.Failure(slotError);
             }
 
             var appt = new Appointment(
                 appointmentId, clinicId, patient.Id, doctor.Id, effectiveRoomId, category.Id,
                 input.StartUtc, endUtc, priority, source, input.PlanSessionId, input.Notes, userId, now);
+
+            if (source == AppointmentSource.Portal && portalBookingSetting?.Mode == PortalBookingMode.RequiresApproval)
+            {
+                appt.MarkAsPendingPortalRequest(now.AddHours(portalBookingSetting.ApprovalHoldHours), now);
+            }
 
             _dbContext.Appointments.Add(appt);
             if (input.OperationId.HasValue)
@@ -1246,6 +1515,27 @@ public sealed class SchedulingService : ISchedulingService, IPortalBooking, ISch
 
             await _dbContext.SaveChangesAsync(cancellationToken);
             await tx.CommitAsync(cancellationToken);
+
+            if (source == AppointmentSource.Portal)
+            {
+                await _auditService.LogAsync(
+                    "portal.booking.created",
+                    nameof(Appointment),
+                    appt.Id.ToString(),
+                    null,
+                    JsonSerializer.Serialize(new { appt.DoctorId, appt.CategoryId, Status = appt.Status.ToString(), appt.StartUtc }),
+                    null,
+                    clinicId,
+                    ipAddress,
+                    requestId,
+                    cancellationToken);
+
+                string eventType = appt.Status == AppointmentStatus.Requested ? "PortalBookingRequested" : "PortalBookingConfirmed";
+                string msg = appt.Status == AppointmentStatus.Requested
+                    ? "New portal booking request awaiting reception approval."
+                    : "New portal appointment booked.";
+                await _realtimeNotifier.NotifyClinicAsync(new ScheduleRealtimeEvent(clinicId, eventType, appt.Id, doctor.Id, now, msg), cancellationToken);
+            }
 
             if (priority is AppointmentPriority.Vip or AppointmentPriority.Rush)
             {
@@ -1309,22 +1599,30 @@ public sealed class SchedulingService : ISchedulingService, IPortalBooking, ISch
                 await _realtimeNotifier.NotifyClinicAsync(new ScheduleRealtimeEvent(clinicId, "QueueChanged", linked.Id, appt.DoctorId, now, "Patient in session."), cancellationToken);
             }
         }
-        else if (targetStatus is AppointmentStatus.Completed or AppointmentStatus.NoShow && queueEnabled)
+        else if (targetStatus is AppointmentStatus.Completed or AppointmentStatus.NoShow)
         {
-            QueueEntry? linked = await _dbContext.QueueEntries.FirstOrDefaultAsync(q => q.ClinicId == clinicId && q.AppointmentId == appt.Id && !q.IsVoided, cancellationToken);
-            if (linked != null)
+            if (targetStatus == AppointmentStatus.NoShow)
             {
-                if (targetStatus == AppointmentStatus.Completed)
-                {
-                    linked.MarkServed(now);
-                }
-                else
-                {
-                    linked.IncrementPush(now, exceedMaxAsNoShow: true);
-                }
+                await PortalBookingHelper.RecordPatientNoShowAsync(_dbContext, clinicId, appt.PatientId, now, cancellationToken);
+            }
 
-                await _dbContext.SaveChangesAsync(cancellationToken);
-                await _realtimeNotifier.NotifyClinicAsync(new ScheduleRealtimeEvent(clinicId, "QueueChanged", linked.Id, appt.DoctorId, now, "Queue updated."), cancellationToken);
+            if (queueEnabled)
+            {
+                QueueEntry? linked = await _dbContext.QueueEntries.FirstOrDefaultAsync(q => q.ClinicId == clinicId && q.AppointmentId == appt.Id && !q.IsVoided, cancellationToken);
+                if (linked != null)
+                {
+                    if (targetStatus == AppointmentStatus.Completed)
+                    {
+                        linked.MarkServed(now);
+                    }
+                    else
+                    {
+                        linked.IncrementPush(now, exceedMaxAsNoShow: true);
+                    }
+
+                    await _dbContext.SaveChangesAsync(cancellationToken);
+                    await _realtimeNotifier.NotifyClinicAsync(new ScheduleRealtimeEvent(clinicId, "QueueChanged", linked.Id, appt.DoctorId, now, "Queue updated."), cancellationToken);
+                }
             }
         }
         else if (targetStatus == AppointmentStatus.Cancelled)
@@ -1391,8 +1689,9 @@ public sealed class SchedulingService : ISchedulingService, IPortalBooking, ISch
                         && (!excludeAppointmentId.HasValue || a.Id != excludeAppointmentId.Value))
             .ToListAsync(cancellationToken);
 
+        DateTimeOffset nowUtc = _clock.UtcNow;
         bool hasConflict = candidates.Any(a =>
-            AppointmentStateMachine.IsOccupyingStatus(a.Status)
+            AppointmentStateMachine.IsOccupying(a, nowUtc)
             && AvailabilityCalculator.IntervalsOverlap(startUtc, endUtc, a.StartUtc, a.EndUtc)
             && (a.DoctorId == doctorId || (roomId.HasValue && a.RoomId == roomId.Value)));
 
@@ -1419,7 +1718,9 @@ public sealed class SchedulingService : ISchedulingService, IPortalBooking, ISch
                             && (a.Status == AppointmentStatus.Booked
                                 || a.Status == AppointmentStatus.Arrived
                                 || a.Status == AppointmentStatus.Late
-                                || a.Status == AppointmentStatus.InSession))
+                                || a.Status == AppointmentStatus.InSession
+                                || (a.Status == AppointmentStatus.Requested
+                                    && (!a.ApprovalExpiresAtUtc.HasValue || a.ApprovalExpiresAtUtc.Value > now))))
                 .OrderBy(a => a.StartUtc)
                 .Take(50)
                 .ToListAsync(cancellationToken);

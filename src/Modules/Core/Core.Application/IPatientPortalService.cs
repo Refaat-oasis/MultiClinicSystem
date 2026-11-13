@@ -172,5 +172,101 @@ public interface IPatientPortalService
         string adminId,
         Guid clinicId,
         CancellationToken cancellationToken = default);
+
+    Task<Result<PortalAvailabilityResult>> GetPortalAvailabilityAsync(
+        Guid accountId,
+        Guid clinicId,
+        Guid patientId,
+        string slug,
+        Guid? categoryId,
+        Guid? doctorId,
+        DateTimeOffset? fromUtc,
+        DateTimeOffset? toUtc,
+        CancellationToken cancellationToken = default);
+
+    Task<Result<PortalUpcomingAppointmentItemResult>> BookAppointmentFromPortalAsync(
+        Guid accountId,
+        Guid clinicId,
+        Guid patientId,
+        string slug,
+        PortalBookAppointmentInput input,
+        string? ipAddress,
+        string? requestId,
+        CancellationToken cancellationToken = default);
+
+    Task<Result<PortalUpcomingAppointmentItemResult>> CancelAppointmentFromPortalAsync(
+        Guid accountId,
+        Guid clinicId,
+        Guid patientId,
+        string slug,
+        Guid appointmentId,
+        string? reason,
+        string? ipAddress,
+        string? requestId,
+        CancellationToken cancellationToken = default);
+
+    Task<Result<ClinicPortalBookingSettingResult>> GetClinicPortalBookingSettingsAsync(
+        Guid staffUserId,
+        Guid clinicId,
+        string? deviceId,
+        CancellationToken cancellationToken = default);
+
+    Task<Result<ClinicPortalBookingSettingResult>> UpdateClinicPortalBookingSettingsAsync(
+        Guid staffUserId,
+        Guid clinicId,
+        UpdateClinicPortalBookingSettingInput input,
+        string? deviceId,
+        string? ipAddress,
+        string? requestId,
+        CancellationToken cancellationToken = default);
+
+    Task<Result<IReadOnlyList<PortalBookingRequestItemResult>>> ListPortalBookingRequestsAsync(
+        Guid staffUserId,
+        Guid clinicId,
+        string? statusFilter,
+        string? deviceId,
+        CancellationToken cancellationToken = default);
+
+    Task<Result<PortalBookingRequestItemResult>> ApprovePortalBookingRequestAsync(
+        Guid staffUserId,
+        Guid clinicId,
+        Guid appointmentId,
+        string? reviewNotes,
+        string? deviceId,
+        string? ipAddress,
+        string? requestId,
+        CancellationToken cancellationToken = default);
+
+    Task<Result<PortalBookingRequestItemResult>> DeclinePortalBookingRequestAsync(
+        Guid staffUserId,
+        Guid clinicId,
+        Guid appointmentId,
+        string? reviewNotes,
+        string? deviceId,
+        string? ipAddress,
+        string? requestId,
+        CancellationToken cancellationToken = default);
+
+    Task<Result<int>> ExpireStalePortalBookingRequestsAsync(
+        Guid staffUserId,
+        Guid clinicId,
+        string? deviceId,
+        CancellationToken cancellationToken = default);
+
+    Task<Result<PatientPortalAdminStatusResult>> SetPatientOnlineBookingBlockAsync(
+        Guid staffUserId,
+        Guid clinicId,
+        Guid patientId,
+        bool blocked,
+        string? reason,
+        string? deviceId,
+        string? ipAddress,
+        string? requestId,
+        CancellationToken cancellationToken = default);
+
+    Task<Result<ClinicPortalBookingInspectResult>> InspectClinicPortalBookingAsync(
+        string adminId,
+        Guid clinicId,
+        CancellationToken cancellationToken = default);
 }
 

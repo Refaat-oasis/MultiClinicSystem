@@ -81,6 +81,7 @@ public sealed class CoreDbContext : IdentityDbContext<AppUser, AppRole, Guid>
     public DbSet<PatientAccount> PatientAccounts => Set<PatientAccount>();
     public DbSet<PortalConsent> PortalConsents => Set<PortalConsent>();
     public DbSet<ClinicPortalSetting> ClinicPortalSettings => Set<ClinicPortalSetting>();
+    public DbSet<ClinicPortalBookingSetting> ClinicPortalBookingSettings => Set<ClinicPortalBookingSetting>();
 
     public CoreDbContext(DbContextOptions<CoreDbContext> options, ICurrentClinic currentClinic)
         : base(options)
@@ -582,6 +583,7 @@ public sealed class CoreDbContext : IdentityDbContext<AppUser, AppRole, Guid>
             b.Property(a => a.Source).HasConversion<string>().HasMaxLength(16).IsRequired();
             b.Property(a => a.Notes).HasMaxLength(1000);
             b.Property(a => a.CancelReason).HasMaxLength(500);
+            b.Property(a => a.ReviewNotes).HasMaxLength(500);
             b.Property(a => a.RowVersion).IsRowVersion();
             b.HasIndex(a => new { a.ClinicId, a.DoctorId, a.StartUtc, a.EndUtc });
             b.HasIndex(a => new { a.ClinicId, a.RoomId, a.StartUtc, a.EndUtc });
@@ -1098,6 +1100,7 @@ public sealed class CoreDbContext : IdentityDbContext<AppUser, AppRole, Guid>
             b.Property(x => x.Status).HasConversion<string>().HasMaxLength(32).IsRequired();
             b.Property(x => x.PrintedCodeHmac).HasMaxLength(128);
             b.Property(x => x.GuardianName).HasMaxLength(200);
+            b.Property(x => x.OnlineBookingBlockReason).HasMaxLength(300);
             b.Property(x => x.VoidedBy).HasMaxLength(128);
             b.Property(x => x.VoidReason).HasMaxLength(500);
             b.Property(x => x.RowVersion).IsRowVersion();
@@ -1130,6 +1133,19 @@ public sealed class CoreDbContext : IdentityDbContext<AppUser, AppRole, Guid>
             b.Property(x => x.TermsTextEn).HasMaxLength(2000).IsRequired();
             b.Property(x => x.WelcomeMessageAr).HasMaxLength(1000).IsRequired();
             b.Property(x => x.WelcomeMessageEn).HasMaxLength(1000).IsRequired();
+            b.Property(x => x.VoidedBy).HasMaxLength(128);
+            b.Property(x => x.VoidReason).HasMaxLength(500);
+            b.Property(x => x.RowVersion).IsRowVersion();
+            b.HasIndex(x => x.ClinicId).IsUnique().HasFilter("[IsVoided] = 0");
+            b.HasQueryFilter(x => _currentClinic.IsPlatformAdmin || x.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // ClinicPortalBookingSettings tenant table (portal schema)
+        builder.Entity<ClinicPortalBookingSetting>(b =>
+        {
+            b.ToTable("ClinicPortalBookingSettings", "portal");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.Mode).HasConversion<string>().HasMaxLength(32).IsRequired();
             b.Property(x => x.VoidedBy).HasMaxLength(128);
             b.Property(x => x.VoidReason).HasMaxLength(500);
             b.Property(x => x.RowVersion).IsRowVersion();
@@ -1278,7 +1294,9 @@ public sealed class CoreDbContext : IdentityDbContext<AppUser, AppRole, Guid>
                 ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON portal.PortalConsents,
                 ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON portal.PortalConsents,
                 ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON portal.ClinicPortalSettings,
-                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON portal.ClinicPortalSettings
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON portal.ClinicPortalSettings,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON portal.ClinicPortalBookingSettings,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON portal.ClinicPortalBookingSettings
                 WITH (STATE = ON);
             ');
         ";

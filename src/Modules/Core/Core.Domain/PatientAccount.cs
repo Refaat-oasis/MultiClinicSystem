@@ -27,6 +27,12 @@ public sealed class PatientAccount : ITenantEntity, ISoftDeletable
     public int PrintedCodeAttempts { get; private set; }
     public bool IsGuardianAccount { get; private set; }
     public string? GuardianName { get; private set; }
+    public int NoShowCount { get; private set; }
+    public int NoShowsSinceUnblock { get; private set; }
+    public bool IsOnlineBookingBlocked { get; private set; }
+    public string? OnlineBookingBlockReason { get; private set; }
+    public DateTimeOffset? OnlineBookingBlockedAtUtc { get; private set; }
+    public Guid? OnlineBookingBlockedByUserId { get; private set; }
     public DateTimeOffset? LastLoginAtUtc { get; private set; }
     public DateTimeOffset CreatedAtUtc { get; private set; }
     public DateTimeOffset UpdatedAtUtc { get; private set; }
@@ -217,6 +223,43 @@ public sealed class PatientAccount : ITenantEntity, ISoftDeletable
         LockoutEndUtc = null;
         SecurityStamp = GenerateStamp();
         UpdatedAtUtc = nowUtc.ToUniversalTime();
+    }
+
+    public void RecordNoShow(int autoBlockThreshold, DateTimeOffset nowUtc)
+    {
+        DateTimeOffset utc = nowUtc.ToUniversalTime();
+        NoShowCount++;
+        NoShowsSinceUnblock++;
+        if (autoBlockThreshold > 0 && NoShowsSinceUnblock >= autoBlockThreshold)
+        {
+            IsOnlineBookingBlocked = true;
+            OnlineBookingBlockReason = "AutoBlockedAfterNoShows";
+            OnlineBookingBlockedAtUtc = utc;
+            OnlineBookingBlockedByUserId = null;
+        }
+
+        UpdatedAtUtc = utc;
+    }
+
+    public void BlockOnlineBooking(Guid? blockedByUserId, string? reason, DateTimeOffset nowUtc)
+    {
+        DateTimeOffset utc = nowUtc.ToUniversalTime();
+        IsOnlineBookingBlocked = true;
+        OnlineBookingBlockReason = string.IsNullOrWhiteSpace(reason) ? "BlockedByStaff" : reason.Trim();
+        OnlineBookingBlockedAtUtc = utc;
+        OnlineBookingBlockedByUserId = blockedByUserId == Guid.Empty ? null : blockedByUserId;
+        UpdatedAtUtc = utc;
+    }
+
+    public void UnblockOnlineBooking(DateTimeOffset nowUtc)
+    {
+        DateTimeOffset utc = nowUtc.ToUniversalTime();
+        IsOnlineBookingBlocked = false;
+        NoShowsSinceUnblock = 0;
+        OnlineBookingBlockReason = null;
+        OnlineBookingBlockedAtUtc = null;
+        OnlineBookingBlockedByUserId = null;
+        UpdatedAtUtc = utc;
     }
 
     private static string GenerateStamp()
