@@ -304,6 +304,66 @@ public sealed class DashboardService : IDashboardService
                     breakdown["offersAccepted"] = offers.Count(o => o.Status == SlotOfferStatus.Accepted);
                     break;
                 }
+                case "clinical.sessions-summary":
+                case "clinical.avg-duration":
+                case "clinical.overtime-sessions":
+                case "clinical.top-diagnoses":
+                {
+                    Guid? doctorScopeId = await ResolveDoctorScopeIdIfDoctorAsync(userId, clinicId, effectiveScope, cancellationToken);
+                    List<Visit> visits = await _dbContext.Visits
+                        .AsNoTracking()
+                        .Where(v => v.ClinicId == clinicId
+                                    && !v.IsVoided
+                                    && v.StartedAtUtc >= start
+                                    && v.StartedAtUtc <= end
+                                    && (!doctorScopeId.HasValue || v.DoctorId == doctorScopeId.Value))
+                        .ToListAsync(cancellationToken);
+
+                    if (def.WidgetKey == "clinical.sessions-summary")
+                    {
+                        unit = "visits";
+                        primary = visits.Count;
+                        breakdown["inProgress"] = visits.Count(v => v.Status == VisitStatus.InProgress);
+                        breakdown["completed"] = visits.Count(v => v.Status == VisitStatus.Completed);
+                        breakdown["dentalVisits"] = visits.Count(v => v.SpecialtyCode == "dental");
+                    }
+                    else if (def.WidgetKey == "clinical.avg-duration")
+                    {
+                        unit = "minutes";
+                        List<Visit> completed = visits.Where(v => v.Status == VisitStatus.Completed && v.EndedAtUtc.HasValue).ToList();
+                        decimal avg = completed.Count == 0
+                            ? 0m
+                            : Math.Round((decimal)completed.Average(v => Math.Max(0, (v.EndedAtUtc!.Value - v.StartedAtUtc).TotalMinutes)), 2);
+                        primary = avg;
+                        breakdown["completedCount"] = completed.Count;
+                        breakdown["averageMinutes"] = avg;
+                    }
+                    else if (def.WidgetKey == "clinical.overtime-sessions")
+                    {
+                        unit = "visits";
+                        List<Visit> overtimeVisits = visits.Where(v => v.OvertimeMinutes > 0).ToList();
+                        primary = overtimeVisits.Count;
+                        breakdown["overtimeVisits"] = overtimeVisits.Count;
+                        breakdown["excusedCount"] = overtimeVisits.Count(v => v.IsOvertimeExcused);
+                        breakdown["totalOvertimeMinutes"] = overtimeVisits.Sum(v => v.OvertimeMinutes);
+                    }
+                    else
+                    {
+                        unit = "entries";
+                        List<Guid> visitIds = visits.Select(v => v.Id).ToList();
+                        int diagnosesCount = await _dbContext.VisitDiagnoses
+                            .AsNoTracking()
+                            .CountAsync(d => d.ClinicId == clinicId && !d.IsVoided && visitIds.Contains(d.VisitId), cancellationToken);
+                        int proceduresCount = await _dbContext.VisitProcedures
+                            .AsNoTracking()
+                            .CountAsync(p => p.ClinicId == clinicId && !p.IsVoided && visitIds.Contains(p.VisitId), cancellationToken);
+                        primary = diagnosesCount + proceduresCount;
+                        breakdown["diagnoses"] = diagnosesCount;
+                        breakdown["procedures"] = proceduresCount;
+                    }
+
+                    break;
+                }
                 default:
                 {
                     breakdown["configured"] = 1m;
@@ -382,6 +442,30 @@ public sealed class DashboardService : IDashboardService
         });
 
         return Result<IReadOnlyList<string>>.Success(sanitized);
+    }
+
+    private async Task<Guid?> ResolveDoctorScopeIdIfDoctorAsync(
+        Guid userId,
+        Guid clinicId,
+        string effectiveScope,
+        CancellationToken cancellationToken)
+    {
+        if (!string.Equals(effectiveScope, "Doctor", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        var perms = await _authorizationService.GetUserEffectivePermissionsAsync(userId, clinicId, cancellationToken);
+        if (perms.IsSuccess && perms.Value.IsOwner)
+        {
+            return null;
+        }
+
+        ClinicDoctor? doc = await _dbContext.ClinicDoctors
+            .AsNoTracking()
+            .FirstOrDefaultAsync(d => d.ClinicId == clinicId && !d.IsVoided && d.UserId == userId, cancellationToken);
+
+        return doc?.Id;
     }
 
     private async Task<T> ExecuteForClinicAsync<T>(Guid clinicId, Func<Task<T>> action)

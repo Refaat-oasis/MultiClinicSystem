@@ -51,6 +51,16 @@ public sealed class CoreDbContext : IdentityDbContext<AppUser, AppRole, Guid>
     public DbSet<QueueEntry> QueueEntries => Set<QueueEntry>();
     public DbSet<WaitingListEntry> WaitingListEntries => Set<WaitingListEntry>();
     public DbSet<SlotOffer> SlotOffers => Set<SlotOffer>();
+    public DbSet<Visit> Visits => Set<Visit>();
+    public DbSet<VisitVital> VisitVitals => Set<VisitVital>();
+    public DbSet<VisitDiagnosis> VisitDiagnoses => Set<VisitDiagnosis>();
+    public DbSet<VisitProcedure> VisitProcedures => Set<VisitProcedure>();
+    public DbSet<Prescription> Prescriptions => Set<Prescription>();
+    public DbSet<PrescriptionItem> PrescriptionItems => Set<PrescriptionItem>();
+    public DbSet<LabOrder> LabOrders => Set<LabOrder>();
+    public DbSet<ClinicalForm> ClinicalForms => Set<ClinicalForm>();
+    public DbSet<VisitFormData> VisitFormData => Set<VisitFormData>();
+    public DbSet<ToothRecord> ToothRecords => Set<ToothRecord>();
 
     public CoreDbContext(DbContextOptions<CoreDbContext> options, ICurrentClinic currentClinic)
         : base(options)
@@ -590,6 +600,155 @@ public sealed class CoreDbContext : IdentityDbContext<AppUser, AppRole, Guid>
             b.HasIndex(o => new { o.ClinicId, o.Status, o.OfferedAtUtc });
             b.HasQueryFilter(o => _currentClinic.IsPlatformAdmin || o.ClinicId == _currentClinic.ClinicId);
         });
+
+        // Visits tenant table (clinical schema)
+        builder.Entity<Visit>(b =>
+        {
+            b.ToTable("Visits", "clinical");
+            b.HasKey(v => v.Id);
+            b.Property(v => v.SpecialtyCode).HasMaxLength(64).IsRequired();
+            b.Property(v => v.Status).HasConversion<string>().HasMaxLength(24).IsRequired();
+            b.Property(v => v.ChiefComplaint).HasMaxLength(1000);
+            b.Property(v => v.HistoryOfPresentIllness).HasMaxLength(2000);
+            b.Property(v => v.Examination).HasMaxLength(2000);
+            b.Property(v => v.DiagnosisSummary).HasMaxLength(1000);
+            b.Property(v => v.Advice).HasMaxLength(2000);
+            b.Property(v => v.PrivateDoctorNotes).HasMaxLength(2000);
+            b.Property(v => v.OvertimeExcuseReason).HasMaxLength(500);
+            b.Property(v => v.RowVersion).IsRowVersion();
+            b.HasIndex(v => new { v.ClinicId, v.AppointmentId });
+            b.HasIndex(v => new { v.ClinicId, v.PatientId, v.StartedAtUtc });
+            b.HasQueryFilter(v => _currentClinic.IsPlatformAdmin || v.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // VisitVitals tenant table (clinical schema)
+        builder.Entity<VisitVital>(b =>
+        {
+            b.ToTable("VisitVitals", "clinical");
+            b.HasKey(v => v.Id);
+            b.Property(v => v.TemperatureCelsius).HasPrecision(5, 2);
+            b.Property(v => v.WeightKg).HasPrecision(6, 2);
+            b.Property(v => v.HeightCm).HasPrecision(6, 2);
+            b.Property(v => v.Bmi).HasPrecision(6, 2);
+            b.Property(v => v.GlucoseMgDl).HasPrecision(7, 2);
+            b.Property(v => v.RowVersion).IsRowVersion();
+            b.HasIndex(v => new { v.ClinicId, v.VisitId });
+            b.HasQueryFilter(v => _currentClinic.IsPlatformAdmin || v.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // VisitDiagnoses tenant table (clinical schema)
+        builder.Entity<VisitDiagnosis>(b =>
+        {
+            b.ToTable("VisitDiagnoses", "clinical");
+            b.HasKey(d => d.Id);
+            b.Property(d => d.Icd10Code).HasMaxLength(32).IsRequired();
+            b.Property(d => d.TitleAr).HasMaxLength(300).IsRequired();
+            b.Property(d => d.TitleEn).HasMaxLength(300).IsRequired();
+            b.Property(d => d.Notes).HasMaxLength(1000);
+            b.Property(d => d.RowVersion).IsRowVersion();
+            b.HasIndex(d => new { d.ClinicId, d.VisitId });
+            b.HasQueryFilter(d => _currentClinic.IsPlatformAdmin || d.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // VisitProcedures tenant table (clinical schema)
+        builder.Entity<VisitProcedure>(b =>
+        {
+            b.ToTable("VisitProcedures", "clinical");
+            b.HasKey(p => p.Id);
+            b.Property(p => p.ProcedureCode).HasMaxLength(64).IsRequired();
+            b.Property(p => p.NameAr).HasMaxLength(300).IsRequired();
+            b.Property(p => p.NameEn).HasMaxLength(300).IsRequired();
+            b.Property(p => p.ToothOrSite).HasMaxLength(100);
+            b.Property(p => p.Notes).HasMaxLength(1000);
+            b.Property(p => p.RowVersion).IsRowVersion();
+            b.HasIndex(p => new { p.ClinicId, p.VisitId });
+            b.HasQueryFilter(p => _currentClinic.IsPlatformAdmin || p.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // Prescriptions tenant table (clinical schema)
+        builder.Entity<Prescription>(b =>
+        {
+            b.ToTable("Prescriptions", "clinical");
+            b.HasKey(p => p.Id);
+            b.Property(p => p.Notes).HasMaxLength(1000);
+            b.Property(p => p.AllergyWarningDetails).HasMaxLength(1000);
+            b.Property(p => p.RowVersion).IsRowVersion();
+            b.HasIndex(p => new { p.ClinicId, p.VisitId });
+            b.HasQueryFilter(p => _currentClinic.IsPlatformAdmin || p.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // PrescriptionItems tenant table (clinical schema)
+        builder.Entity<PrescriptionItem>(b =>
+        {
+            b.ToTable("PrescriptionItems", "clinical");
+            b.HasKey(i => i.Id);
+            b.Property(i => i.DrugName).HasMaxLength(200).IsRequired();
+            b.Property(i => i.ActiveIngredient).HasMaxLength(200);
+            b.Property(i => i.Dosage).HasMaxLength(120).IsRequired();
+            b.Property(i => i.Frequency).HasMaxLength(120).IsRequired();
+            b.Property(i => i.Duration).HasMaxLength(120).IsRequired();
+            b.Property(i => i.Instructions).HasMaxLength(500);
+            b.Property(i => i.RowVersion).IsRowVersion();
+            b.HasIndex(i => new { i.ClinicId, i.PrescriptionId });
+            b.HasQueryFilter(i => _currentClinic.IsPlatformAdmin || i.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // LabOrders tenant table (clinical schema)
+        builder.Entity<LabOrder>(b =>
+        {
+            b.ToTable("LabOrders", "clinical");
+            b.HasKey(l => l.Id);
+            b.Property(l => l.LabName).HasMaxLength(200).IsRequired();
+            b.Property(l => l.TestOrWorkName).HasMaxLength(300).IsRequired();
+            b.Property(l => l.ToothOrSite).HasMaxLength(100);
+            b.Property(l => l.Instructions).HasMaxLength(1000);
+            b.Property(l => l.Status).HasMaxLength(32).IsRequired();
+            b.Property(l => l.ResultSummary).HasMaxLength(2000);
+            b.Property(l => l.RowVersion).IsRowVersion();
+            b.HasIndex(l => new { l.ClinicId, l.VisitId });
+            b.HasQueryFilter(l => _currentClinic.IsPlatformAdmin || l.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // ClinicalForms tenant table (clinical schema)
+        builder.Entity<ClinicalForm>(b =>
+        {
+            b.ToTable("ClinicalForms", "clinical");
+            b.HasKey(f => f.Id);
+            b.Property(f => f.SpecialtyCode).HasMaxLength(64).IsRequired();
+            b.Property(f => f.TitleAr).HasMaxLength(200).IsRequired();
+            b.Property(f => f.TitleEn).HasMaxLength(200).IsRequired();
+            b.Property(f => f.JsonSchema).IsRequired();
+            b.Property(f => f.RowVersion).IsRowVersion();
+            b.HasIndex(f => new { f.ClinicId, f.SpecialtyCode, f.Version });
+            b.HasQueryFilter(f => _currentClinic.IsPlatformAdmin || f.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // VisitFormData tenant table (clinical schema)
+        builder.Entity<VisitFormData>(b =>
+        {
+            b.ToTable("VisitFormData", "clinical");
+            b.HasKey(d => d.Id);
+            b.Property(d => d.SpecialtyCode).HasMaxLength(64).IsRequired();
+            b.Property(d => d.AnswersJson).IsRequired();
+            b.Property(d => d.RowVersion).IsRowVersion();
+            b.HasIndex(d => new { d.ClinicId, d.VisitId, d.ClinicalFormId });
+            b.HasQueryFilter(d => _currentClinic.IsPlatformAdmin || d.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // ToothRecords tenant table (clinical schema)
+        builder.Entity<ToothRecord>(b =>
+        {
+            b.ToTable("ToothRecords", "clinical");
+            b.HasKey(t => t.Id);
+            b.Property(t => t.FdiToothNumber).HasMaxLength(8).IsRequired();
+            b.Property(t => t.UniversalToothCode).HasMaxLength(8).IsRequired();
+            b.Property(t => t.Condition).HasConversion<string>().HasMaxLength(32).IsRequired();
+            b.Property(t => t.SurfacesJson).HasMaxLength(128).IsRequired();
+            b.Property(t => t.Notes).HasMaxLength(500);
+            b.Property(t => t.RowVersion).IsRowVersion();
+            b.HasIndex(t => new { t.ClinicId, t.PatientId, t.FdiToothNumber, t.RecordedAtUtc });
+            b.HasQueryFilter(t => _currentClinic.IsPlatformAdmin || t.ClinicId == _currentClinic.ClinicId);
+        });
     }
 
     /// <summary>
@@ -672,7 +831,27 @@ public sealed class CoreDbContext : IdentityDbContext<AppUser, AppRole, Guid>
                 ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON queue.WaitingListEntries,
                 ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON queue.WaitingListEntries,
                 ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON queue.SlotOffers,
-                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON queue.SlotOffers
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON queue.SlotOffers,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON clinical.Visits,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON clinical.Visits,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON clinical.VisitVitals,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON clinical.VisitVitals,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON clinical.VisitDiagnoses,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON clinical.VisitDiagnoses,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON clinical.VisitProcedures,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON clinical.VisitProcedures,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON clinical.Prescriptions,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON clinical.Prescriptions,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON clinical.PrescriptionItems,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON clinical.PrescriptionItems,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON clinical.LabOrders,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON clinical.LabOrders,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON clinical.ClinicalForms,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON clinical.ClinicalForms,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON clinical.VisitFormData,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON clinical.VisitFormData,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON clinical.ToothRecords,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON clinical.ToothRecords
                 WITH (STATE = ON);
             ');
         ";

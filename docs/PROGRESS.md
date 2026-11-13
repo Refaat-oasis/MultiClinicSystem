@@ -352,3 +352,27 @@ Status: 0 Errors, Clean Build
 - [x] Queue push-back + `NoShow` threshold, VIP jump limit, waiting-list cancellation `SlotOffer` generation/acceptance, close-day cascade, and `after_week` reschedule verified end-to-end.
 - [x] `queue` module toggle cleanly disables queue/waiting-list endpoints and dashboard widgets without breaking `scheduling`, and Super Admin read-only schedule inspect logs `PatientAccessLog`.
 - [x] Phases 0 to 6 integration gates, all architecture sweeps, and frontend test/lint/build pass 100% green.
+
+
+---
+
+## Phase 7: Visits, Clinical Records, and Specialty Plugins (DONE)
+- **Branch**: `phase-7/visits-clinical-specialty-plugins`
+- **Completed Tasks**:
+  - **Domain (`src/Modules/Core/Core.Domain/`)**: Added `VisitStatus`, `ToothCondition`, `DentalNumberingSystem`, `DerivedToothState`, `ClinicalFormValidationResult`, `DentalNotationConverter` (FDI <-> Universal conversion for permanent & primary teeth + historical chart state derivation), `ClinicalFormSchemaValidator` (JSON Schema structural + required + min/max bounds validator), `Visit` (server-side elapsed & overtime tracking + excused reason), `VisitVital` (automatic BMI calculation), `VisitDiagnosis`, `VisitProcedure`, `Prescription`, `PrescriptionItem`, `LabOrder`, `ClinicalForm`, `VisitFormData`, `ToothRecord`, and unit tests `ClinicalDomainTests`.
+  - **Application & Infrastructure**: Added `ISpecialtyPlugin`, `IClinicalPortalQueries`, `IClinicalService` + Phase 7 input/result records, `DentalSpecialtyPlugin`, `OphthalmologySpecialtyPlugin`, `ClinicalPdfGenerator` (`%PDF-1.4` printable prescription generator), `ClinicalProjectionHelper`, `ClinicalService`, `CoreDbContext` (`clinical` schema tables + EF global query filters + SQL Server RLS filter/block predicates), live clinical dashboard widgets (`clinical.sessions-summary`, `clinical.top-diagnoses`, `clinical.avg-duration`, `clinical.overtime-sessions`) in `ModuleCatalogService` + `DashboardService`, and idempotent `SessionCompleted` outbox emission.
+  - **API (`src/Platform.Api/`)**: Added `ClinicalController` (thin transport + single-type DTOs/ViewModels + `ClinicalViewModelMapper`), Super Admin read-only `InspectClinical` endpoint on `PlatformClinicsController`, `409 ALLERGY_WARNING_CONFIRMATION_REQUIRED` handling in `ProblemDetailsMapper`, and DI registrations in `Program.cs` & `TestServiceFactory.cs`.
+  - **Frontend (`web/`)**: Added `Phase7ClinicalScreen` + `Phase7ClinicalScreen.test.tsx`, wired `'clinical'` tab (`الجلسات السريرية`) into `web/apps/clinic/src/App.tsx` and read-only clinical inspect panel into `web/apps/admin/src/InspectClinicShell.tsx`.
+- **Verification Output Summary**:
+  - `dotnet test tests/UnitTests/UnitTests.csproj`: `Passed! - Failed: 0, Passed: 125, Skipped: 0, Total: 125`
+  - `dotnet test tests/ArchitectureTests/ArchitectureTests.csproj`: `Passed! - Failed: 0, Passed: 12, Skipped: 0, Total: 12`
+  - `dotnet test tests/IntegrationTests/IntegrationTests.csproj`: `Passed! - Failed: 0, Passed: 27, Skipped: 0, Total: 27`
+  - `dotnet test tests/Gates/Gates.csproj` (Phases 0–7 cumulative): `Passed! - Failed: 0, Passed: 20, Skipped: 0, Total: 20`
+  - Frontend `npm --prefix web test; npm --prefix web run lint; npm --prefix web run build`: `38/38` Vitest tests passed (`admin-app`: 7, `clinic-app`: 2, `api-client`: 3, `ui`: 3, `feature-core`: 23), `tsc --noEmit` 0 errors, Vite production builds succeeded for both apps.
+
+### Phase 7 Exit Checklist
+- [x] Server-side visit timer survives reload/resume and accurately tracks elapsed & overtime minutes with optional excused reason.
+- [x] Patient allergy warning banner visible, conflicting prescriptions require acknowledged override (`409` otherwise + audited), and printable PDF contains patient file number and prescribed medications.
+- [x] Dental specialty plugin supports FDI & Universal notation for permanent & primary teeth with historical `ToothRecords` and derived current chart state, while non-dental specialties (Ophthalmology) validate structured JSON-Schema forms with zero dental rows touched.
+- [x] `SessionCompleted` enqueued once in transactional outbox, doctor scoping returns `404`, portal queries exclude hidden visits and omit `PrivateDoctorNotes` while logging `PatientAccessLog`, and `clinical`-off leaves `scheduling` working.
+- [x] Phases 0 to 7 integration gates, all architecture sweeps, and frontend test/lint/build pass 100% green.

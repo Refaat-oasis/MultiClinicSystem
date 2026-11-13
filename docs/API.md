@@ -343,3 +343,17 @@
 - `GET /api/v1/clinics/{clinicId}/queue/waiting-list` & `POST .../queue/waiting-list` & `GET .../queue/slot-offers` & `POST .../queue/slot-offers/{offerId}/accept`: Waiting list enrollment, cancellation-triggered `SlotOffer` listing, and one-click slot offer booking.
 - `SignalR Hub /hubs/schedule` (`JoinClinic(clinicId)` / `LeaveClinic(clinicId)`): Tenant-verified real-time broadcasts (`PatientArrived`, `QueueChanged`, `SlotFreed`) isolated to `clinic:{clinicId}` group using zero-PII IDs only.
 - `GET /api/v1/platform/clinics/{clinicId}/inspect/schedule`: Super Admin read-only schedule & queue inspect snapshot via `IPlatformAccess`.
+
+## 9. Phase 7: Clinical Visits, Prescriptions, Dental Chart & Specialty Plugins
+- `GET /api/v1/clinics/{clinicId}/clinical/icd10?query=...`: Search curated bilingual ICD-10 diagnosis catalog.
+- `POST /api/v1/clinics/{clinicId}/clinical/visits`: Start or resume a clinical visit session (`OperationId` idempotent, linked to an appointment or walk-in patient, transitions appointment to `InSession`, enforces server-side elapsed & overtime tracking across reloads).
+- `GET /api/v1/clinics/{clinicId}/clinical/visits/{visitId}` & `GET .../patients/{patientId}/visits`: Load full clinical visit read model or patient visit history (doctor-scoped via `404 VISIT_NOT_FOUND`).
+- `PUT /api/v1/clinics/{clinicId}/clinical/visits/{visitId}/notes`: Update structured consultation notes (`ChiefComplaint`, `HistoryOfPresentIllness`, `Examination`, `DiagnosisSummary`, `Advice`, `PrivateDoctorNotes`, `FollowUpDate`, `IsVisibleToPatient`).
+- `POST /api/v1/clinics/{clinicId}/clinical/visits/{visitId}/vitals`: Record patient vitals and automatically compute `Bmi`.
+- `POST /api/v1/clinics/{clinicId}/clinical/visits/{visitId}/diagnoses` & `POST .../procedures`: Record ICD-10 diagnoses and clinical procedures on a visit.
+- `POST /api/v1/clinics/{clinicId}/clinical/visits/{visitId}/prescriptions` & `GET .../prescriptions/{prescriptionId}/pdf`: Issue allergy-checked prescriptions (`409 ALLERGY_WARNING_CONFIRMATION_REQUIRED` unless `AcknowledgeAllergyWarning = true` and audited) and generate printable `%PDF-1.4` prescription PDF (`application/pdf`).
+- `POST /api/v1/clinics/{clinicId}/clinical/visits/{visitId}/lab-orders` & `POST .../lab-orders/{labOrderId}/result`: Create lab/dental lab orders and record results.
+- `GET /api/v1/clinics/{clinicId}/clinical/forms` & `POST .../forms` & `POST .../visits/{visitId}/form-data`: Define clinic-scoped specialty JSON Schema forms (`ClinicalForms`) and validate/persist structured specialty answers (`VisitFormData`).
+- `POST /api/v1/clinics/{clinicId}/clinical/visits/{visitId}/dental-chart` & `GET .../patients/{patientId}/dental-chart`: Append permanent or primary tooth state records in FDI or Universal numbering (`DentalNotationConverter`) and query derived current tooth states across visit history (`ToothRecords`).
+- `POST /api/v1/clinics/{clinicId}/clinical/visits/{visitId}/complete`: Complete visit, calculate final duration/overtime with optional excused reason, transition linked appointment & queue entry, and enqueue `SessionCompleted` **once** in `OutboxMessages`.
+- `GET /api/v1/platform/clinics/{clinicId}/inspect/clinical`: Super Admin read-only clinical visits and specialty forms inspect snapshot via `IPlatformAccess` (`PatientAccessLog`).

@@ -48,6 +48,7 @@ public static class ProblemDetailsMapper
                        c.Contains("ROOM_CODE_EXISTS", StringComparison.OrdinalIgnoreCase) ||
                        c.Contains("NUMBER_BLOCK_CONTENTION", StringComparison.OrdinalIgnoreCase) ||
                        c.Contains("NUMBER_BLOCK_EXHAUSTED", StringComparison.OrdinalIgnoreCase) ||
+                       c.Contains("ALLERGY_WARNING_CONFIRMATION_REQUIRED", StringComparison.OrdinalIgnoreCase) ||
                        c.Contains("DUPLICATE", StringComparison.OrdinalIgnoreCase) => StatusCodes.Status409Conflict,
             _ => StatusCodes.Status400BadRequest
         };

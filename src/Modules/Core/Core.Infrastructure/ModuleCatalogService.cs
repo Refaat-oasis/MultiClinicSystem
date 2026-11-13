@@ -346,7 +346,10 @@ public sealed class ModuleCatalogService : IModuleCatalogService
                 SettingsSections: Array.Empty<SettingsSectionResult>(),
                 DashboardWidgets:
                 [
-                    new("clinical.sessions-summary", "clinical", "clinical.read", "Doctor", "الجلسات الطبية", "Clinical Sessions Summary")
+                    new("clinical.sessions-summary", "clinical", "clinical.read", "Doctor", "الجلسات الطبية", "Clinical Sessions Summary"),
+                    new("clinical.top-diagnoses", "clinical", "clinical.read", "Doctor", "أبرز التشخيصات والإجراءات", "Top Diagnoses & Procedures"),
+                    new("clinical.avg-duration", "clinical", "clinical.read", "Doctor", "متوسط مدة الجلسة", "Average Session Length"),
+                    new("clinical.overtime-sessions", "clinical", "clinical.read", "Doctor", "الجلسات المتجاوزة للوقت", "Overtime Sessions")
                 ]),
 
             new ModuleManifestEntry(
