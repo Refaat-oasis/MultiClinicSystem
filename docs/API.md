@@ -183,3 +183,61 @@
   ```
 - **Response `200 OK` (`GenericMessageViewModel`).**
 
+
+### `GET /api/v1/auth/access-logs`
+- **Description:** Returns `PatientAccessLog` rows (such as Super Admin inspect-mode accesses) for clinics owned by the authenticated clinic owner. Cross-clinic or non-owned clinic queries return `404 NotFound`.
+- **Access:** Authorized clinic owner.
+- **Query Params:** `clinicId` (optional `Guid`).
+- **Response `200 OK`:** Array of `PatientAccessLogItemViewModel` (`id`, `actorId`, `reason`, `timestampUtc`, `clinicId`, `details`).
+
+---
+
+## 3. Platform Super Admin Control Plane (`/api/v1/platform/**`)
+
+> **Host Isolation:** All `/platform/**` and `/api/v1/platform/**` routes are served exclusively on the Admin host (`admin.*` or `X-Host-Type: admin`) and return `404 Not Found` on the clinic host. Auth uses the `__Host-Platform-Token` cookie and `realm=PlatformAdmin` JWT claim.
+
+### `POST /api/v1/platform/auth/login`
+- **Description:** Super Admin three-factor sign-in (`email`, `password`, and 6-digit `hourlyCode` with 3600s TOTP period or single-use `recoveryKey`). First login returns `requiresEnrollment: true` with manual setup key and `otpauth://` URI (`period=3600`). Sets `__Host-Platform-Token` HttpOnly Secure SameSite=Strict cookie.
+- **Access:** Anonymous (`[AllowAnonymous]`).
+- **Request Body (`PlatformAdminLoginDto`):** `{ "email", "password", "hourlyCode?", "recoveryKey?" }`
+- **Response `200 OK`:** `PlatformAdminLoginViewModel`
+
+### `POST /api/v1/platform/auth/enroll`
+- **Description:** Completes mandatory first-login password change and hourly TOTP enrollment, issuing 10 HMAC-hashed single-use recovery keys.
+- **Access:** `PlatformAdminEnrollment` policy (`realm=PlatformAdmin`).
+- **Request Body (`PlatformAdminEnrollDto`):** `{ "newPassword", "hourlyCode" }`
+- **Response `200 OK`:** `TotpEnrollmentCompletedViewModel`
+
+### `POST /api/v1/platform/auth/step-up`
+- **Description:** Verifies Super Admin password to open a 10-minute step-up confirmation window for sensitive actions (owner deactivation, quota edits, clinic ownership transfers).
+- **Access:** `PlatformAdmin` policy (`realm=PlatformAdmin`, `totp_enrolled=true`).
+- **Request Body (`PlatformStepUpDto`):** `{ "password" }`
+
+### `POST /api/v1/platform/auth/break-glass-reset`
+- **Description:** Emergency 2FA reset authenticated by server-side break-glass secret (also available via CLI `platform-admin reset-2fa --email ... --secret ...`). Writes immutable `AuditLog` entry.
+- **Access:** Anonymous (`[AllowAnonymous]`), gated by `PlatformAdmin:BreakGlassSecret`.
+- **Request Body (`BreakGlassResetDto`):** `{ "email", "breakGlassSecret" }`
+
+### `POST /api/v1/platform/auth/logout`
+- **Description:** Clears `__Host-Platform-Token` cookie.
+- **Access:** `PlatformAdminEnrollment` policy.
+
+### Owners Management (`/api/v1/platform/owners`) — Requires `PlatformAdmin`
+- `POST /api/v1/platform/owners`: Creates & invites an Owner (quota `maxClinics`), dispatching 6-digit activation email via outbox. Returns `201 Created` (`OwnerSummaryViewModel`).
+- `GET /api/v1/platform/owners?search=...`: Lists platform owners with clinic counts.
+- `GET /api/v1/platform/owners/{ownerId}`: Returns `OwnerDetailViewModel` including assigned clinics.
+- `POST /api/v1/platform/owners/{ownerId}/resend-code`: Re-dispatches 6-digit activation email.
+- `POST /api/v1/platform/owners/{ownerId}/deactivate`: Step-up protected; suspends owner, blocks login, and revokes active tokens/devices.
+- `POST /api/v1/platform/owners/{ownerId}/reactivate`: Restores owner active status.
+- `PUT /api/v1/platform/owners/{ownerId}/quota`: Step-up protected; updates owner `MaxClinics` quota.
+
+### Clinics Directory, Lifecycle & Read-Only Inspect (`/api/v1/platform/clinics`) — Requires `PlatformAdmin`
+- `GET /api/v1/platform/clinics?search=...`: Cross-clinic directory grouped by owner.
+- `PUT /api/v1/platform/clinics/{clinicId}/status`: Updates clinic status (`Active`, `ReadOnly`, `Suspended`, `PendingOnboarding`), subscription expiry, and grace days.
+- `POST /api/v1/platform/clinics/{clinicId}/move`: Step-up protected; transfers clinic ownership, revokes old owner `UserClinic` mapping, assigns new owner, and audits.
+- `GET /api/v1/platform/clinics/{clinicId}/inspect`: Uses `IPlatformAccess` to inspect clinic summary read-only, writes `PatientAccessLog` (`ActorType:SuperAdmin`), and returns `InspectClinicViewModel`.
+- `POST/PUT/DELETE/PATCH /api/v1/platform/clinics/{clinicId}/inspect/{*subpath}`: Explicitly returns `403 Forbidden` (`INSPECT_MODE_READ_ONLY`).
+
+### Monitoring & Audit (`/api/v1/platform`) — Requires `PlatformAdmin`
+- `GET /api/v1/platform/dashboard`: Returns `PlatformDashboardViewModel` aggregate metrics, failed login counts, expiring subscriptions, outbox queue count, and recent audit rows.
+- `GET /api/v1/platform/audit?clinicId=...&action=...&page=1&pageSize=50`: Paginated platform-wide audit viewer.

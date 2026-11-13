@@ -19,7 +19,9 @@ public sealed class AnonymousEndpointAllowlistTests
         "AuthController.ForgotPassword",
         "AuthController.ResetPassword",
         "AuthController.ResendCode",
-        "AuthController.RefreshToken"
+        "AuthController.RefreshToken",
+        "PlatformAuthController.Login",
+        "PlatformAuthController.BreakGlassReset"
     };
 
     [Fact]

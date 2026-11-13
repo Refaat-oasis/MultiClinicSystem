@@ -24,6 +24,7 @@ public sealed class CoreDbContext : IdentityDbContext<AppUser, AppRole, Guid>
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
+    public DbSet<PlatformAdmin> PlatformAdmins => Set<PlatformAdmin>();
 
     public CoreDbContext(DbContextOptions<CoreDbContext> options, ICurrentClinic currentClinic)
         : base(options)
@@ -165,6 +166,20 @@ public sealed class CoreDbContext : IdentityDbContext<AppUser, AppRole, Guid>
             b.Property(m => m.Content).IsRequired();
         });
 
+        // PlatformAdmin entity configuration (isolated from clinic Identity tables)
+        builder.Entity<PlatformAdmin>(b =>
+        {
+            b.ToTable("PlatformAdmins", "core");
+            b.HasKey(p => p.Id);
+            b.Property(p => p.Email).IsRequired().HasMaxLength(256);
+            b.Property(p => p.FullName).IsRequired().HasMaxLength(200);
+            b.Property(p => p.PasswordHash).IsRequired().HasMaxLength(500);
+            b.Property(p => p.EncryptedTotpSecret).HasMaxLength(1000);
+            b.Property(p => p.RecoveryCodeHashesJson).IsRequired();
+            b.Property(p => p.SecurityStamp).IsRequired().HasMaxLength(128);
+            b.HasIndex(p => p.Email).IsUnique();
+        });
+
         // TenantSampleRecord entity configuration with Global Query Filter
         builder.Entity<TenantSampleRecord>(b =>
         {
@@ -181,7 +196,7 @@ public sealed class CoreDbContext : IdentityDbContext<AppUser, AppRole, Guid>
                 .IsRequired();
 
             // Layer 1 Tenant Isolation: EF Core Global Query Filter
-            b.HasQueryFilter(r => _currentClinic.IsPlatformAdmin || (_currentClinic.ClinicId.HasValue && r.ClinicId == _currentClinic.ClinicId.Value));
+            b.HasQueryFilter(r => _currentClinic.IsPlatformAdmin || r.ClinicId == _currentClinic.ClinicId);
         });
     }
 

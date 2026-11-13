@@ -1,0 +1,188 @@
+using System.Security.Claims;
+using BuildingBlocks.Domain;
+using Core.Application;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Platform.Api.DTOs;
+using Platform.Api.ViewModels;
+
+namespace Platform.Api.Controllers;
+
+/// <summary>
+/// Transport layer for Super Admin clinic directory, lifecycle updates, ownership transfer, and read-only inspect mode.
+/// </summary>
+[ApiController]
+[Route("api/v1/platform/clinics")]
+[Authorize(Policy = "PlatformAdmin")]
+public sealed class PlatformClinicsController : ControllerBase
+{
+    private readonly IPlatformAdminService _platformService;
+
+    public PlatformClinicsController(IPlatformAdminService platformService)
+    {
+        _platformService = platformService ?? throw new ArgumentNullException(nameof(platformService));
+    }
+
+    [HttpGet]
+    [ProducesResponseType(typeof(IReadOnlyList<OwnerSummaryViewModel>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ListClinics([FromQuery] string? search, CancellationToken cancellationToken)
+    {
+        var result = await _platformService.GetClinicDirectoryAsync(search, cancellationToken);
+        if (result.IsFailure)
+        {
+            return ProblemDetailsMapper.ToProblemDetails(result.Error);
+        }
+
+        return Ok(result.Value.Select(o => new OwnerSummaryViewModel(
+            o.OwnerId,
+            o.UserId,
+            o.FullName,
+            o.Email,
+            o.PhoneNumber,
+            o.Status,
+            o.EmailConfirmed,
+            o.MaxClinics,
+            o.ClinicsCount,
+            o.CreatedAtUtc,
+            o.Clinics.Select(c => new ClinicSummaryViewModel(
+                c.ClinicId,
+                c.Name,
+                c.Slug,
+                c.Status,
+                c.SubscriptionExpiryUtc,
+                c.GraceDays,
+                c.IsActive,
+                c.CreatedAtUtc,
+                c.ModulesEnabled)).ToList())).ToList());
+    }
+
+    [HttpPut("{clinicId:guid}/status")]
+    [ProducesResponseType(typeof(GenericMessageViewModel), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateStatus(
+        Guid clinicId,
+        [FromBody] UpdateClinicStatusDto dto,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetAdminId(out Guid adminId))
+        {
+            return Unauthorized();
+        }
+
+        string? ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
+        string? requestId = HttpContext.Items["RequestId"]?.ToString();
+
+        var result = await _platformService.UpdateClinicStatusAsync(
+            adminId,
+            clinicId,
+            dto.Status,
+            dto.SubscriptionExpiryUtc,
+            dto.GraceDays,
+            ipAddress,
+            requestId,
+            cancellationToken);
+
+        if (result.IsFailure)
+        {
+            return ProblemDetailsMapper.ToProblemDetails(result.Error);
+        }
+
+        return Ok(new GenericMessageViewModel("تم تحديث حالة العيادة بنجاح. / Clinic status updated."));
+    }
+
+    [HttpPost("{clinicId:guid}/move")]
+    [ProducesResponseType(typeof(GenericMessageViewModel), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> MoveClinic(
+        Guid clinicId,
+        [FromBody] MoveClinicDto dto,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetAdminId(out Guid adminId))
+        {
+            return Unauthorized();
+        }
+
+        string? ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
+        string? requestId = HttpContext.Items["RequestId"]?.ToString();
+
+        var result = await _platformService.MoveClinicOwnerAsync(
+            adminId,
+            clinicId,
+            dto.TargetOwnerId,
+            dto.StepUpPassword,
+            ipAddress,
+            requestId,
+            cancellationToken);
+
+        if (result.IsFailure)
+        {
+            return ProblemDetailsMapper.ToProblemDetails(result.Error);
+        }
+
+        return Ok(new GenericMessageViewModel("تم نقل ملكية العيادة بنجاح. / Clinic ownership transferred."));
+    }
+
+    [HttpGet("{clinicId:guid}/inspect")]
+    [ProducesResponseType(typeof(InspectClinicViewModel), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> InspectClinic(Guid clinicId, CancellationToken cancellationToken)
+    {
+        if (!TryGetAdminId(out Guid adminId))
+        {
+            return Unauthorized();
+        }
+
+        string? ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
+        string? requestId = HttpContext.Items["RequestId"]?.ToString();
+
+        var result = await _platformService.InspectClinicAsync(
+            adminId,
+            clinicId,
+            ipAddress,
+            requestId,
+            cancellationToken);
+
+        if (result.IsFailure)
+        {
+            return ProblemDetailsMapper.ToProblemDetails(result.Error);
+        }
+
+        var v = result.Value;
+        return Ok(new InspectClinicViewModel(
+            v.ClinicId,
+            v.Name,
+            v.Slug,
+            v.Status,
+            v.OwnerId,
+            v.SubscriptionExpiryUtc,
+            v.GraceDays,
+            v.SampleRecordsCount,
+            v.SampleRecordsTotalAmount.Amount,
+            v.SampleRecordsTotalAmount.Currency,
+            v.ReadOnlyMode));
+    }
+
+    [HttpPost("{clinicId:guid}/inspect/{*subpath}")]
+    [HttpPut("{clinicId:guid}/inspect/{*subpath}")]
+    [HttpDelete("{clinicId:guid}/inspect/{*subpath}")]
+    [HttpPatch("{clinicId:guid}/inspect/{*subpath}")]
+    [HttpPost("{clinicId:guid}/inspect")]
+    [HttpPut("{clinicId:guid}/inspect")]
+    [HttpDelete("{clinicId:guid}/inspect")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public IActionResult RejectInspectWrite(Guid clinicId, string? subpath = null)
+    {
+        return ProblemDetailsMapper.ToProblemDetails(
+            Error.Forbidden("INSPECT_MODE_READ_ONLY", "Inspect mode is strictly read-only. Writes are forbidden."));
+    }
+
+    private bool TryGetAdminId(out Guid adminId)
+    {
+        string? sub = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        return Guid.TryParse(sub, out adminId);
+    }
+}
+

@@ -56,7 +56,7 @@ builder.Services.AddIdentityCore<AppUser>(options =>
 .AddEntityFrameworkStores<CoreDbContext>()
 .AddDefaultTokenProviders();
 
-// Authentication with JWT Bearer + Cookie fallback
+// Authentication with JWT Bearer + Host-isolated Cookie fallback + Realm enforcement
 var jwtSecret = builder.Configuration["Security:JwtSecret"]
                 ?? "clinic-platform-ultra-secure-jwt-secret-signing-key-minimum-32-chars";
 var key = Encoding.UTF8.GetBytes(jwtSecret);
@@ -82,17 +82,59 @@ builder.Services.AddAuthentication(options =>
     {
         OnMessageReceived = context =>
         {
-            if (string.IsNullOrEmpty(context.Token) &&
-                context.Request.Cookies.TryGetValue("__Host-Staff-Token", out var cookieToken))
+            if (string.IsNullOrEmpty(context.Token))
             {
-                context.Token = cookieToken;
+                bool isAdminHost = HostRoutingMiddleware.IsAdminHost(context.Request);
+                string cookieName = isAdminHost ? "__Host-Platform-Token" : "__Host-Staff-Token";
+                if (context.Request.Cookies.TryGetValue(cookieName, out var cookieToken))
+                {
+                    context.Token = cookieToken;
+                }
             }
+
+            return Task.CompletedTask;
+        },
+        OnTokenValidated = context =>
+        {
+            bool isAdminHost = HostRoutingMiddleware.IsAdminHost(context.Request);
+            string? realm = context.Principal?.FindFirst("realm")?.Value;
+
+            if (isAdminHost && !string.Equals(realm, "PlatformAdmin", StringComparison.Ordinal))
+            {
+                context.Fail("Clinic credentials are not permitted on the admin host.");
+            }
+            else if (!isAdminHost && string.Equals(realm, "PlatformAdmin", StringComparison.Ordinal))
+            {
+                context.Fail("Platform admin credentials are not permitted on the clinic host.");
+            }
+
             return Task.CompletedTask;
         }
     };
 });
 
-builder.Services.AddAuthorization();
+builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
+    .Configure<IClock>((options, clock) =>
+    {
+        options.TokenValidationParameters.LifetimeValidator = (notBefore, expires, _, _) =>
+        {
+            DateTime now = clock.UtcNow.UtcDateTime;
+            return (!notBefore.HasValue || now >= notBefore.Value) &&
+                   (!expires.HasValue || now < expires.Value);
+        };
+    });
+
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("PlatformAdmin", policy =>
+        policy.RequireAuthenticatedUser()
+              .RequireClaim("realm", "PlatformAdmin")
+              .RequireClaim("totp_enrolled", "true"));
+
+    options.AddPolicy("PlatformAdminEnrollment", policy =>
+        policy.RequireAuthenticatedUser()
+              .RequireClaim("realm", "PlatformAdmin"));
+});
 
 // Application & Infrastructure Services
 builder.Services.AddSingleton<IEmailSender, FakeEmailSender>();
@@ -103,12 +145,42 @@ builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IAuditService, AuditService>();
 builder.Services.AddScoped<IAccountInvitations, AccountInvitations>();
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IHourlyTotpService, HourlyTotpService>();
+builder.Services.AddScoped<IPlatformAdminAuthService, PlatformAdminAuthService>();
+builder.Services.AddScoped<IPlatformAdminService, PlatformAdminService>();
 
 // Configure ProblemDetails and Controllers
 builder.Services.AddProblemDetails();
 builder.Services.AddControllers();
 
 var app = builder.Build();
+
+// Support server-side break-glass CLI command: platform-admin reset-2fa --email <email> --secret <secret>
+if (args.Length >= 2 &&
+    string.Equals(args[0], "platform-admin", StringComparison.OrdinalIgnoreCase) &&
+    string.Equals(args[1], "reset-2fa", StringComparison.OrdinalIgnoreCase))
+{
+    string? cliEmail = null;
+    string? cliSecret = null;
+    for (int i = 2; i < args.Length - 1; i++)
+    {
+        if (string.Equals(args[i], "--email", StringComparison.OrdinalIgnoreCase))
+        {
+            cliEmail = args[i + 1];
+        }
+        else if (string.Equals(args[i], "--secret", StringComparison.OrdinalIgnoreCase))
+        {
+            cliSecret = args[i + 1];
+        }
+    }
+
+    using var scope = app.Services.CreateScope();
+    var auth = scope.ServiceProvider.GetRequiredService<IPlatformAdminAuthService>();
+    var res = await auth.ResetTwoFactorBreakGlassAsync(cliEmail ?? string.Empty, cliSecret ?? string.Empty, "localhost-cli", null);
+    Console.WriteLine(res.IsSuccess ? "2FA reset complete." : $"2FA reset failed: {res.Error.Code} - {res.Error.Message}");
+    Environment.ExitCode = res.IsSuccess ? 0 : 1;
+    return;
+}
 
 // Pipeline Middlewares
 app.UseMiddleware<RequestIdMiddleware>();

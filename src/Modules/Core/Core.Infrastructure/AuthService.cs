@@ -79,6 +79,16 @@ public sealed class AuthService : IAuthService
                 "Account is not activated. Please enter your verification code to activate your account."));
         }
 
+        // Check Owner Deactivation Status
+        var owner = await _dbContext.Owners
+            .FirstOrDefaultAsync(o => o.UserId == user.Id, cancellationToken);
+        if (owner != null && !string.Equals(owner.Status, "Active", StringComparison.OrdinalIgnoreCase))
+        {
+            return Result<AuthResult>.Failure(Error.Unauthorized(
+                "OWNER_DEACTIVATED",
+                "Owner account has been deactivated."));
+        }
+
         // Check Password
         bool isValid = await _userManager.CheckPasswordAsync(user, password);
         if (!isValid)
@@ -121,6 +131,30 @@ public sealed class AuthService : IAuthService
         // Resolve Active Clinic
         var userClinic = await _dbContext.UserClinics
             .FirstOrDefaultAsync(uc => uc.UserId == user.Id, cancellationToken);
+
+        if (userClinic != null)
+        {
+            var clinic = await _dbContext.Clinics
+                .FirstOrDefaultAsync(c => c.Id == userClinic.ClinicId, cancellationToken);
+            if (clinic != null && (!clinic.IsActive || string.Equals(clinic.Status, "Suspended", StringComparison.OrdinalIgnoreCase)))
+            {
+                return Result<AuthResult>.Failure(Error.Unauthorized(
+                    "CLINIC_SUSPENDED",
+                    "This clinic is currently suspended."));
+            }
+
+            if (clinic?.OwnerId != null)
+            {
+                var clinicOwner = await _dbContext.Owners
+                    .FirstOrDefaultAsync(o => o.Id == clinic.OwnerId.Value, cancellationToken);
+                if (clinicOwner != null && !string.Equals(clinicOwner.Status, "Active", StringComparison.OrdinalIgnoreCase))
+                {
+                    return Result<AuthResult>.Failure(Error.Unauthorized(
+                        "OWNER_DEACTIVATED",
+                        "Owner account has been deactivated."));
+                }
+            }
+        }
 
         var tokenResult = await _tokenService.GenerateTokensAsync(user, cleanDeviceId, userClinic?.ClinicId, cancellationToken);
         if (!tokenResult.IsSuccess)
@@ -222,6 +256,30 @@ public sealed class AuthService : IAuthService
         // Resolve Active Clinic
         var userClinic = await _dbContext.UserClinics
             .FirstOrDefaultAsync(uc => uc.UserId == user.Id, cancellationToken);
+
+        if (userClinic != null)
+        {
+            var clinic = await _dbContext.Clinics
+                .FirstOrDefaultAsync(c => c.Id == userClinic.ClinicId, cancellationToken);
+            if (clinic != null && (!clinic.IsActive || string.Equals(clinic.Status, "Suspended", StringComparison.OrdinalIgnoreCase)))
+            {
+                return Result<AuthResult>.Failure(Error.Unauthorized(
+                    "CLINIC_SUSPENDED",
+                    "This clinic is currently suspended."));
+            }
+
+            if (clinic?.OwnerId != null)
+            {
+                var clinicOwner = await _dbContext.Owners
+                    .FirstOrDefaultAsync(o => o.Id == clinic.OwnerId.Value, cancellationToken);
+                if (clinicOwner != null && !string.Equals(clinicOwner.Status, "Active", StringComparison.OrdinalIgnoreCase))
+                {
+                    return Result<AuthResult>.Failure(Error.Unauthorized(
+                        "OWNER_DEACTIVATED",
+                        "Owner account has been deactivated."));
+                }
+            }
+        }
 
         var tokenResult = await _tokenService.GenerateTokensAsync(user, cleanDeviceId, userClinic?.ClinicId, cancellationToken);
         if (!tokenResult.IsSuccess)

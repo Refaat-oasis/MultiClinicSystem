@@ -185,3 +185,44 @@ Status: 0 Errors, Clean Build
 - [x] Every audited action creates an immutable `AuditLog` entry.
 - [x] Arabic RTL-first UI screens built with Liquid Glass design tokens (Light/Dark themes).
 - [x] Phase 0 and Phase 1 integration gates pass 100% green.
+
+
+---
+
+## Phase 2 — Super Admin Site, Hourly TOTP, Host Isolation & Inspect Mode
+
+**Status:** COMPLETE  
+**Date:** 2026-11-13  
+
+### Tasks Completed
+- **Super Admin Identity & Hourly TOTP (`PlatformAdmins`, `PlatformAdminRecoveryKeys`, `HourlyTotpService`, `PlatformAdminAuthService`):**
+  - Seeded Super Admin (`ahmed@platform.local` / `AdminInitial#2026`) with mandatory password change + 3600-second period HMAC-SHA1 TOTP enrollment (`MustChangePassword`, `TotpEnrolled`), DataProtection secret encryption, replay protection (`LastAcceptedTotpStep`), 5-minute previous-hour grace window (`< 300s`), and 10 single-use HMAC-SHA256 recovery keys.
+  - Added step-up password confirmation (`POST /api/v1/platform/auth/step-up`) with short-lived step-up session validation (`STEP_UP_REQUIRED` / `STEP_UP_INVALID`), plus break-glass 2FA reset endpoint (`POST /api/v1/platform/auth/break-glass-reset`) and CLI support.
+  - Added host isolation (`HostRoutingMiddleware`) returning 404 for `/platform/**` & `/api/v1/platform/**` on the clinic host, 404 for `/c/**`, `/api/v1/auth/**`, `/api/v1/clinics/**` on the admin host, `__Host-Platform-Token` cookie binding, and cross-realm JWT rejection (`AdminHostSweepTests`).
+- **Owner Management, Clinic Directory, Moves & Read-Only Inspect Mode (`PlatformAdminService`, `PlatformOwnersController`, `PlatformClinicsController`, `PlatformMonitoringController`):**
+  - Owner creation with clinic quota (`POST /api/v1/platform/owners`), outbox invitation email trigger, resend verification code (`POST /api/v1/platform/owners/{ownerId}/resend-code`), deactivate/reactivate (`POST .../deactivate`, `POST .../reactivate` blocking deactivated logins), and quota updates (`PUT .../quota`).
+  - Clinic directory listing (`GET /api/v1/platform/clinics`), status updates (`PUT .../status`), ownership transfer with step-up (`POST .../move` removing prior owner's `UserClinic` mapping so prior owner receives 404 on `/api/v1/auth/access-logs`), and `IPlatformAccess` read-only inspect mode (`GET .../inspect`, writing `PatientAccessLog` with `ActorType:SuperAdmin`, and returning `403 INSPECT_MODE_READ_ONLY` on `POST`/`PUT`/`DELETE`/`PATCH .../inspect`).
+  - Platform dashboard & audit endpoints (`GET /api/v1/platform/dashboard`, `GET /api/v1/platform/audit`) and clinic-owner access log viewer (`GET /api/v1/auth/access-logs`).
+- **EF Core / Clock / API Infrastructure Fixes:**
+  - Fixed `CoreDbContext` tenant global query filter (`r.ClinicId == _currentClinic.ClinicId`) to avoid EF Core 10 eager `Nullable<Guid>.Value` evaluation when `IsPlatformAdmin` is active.
+  - Aligned `JwtSecurityTokenHandler` `NotBefore`/`IssuedAt` and `LifetimeValidator` in `TokenService`, `PlatformAdminAuthService`, and `Program.cs` with `IClock.UtcNow`.
+  - Mapped domain error codes to `ProblemDetails` in `ProblemDetailsMapper` and added `<FrameworkReference Include="Microsoft.AspNetCore.App" />` to `Core.Infrastructure` & `UnitTests`.
+- **Frontend Super Admin App (`web/apps/admin`):**
+  - Added `AdminLoginScreen.tsx`, `AdminEnrollmentScreen.tsx`, `PlatformDashboardScreen.tsx`, `OwnersManagementScreen.tsx`, `ClinicDirectoryScreen.tsx`, `InspectClinicShell.tsx`, `PlatformAuditScreen.tsx`, updated `App.tsx` with navigation + `QueryClientProvider` (preserving Arabic RTL + English and Light + Dark themes), and added 6 Vitest specs in `App.test.tsx`.
+  - Fixed unused `React` import TS6133 lint errors in `web/packages/features/core/src/ActivationScreen.test.tsx` and `LoginScreen.test.tsx`.
+
+### Verification Results (Phase 2 Integration Gate + Cumulative Regression)
+- `dotnet test tests/UnitTests/UnitTests.csproj`: `Passed! - Failed: 0, Passed: 48, Skipped: 0, Total: 48, Duration: 189 ms`
+- `dotnet test tests/ArchitectureTests/ArchitectureTests.csproj`: `Passed! - Failed: 0, Passed: 7, Skipped: 0, Total: 7, Duration: 215 ms`
+- `dotnet test tests/IntegrationTests/IntegrationTests.csproj`: `Passed! - Failed: 0, Passed: 17, Skipped: 0, Total: 17, Duration: 9 s`
+- `dotnet test tests/Gates/Gates.csproj`: `Passed! - Failed: 0, Passed: 15, Skipped: 0, Total: 15, Duration: 12 s` (Phase 0 + Phase 1 + Phase 2 gates all green)
+- `npm --prefix web test`: All 5 workspaces passed (`@clinic/admin-app`: 6/6, `@clinic/clinic-app`: 2/2, `@clinic/api-client`: 3/3, `@clinic/ui`: 3/3, `@clinic/feature-core`: 5/5) — Total: 19 passed
+- `npm --prefix web run lint`: `tsc --noEmit` passed across all 5 workspaces (0 errors)
+- `npm --prefix web run build`: `@clinic/admin-app` built in `3.41s`; `@clinic/clinic-app` built in `3.39s`
+
+### Phase 2 Exit Checklist
+- [x] Seeded Super Admin mandatory password change, 3600s TOTP enrollment, replay protection, 5-minute previous-hour grace, and 10 single-use recovery keys implemented and verified.
+- [x] Step-up password verification, break-glass reset, owner management + quotas + deactivation, clinic directory + ownership transfer, and read-only inspect mode with `PatientAccessLog` audit trail verified.
+- [x] Host isolation (`AdminHostSweepTests`) and cross-clinic 404 enforcement verified.
+- [x] Admin React app built and tested with Arabic RTL + English and Light + Dark themes.
+- [x] Phase 0, Phase 1, and Phase 2 integration gates pass 100% green.

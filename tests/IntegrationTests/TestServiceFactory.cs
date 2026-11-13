@@ -76,6 +76,32 @@ public static class TestServiceFactory
         services.AddScoped<IAccountInvitations, AccountInvitations>();
         services.AddScoped<IAuthService, AuthService>();
 
+        if (currentClinic is CurrentClinicContext concreteClinicContext)
+        {
+            services.AddSingleton(concreteClinicContext);
+        }
+        else
+        {
+            services.AddSingleton(_ =>
+            {
+                var ctx = new CurrentClinicContext();
+                if (currentClinic.ClinicId.HasValue)
+                {
+                    ctx.SetTenant(currentClinic.ClinicId.Value);
+                }
+                if (currentClinic.IsPlatformAdmin)
+                {
+                    ctx.SetPlatformAdmin();
+                }
+                return ctx;
+            });
+        }
+
+        services.AddScoped<IPlatformAccess, PlatformAccessService>();
+        services.AddScoped<IHourlyTotpService, HourlyTotpService>();
+        services.AddScoped<IPlatformAdminAuthService, PlatformAdminAuthService>();
+        services.AddScoped<IPlatformAdminService, PlatformAdminService>();
+
         var provider = services.BuildServiceProvider();
         return (provider, emailSender);
     }

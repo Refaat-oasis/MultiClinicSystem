@@ -81,4 +81,14 @@ public sealed class Clinic
         SubscriptionExpiryUtc = expiryUtc;
         GraceDays = graceDays;
     }
+
+    public void MoveToOwner(Guid newOwnerId)
+    {
+        if (newOwnerId == Guid.Empty)
+        {
+            throw new ArgumentException("Target owner ID cannot be empty.", nameof(newOwnerId));
+        }
+
+        OwnerId = newOwnerId;
+    }
 }

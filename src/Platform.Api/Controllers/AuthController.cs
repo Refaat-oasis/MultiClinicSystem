@@ -18,11 +18,16 @@ public sealed class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
     private readonly IAccountInvitations _accountInvitations;
+    private readonly IPlatformAdminService _platformService;
 
-    public AuthController(IAuthService authService, IAccountInvitations accountInvitations)
+    public AuthController(
+        IAuthService authService,
+        IAccountInvitations accountInvitations,
+        IPlatformAdminService platformService)
     {
         _authService = authService ?? throw new ArgumentNullException(nameof(authService));
         _accountInvitations = accountInvitations ?? throw new ArgumentNullException(nameof(accountInvitations));
+        _platformService = platformService ?? throw new ArgumentNullException(nameof(platformService));
     }
 
     [HttpPost("login")]
@@ -291,6 +296,33 @@ public sealed class AuthController : ControllerBase
         Response.Cookies.Delete("__Host-Staff-Token");
         Response.Cookies.Delete("__Host-Staff-Refresh");
         return Ok(new GenericMessageViewModel("تم تسجيل الخروج بنجاح. / Successfully logged out."));
+    }
+
+    [HttpGet("access-logs")]
+    [Authorize]
+    [ProducesResponseType(typeof(IReadOnlyList<PatientAccessLogItemViewModel>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GetClinicAccessLogs([FromQuery] Guid? clinicId, CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(out Guid userId))
+        {
+            return Unauthorized();
+        }
+
+        var result = await _platformService.GetClinicAccessLogsForOwnerAsync(userId, clinicId, cancellationToken);
+        if (result.IsFailure)
+        {
+            return ToProblemDetails(result.Error);
+        }
+
+        return Ok(result.Value.Select(l => new PatientAccessLogItemViewModel(
+            l.Id,
+            l.ActorId,
+            l.Reason,
+            l.TimestampUtc,
+            l.ClinicId,
+            l.Details)).ToList());
     }
 
     private void SetAuthCookies(string accessToken, string refreshToken)

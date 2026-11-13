@@ -75,11 +75,14 @@ public sealed class TokenService : ITokenService
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSecret));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
-        var expiresAtUtc = _clock.UtcNow.AddMinutes(15);
+        var issuedAtUtc = _clock.UtcNow;
+        var expiresAtUtc = issuedAtUtc.AddMinutes(15);
 
         var tokenDescriptor = new SecurityTokenDescriptor
         {
             Subject = new ClaimsIdentity(claims),
+            NotBefore = issuedAtUtc.UtcDateTime,
+            IssuedAt = issuedAtUtc.UtcDateTime,
             Expires = expiresAtUtc.UtcDateTime,
             Issuer = _issuer,
             Audience = _audience,
@@ -204,11 +207,14 @@ public sealed class TokenService : ITokenService
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSecret));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-        var expiresAtUtc = _clock.UtcNow.AddMinutes(15);
+        var issuedAtUtc = _clock.UtcNow;
+        var expiresAtUtc = issuedAtUtc.AddMinutes(15);
 
         var tokenDescriptor = new SecurityTokenDescriptor
         {
             Subject = new ClaimsIdentity(claims),
+            NotBefore = issuedAtUtc.UtcDateTime,
+            IssuedAt = issuedAtUtc.UtcDateTime,
             Expires = expiresAtUtc.UtcDateTime,
             Issuer = _issuer,
             Audience = _audience,
