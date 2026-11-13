@@ -116,6 +116,10 @@ public static class TestServiceFactory
         services.AddScoped<IAvailabilityQueries, AvailabilityQueriesService>();
         services.AddScoped<ISchedulingService, SchedulingService>();
         services.AddScoped<IPortalBooking>(sp => (SchedulingService)sp.GetRequiredService<ISchedulingService>());
+        services.AddSingleton<ISpecialtyPlugin, DentalSpecialtyPlugin>();
+        services.AddSingleton<ISpecialtyPlugin, OphthalmologySpecialtyPlugin>();
+        services.AddScoped<IClinicalService, ClinicalService>();
+        services.AddScoped<IClinicalPortalQueries>(sp => (ClinicalService)sp.GetRequiredService<IClinicalService>());
 
         var provider = services.BuildServiceProvider();
         return (provider, emailSender);

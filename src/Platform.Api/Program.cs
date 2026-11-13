@@ -193,6 +193,10 @@ builder.Services.AddScoped<IPatientService, PatientService>();
 builder.Services.AddScoped<IAvailabilityQueries, AvailabilityQueriesService>();
 builder.Services.AddScoped<ISchedulingService, SchedulingService>();
 builder.Services.AddScoped<IPortalBooking>(sp => (SchedulingService)sp.GetRequiredService<ISchedulingService>());
+builder.Services.AddSingleton<ISpecialtyPlugin, DentalSpecialtyPlugin>();
+builder.Services.AddSingleton<ISpecialtyPlugin, OphthalmologySpecialtyPlugin>();
+builder.Services.AddScoped<IClinicalService, ClinicalService>();
+builder.Services.AddScoped<IClinicalPortalQueries>(sp => (ClinicalService)sp.GetRequiredService<IClinicalService>());
 builder.Services.AddScoped<IScheduleRealtimeNotifier, Platform.Api.Hubs.SignalRScheduleRealtimeNotifier>();
 builder.Services.AddSignalR();
 

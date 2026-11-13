@@ -4,9 +4,12 @@ import { GlassCard, AlertBanner } from '@clinic/ui';
 import { apiClient } from '@clinic/api-client';
 import {
   Phase6SchedulingScreen,
+  Phase7ClinicalScreen,
   type AppointmentItem,
   type QueueEntryItem,
   type WaitingListItem,
+  type ClinicalVisitSessionData,
+  type ClinicalSpecialtyFormDefinition,
 } from '@clinic/feature-core';
 
 interface InspectClinicScheduleSnapshot {
@@ -14,6 +17,12 @@ interface InspectClinicScheduleSnapshot {
   appointments: AppointmentItem[];
   queueEntries: QueueEntryItem[];
   waitingList: WaitingListItem[];
+}
+
+interface InspectClinicClinicalSnapshot {
+  clinicId: string;
+  visits: ClinicalVisitSessionData[];
+  forms: ClinicalSpecialtyFormDefinition[];
 }
 import { Eye, Lock } from 'lucide-react';
 
@@ -46,6 +55,13 @@ export const InspectClinicShell: React.FC<InspectClinicShellProps> = ({ clinicId
   const { data: scheduleSnapshot } = useQuery<InspectClinicScheduleSnapshot>({
     queryKey: ['platform-inspect-schedule', clinicId],
     queryFn: () => apiClient.get<InspectClinicScheduleSnapshot>(`/platform/clinics/${clinicId}/inspect/schedule`),
+    enabled: Boolean(clinicId),
+    retry: false,
+  });
+
+  const { data: clinicalSnapshot } = useQuery<InspectClinicClinicalSnapshot>({
+    queryKey: ['platform-inspect-clinical', clinicId],
+    queryFn: () => apiClient.get<InspectClinicClinicalSnapshot>(`/platform/clinics/${clinicId}/inspect/clinical`),
     enabled: Boolean(clinicId),
     retry: false,
   });
@@ -122,6 +138,15 @@ export const InspectClinicShell: React.FC<InspectClinicShellProps> = ({ clinicId
           appointments={scheduleSnapshot.appointments}
           queueEntries={scheduleSnapshot.queueEntries}
           waitingList={scheduleSnapshot.waitingList}
+          readOnlyInspectMode={true}
+        />
+      )}
+
+      {clinicId && clinicalSnapshot && clinicalSnapshot.visits.length > 0 && (
+        <Phase7ClinicalScreen
+          clinicId={clinicId}
+          initialVisit={clinicalSnapshot.visits[0]}
+          specialtyForms={clinicalSnapshot.forms}
           readOnlyInspectMode={true}
         />
       )}

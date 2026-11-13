@@ -11,5 +11,6 @@ export * from './UserProfileScreen';
 export * from './Phase4Screens';
 export * from './Phase5PatientsScreen';
 export * from './Phase6SchedulingScreen';
+export * from './Phase7ClinicalScreen';
 
 
