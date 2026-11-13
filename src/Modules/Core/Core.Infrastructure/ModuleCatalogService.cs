@@ -423,10 +423,18 @@ public sealed class ModuleCatalogService : IModuleCatalogService
                 ],
                 MenuItems:
                 [
-                    new("treatment-plans.list", "treatment-plans", "خطط العلاج", "Treatment Plans", "/treatment-plans", "treatment_plans.read", 190)
+                    new("treatment-plans.list", "treatment-plans", "خطط العلاج", "Treatment Plans", "/treatment-plans", "treatment_plans.read", 190),
+                    new("treatment-plans.dashboard", "treatment-plans", "لوحة خطط العلاج", "Treatment Plans Dashboard", "/treatment-plans/dashboard", "treatment_plans.read", 191)
                 ],
                 SettingsSections: Array.Empty<SettingsSectionResult>(),
-                DashboardWidgets: Array.Empty<DashboardWidgetDefinitionResult>()),
+                DashboardWidgets:
+                [
+                    new("treatment-plans.active-plans", "treatment-plans", "treatment_plans.read", "Clinic", "الخطط العلاجية النشطة", "Active Treatment Plans"),
+                    new("treatment-plans.completion-rate", "treatment-plans", "treatment_plans.read", "Clinic", "نسبة إنجاز الخطط", "Plan Completion Rate"),
+                    new("treatment-plans.delayed-sessions", "treatment-plans", "treatment_plans.read", "Clinic", "الجلسات المتأخرة", "Delayed Plan Sessions"),
+                    new("treatment-plans.installments-due", "treatment-plans", "treatment_plans.read", "Clinic", "الأقساط المستحقة والمتأخرة", "Installments Due & Overdue"),
+                    new("treatment-plans.plan-revenue", "treatment-plans", "treatment_plans.read", "Clinic", "إيرادات خطط العلاج", "Treatment Plan Revenue")
+                ]),
 
             new ModuleManifestEntry(
                 ModuleKey: "inventory",

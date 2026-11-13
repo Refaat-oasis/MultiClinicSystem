@@ -26,6 +26,7 @@ public sealed class Clinic
     public bool HasFinancialEntries { get; private set; }
     public bool ScopePatientsByDoctor { get; private set; }
     public bool ScopePatientsBySpecialty { get; private set; }
+    public bool PortalShowPlanCostsByDefault { get; private set; } = true;
     public DateTimeOffset? SubscriptionExpiryUtc { get; private set; }
     public int GraceDays { get; private set; }
     public bool IsActive { get; private set; }
@@ -274,5 +275,10 @@ public sealed class Clinic
     {
         ScopePatientsByDoctor = scopeByDoctor;
         ScopePatientsBySpecialty = scopeBySpecialty;
+    }
+
+    public void SetPortalShowPlanCostsByDefault(bool show)
+    {
+        PortalShowPlanCostsByDefault = show;
     }
 }

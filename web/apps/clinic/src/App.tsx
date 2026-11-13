@@ -23,6 +23,7 @@ import {
   Phase6SchedulingScreen,
   Phase7ClinicalScreen,
   Phase8BillingScreen,
+  Phase9TreatmentPlansScreen,
   type PatientSummaryItem,
   type PatientDetailData,
   type PatientScopingSettings,
@@ -61,6 +62,7 @@ import {
   Calendar,
   Stethoscope,
   Receipt,
+  ClipboardList,
 } from 'lucide-react';
 
 interface HealthStatus {
@@ -85,6 +87,7 @@ type ActiveTab =
   | 'scheduling'
   | 'clinical'
   | 'billing'
+  | 'treatmentPlans'
   | 'portfolio'
   | 'profile'
   | 'health';
@@ -470,6 +473,14 @@ export const App: React.FC = () => {
           <Receipt size={16} />
           الفواتير والخزينة
         </GlassButton>
+        <GlassButton
+          aria-label="تبويب خطط العلاج"
+          variant={activeTab === 'treatmentPlans' ? 'prominent' : 'default'}
+          onClick={() => setActiveTab('treatmentPlans')}
+        >
+          <ClipboardList size={16} />
+          خطط العلاج
+        </GlassButton>
 
         <GlassButton
           aria-label="تبويب المحفظة والمؤشرات"
@@ -814,6 +825,9 @@ export const App: React.FC = () => {
 
         {activeTab === 'billing' && (
           <Phase8BillingScreen clinicId={activeClinic?.clinicId ?? 'clinic-1'} />
+        )}
+        {activeTab === 'treatmentPlans' && (
+          <Phase9TreatmentPlansScreen clinicId={activeClinic?.clinicId ?? 'clinic-1'} />
         )}
 
         {activeTab === 'portfolio' && (

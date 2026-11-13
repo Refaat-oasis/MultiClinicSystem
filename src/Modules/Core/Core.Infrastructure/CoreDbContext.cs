@@ -75,6 +75,9 @@ public sealed class CoreDbContext : IdentityDbContext<AppUser, AppRole, Guid>
     public DbSet<Expense> Expenses => Set<Expense>();
     public DbSet<DailyClosing> DailyClosings => Set<DailyClosing>();
     public DbSet<ClosingMethodTotal> ClosingMethodTotals => Set<ClosingMethodTotal>();
+    public DbSet<TreatmentPlan> TreatmentPlans => Set<TreatmentPlan>();
+    public DbSet<PlanSession> PlanSessions => Set<PlanSession>();
+    public DbSet<PlanPaymentScheduleItem> PlanPaymentScheduleItems => Set<PlanPaymentScheduleItem>();
 
     public CoreDbContext(DbContextOptions<CoreDbContext> options, ICurrentClinic currentClinic)
         : base(options)
@@ -1018,6 +1021,63 @@ public sealed class CoreDbContext : IdentityDbContext<AppUser, AppRole, Guid>
             b.HasIndex(x => new { x.ClinicId, x.DailyClosingId, x.Method }).IsUnique();
             b.HasQueryFilter(x => _currentClinic.IsPlatformAdmin || x.ClinicId == _currentClinic.ClinicId);
         });
+
+        // TreatmentPlans tenant table (plans schema)
+        builder.Entity<TreatmentPlan>(b =>
+        {
+            b.ToTable("TreatmentPlans", "plans");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            b.Property(x => x.Mode).HasConversion<string>().HasMaxLength(32).IsRequired();
+            b.Property(x => x.FixedTotalAmount).HasPrecision(18, 2);
+            b.Property(x => x.IncludedMaterialsCostAmount).HasPrecision(18, 2);
+            b.Property(x => x.UpfrontAmount).HasPrecision(18, 2);
+            b.Property(x => x.PaidAmount).HasPrecision(18, 2);
+            b.Property(x => x.RefundedAmount).HasPrecision(18, 2);
+            b.Property(x => x.Currency).HasMaxLength(8).IsRequired();
+            b.Property(x => x.Status).HasConversion<string>().HasMaxLength(32).IsRequired();
+            b.Property(x => x.Notes).HasMaxLength(1000);
+            b.Property(x => x.CreatedByUserId).HasMaxLength(128).IsRequired();
+            b.Property(x => x.VoidedBy).HasMaxLength(128);
+            b.Property(x => x.VoidReason).HasMaxLength(500);
+            b.Property(x => x.RowVersion).IsRowVersion();
+            b.HasIndex(x => new { x.ClinicId, x.PatientId, x.CreatedAtUtc });
+            b.HasIndex(x => new { x.ClinicId, x.DoctorId, x.Status });
+            b.HasQueryFilter(x => _currentClinic.IsPlatformAdmin || x.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // PlanSessions tenant table (plans schema)
+        builder.Entity<PlanSession>(b =>
+        {
+            b.ToTable("PlanSessions", "plans");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.Title).HasMaxLength(200).IsRequired();
+            b.Property(x => x.SessionPriceAmount).HasPrecision(18, 2);
+            b.Property(x => x.MaterialsCostAmount).HasPrecision(18, 2);
+            b.Property(x => x.Status).HasConversion<string>().HasMaxLength(32).IsRequired();
+            b.Property(x => x.Notes).HasMaxLength(500);
+            b.Property(x => x.VoidedBy).HasMaxLength(128);
+            b.Property(x => x.VoidReason).HasMaxLength(500);
+            b.Property(x => x.RowVersion).IsRowVersion();
+            b.HasIndex(x => new { x.ClinicId, x.TreatmentPlanId, x.SequenceNumber }).IsUnique();
+            b.HasQueryFilter(x => _currentClinic.IsPlatformAdmin || x.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // PlanPaymentScheduleItems tenant table (plans schema)
+        builder.Entity<PlanPaymentScheduleItem>(b =>
+        {
+            b.ToTable("PlanPaymentScheduleItems", "plans");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.Amount).HasPrecision(18, 2);
+            b.Property(x => x.PaidAmount).HasPrecision(18, 2);
+            b.Property(x => x.Currency).HasMaxLength(8).IsRequired();
+            b.Property(x => x.Status).HasConversion<string>().HasMaxLength(32).IsRequired();
+            b.Property(x => x.VoidedBy).HasMaxLength(128);
+            b.Property(x => x.VoidReason).HasMaxLength(500);
+            b.Property(x => x.RowVersion).IsRowVersion();
+            b.HasIndex(x => new { x.ClinicId, x.TreatmentPlanId, x.InstallmentNumber }).IsUnique();
+            b.HasQueryFilter(x => _currentClinic.IsPlatformAdmin || x.ClinicId == _currentClinic.ClinicId);
+        });
     }
 
     /// <summary>
@@ -1148,7 +1208,13 @@ public sealed class CoreDbContext : IdentityDbContext<AppUser, AppRole, Guid>
                 ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON finance.DailyClosings,
                 ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON finance.DailyClosings,
                 ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON finance.ClosingMethodTotals,
-                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON finance.ClosingMethodTotals
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON finance.ClosingMethodTotals,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON plans.TreatmentPlans,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON plans.TreatmentPlans,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON plans.PlanSessions,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON plans.PlanSessions,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON plans.PlanPaymentScheduleItems,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON plans.PlanPaymentScheduleItems
                 WITH (STATE = ON);
             ');
         ";

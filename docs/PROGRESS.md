@@ -399,3 +399,26 @@ Status: 0 Errors, Clean Build
 - [x] Refunds write append-only compensating ledger entries without deleting original payments, and lab work keeps clinic `LabCostAmount` separated from patient `PatientPriceAmount`.
 - [x] Daily closing reconciles per payment method (`finance` expenses included when enabled, gracefully excluded with `FinanceExpensesExcluded = true` when `finance` is off), locks closed days (`409 DAY_CLOSED_LOCKED`), and requires owner claim + reason + audit to reopen.
 - [x] Phases 0 to 8 cumulative gates, tenant/policy/module-off/portal-privacy/architecture sweeps, and frontend test/lint/build pass 100% green.
+
+---
+
+## Phase 9: Treatment Plans (DONE)
+- **Branch**: `phase-9/treatment-plans`
+- **Completed Tasks**:
+  - **Domain (`src/Modules/Core/Core.Domain/`)**: Added single-type enums, value objects, calculator (`TreatmentPlanMode`, `TreatmentPlanStatus`, `PlanSessionStatus`, `PlanInstallmentStatus`, `PlanSessionWindowCalculation`, `PlanBalanceSummary`, `TreatmentPlanCalculator`), entities (`TreatmentPlan`, `PlanSession`, `PlanPaymentScheduleItem` in `plans` schema implementing `ITenantEntity` and `ISoftDeletable`), `Clinic.PortalShowPlanCostsByDefault`, and 4 unit tests in `TreatmentPlanDomainTests`.
+  - **Application & Infrastructure**: Added `ITreatmentPlanService` and `ITreatmentPlanPortalQueries` with 8 inputs and 7 results, `CoreDbContext` mappings (`plans` schema, EF global query filters & SQL Server RLS filter/block predicates for all 3 plan tables), `TreatmentPlanService` (`FixedTotal` upfront + installments, `PerSession` per-session billing `Charge` creation on completion, candidate slot suggestion filtering working hours & days off, automatic downstream session window shift on slip with mandatory reason, installment collection via `IBillingService` receipts, online-only append-only deposit/installment refunds, and `ShowCostToPatient` toggle), and 5 live `treatment-plans.*` dashboard widgets in `ModuleCatalogService` and `DashboardService`.
+  - **API (`src/Platform.Api/`)**: Added `TreatmentPlansController`, thin DTOs & ViewModels + `TreatmentPlanViewModelMapper`, Super Admin read-only `InspectTreatmentPlans` endpoint on `PlatformClinicsController`, and DI registrations in `Program.cs` & `TestServiceFactory.cs`.
+  - **Frontend (`web/`)**: Added `Phase9TreatmentPlansScreen` + `Phase9TreatmentPlansScreen.test.tsx` (plan builder for `FixedTotal`/`PerSession`, live window shift on slip, session completion, installment payment/refund, portal cost toggle, and `readOnlyInspectMode`), wired `'treatmentPlans'` tab (`خطط العلاج`) into `web/apps/clinic/src/App.tsx` and read-only inspect treatment plans panel into `web/apps/admin/src/InspectClinicShell.tsx`.
+- **Verification Output Summary**:
+  - `dotnet test tests/UnitTests/UnitTests.csproj`: `Passed! - Failed: 0, Passed: 139, Skipped: 0, Total: 139`
+  - `dotnet test tests/ArchitectureTests/ArchitectureTests.csproj`: `Passed! - Failed: 0, Passed: 12, Skipped: 0, Total: 12`
+  - `dotnet test tests/IntegrationTests/IntegrationTests.csproj`: `Passed! - Failed: 0, Passed: 29, Skipped: 0, Total: 29`
+  - `dotnet test tests/Gates/Gates.csproj` (Phases 0–9 cumulative): `Passed! - Failed: 0, Passed: 22, Skipped: 0, Total: 22`
+  - Frontend `npm --prefix web test; npm --prefix web run lint; npm --prefix web run build`: `44/44` Vitest tests passed (`admin-app`: 7, `clinic-app`: 2, `api-client`: 3, `ui`: 3, `feature-core`: 29), `tsc --noEmit` 0 errors, Vite production builds succeeded for both apps.
+
+### Phase 9 Exit Checklist
+- [x] `FixedTotal` (with upfront + installments) and `PerSession` (creating per-session billing charges on completion) treatment plans store contract balances and staff-only internal material costs.
+- [x] Session windows (`TargetDate`, `[EarliestAllowedDate, LatestAllowedDate]`) suggest open dates excluding closed weekdays/days off, and recording a session slip with reason shifts downstream sessions' targets & windows automatically.
+- [x] Installment payments allocate real receipt numbers via `IBillingService` and appear in daily closing; deposit/installment refunds are append-only, online-only, and never delete payments.
+- [x] Portal cost visibility toggle hides/exposes prices & installments via `ITreatmentPlanPortalQueries`; Super Admin read-only inspect works while writes return 403; turning `treatment-plans` off returns 403/404 and removes widgets without breaking billing or scheduling.
+- [x] Phases 0 to 9 cumulative gates, tenant/policy/module-off/architecture sweeps, and frontend test/lint/build pass 100% green.
