@@ -112,6 +112,10 @@ public static class TestServiceFactory
         services.AddScoped<IOwnerPortfolio, OwnerPortfolioService>();
         services.AddScoped<IClinicStructureService, ClinicStructureService>();
         services.AddScoped<IPatientService, PatientService>();
+        services.AddScoped<IScheduleRealtimeNotifier, NullScheduleRealtimeNotifier>();
+        services.AddScoped<IAvailabilityQueries, AvailabilityQueriesService>();
+        services.AddScoped<ISchedulingService, SchedulingService>();
+        services.AddScoped<IPortalBooking>(sp => (SchedulingService)sp.GetRequiredService<ISchedulingService>());
 
         var provider = services.BuildServiceProvider();
         return (provider, emailSender);

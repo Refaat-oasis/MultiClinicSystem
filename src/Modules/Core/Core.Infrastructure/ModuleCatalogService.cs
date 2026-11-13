@@ -287,7 +287,8 @@ public sealed class ModuleCatalogService : IModuleCatalogService
                 Permissions:
                 [
                     new("scheduling.read", "scheduling", "Scheduling", "عرض المواعيد", "View Appointments", false),
-                    new("scheduling.write", "scheduling", "Scheduling", "إدارة وحجز المواعيد", "Book & Manage Appointments", false)
+                    new("scheduling.write", "scheduling", "Scheduling", "إدارة وحجز المواعيد", "Book & Manage Appointments", false),
+                    new("scheduling.priority", "scheduling", "Scheduling", "تحديد أولوية الحجز (VIP / عاجل)", "Assign VIP & Rush Priority", false)
                 ],
                 MenuItems:
                 [
@@ -299,7 +300,8 @@ public sealed class ModuleCatalogService : IModuleCatalogService
                 ],
                 DashboardWidgets:
                 [
-                    new("scheduling.appointments-summary", "scheduling", "scheduling.read", "Clinic", "ملخص المواعيد", "Appointments Summary")
+                    new("scheduling.appointments-summary", "scheduling", "scheduling.read", "Clinic", "ملخص المواعيد", "Appointments Summary"),
+                    new("scheduling.utilization", "scheduling", "scheduling.read", "Clinic", "معدل إشغال الأطباء والغرف", "Doctor & Room Utilization")
                 ]),
 
             new ModuleManifestEntry(
@@ -321,7 +323,8 @@ public sealed class ModuleCatalogService : IModuleCatalogService
                 SettingsSections: Array.Empty<SettingsSectionResult>(),
                 DashboardWidgets:
                 [
-                    new("queue.waiting-count", "queue", "queue.read", "Clinic", "المنتظرون حالياً", "Waiting Patients")
+                    new("queue.waiting-count", "queue", "queue.read", "Clinic", "المنتظرون حالياً", "Waiting Patients"),
+                    new("queue.waiting-list", "queue", "queue.read", "Clinic", "قائمة الانتظار وعروض المواعيد", "Waiting List & Offers")
                 ]),
 
             new ModuleManifestEntry(

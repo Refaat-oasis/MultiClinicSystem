@@ -20,6 +20,7 @@ import {
   ClinicStructureScreen,
   OwnerPortfolioAndWidgetsScreen,
   Phase5PatientsScreen,
+  Phase6SchedulingScreen,
   type PatientSummaryItem,
   type PatientDetailData,
   type PatientScopingSettings,
@@ -55,6 +56,7 @@ import {
   Users,
   DoorOpen,
   BarChart3,
+  Calendar,
 } from 'lucide-react';
 
 interface HealthStatus {
@@ -76,6 +78,7 @@ type ActiveTab =
   | 'staffDevices'
   | 'structure'
   | 'patients'
+  | 'scheduling'
   | 'portfolio'
   | 'profile'
   | 'health';
@@ -437,6 +440,15 @@ export const App: React.FC = () => {
         </GlassButton>
 
         <GlassButton
+          aria-label="تبويب المواعيد والطابور"
+          variant={activeTab === 'scheduling' ? 'prominent' : 'default'}
+          onClick={() => setActiveTab('scheduling')}
+        >
+          <Calendar size={16} />
+          المواعيد والطابور
+        </GlassButton>
+
+        <GlassButton
           aria-label="تبويب المحفظة والمؤشرات"
           variant={activeTab === 'portfolio' ? 'prominent' : 'default'}
           onClick={() => setActiveTab('portfolio')}
@@ -752,6 +764,24 @@ export const App: React.FC = () => {
               };
               setPatients((prev) => [summary, ...prev]);
             }}
+          />
+        )}
+
+        {activeTab === 'scheduling' && (
+          <Phase6SchedulingScreen
+            doctors={doctors.map((d) => ({ id: d.id, fullName: d.fullName }))}
+            patients={patients.map((p) => ({ id: p.id, fullName: p.fullName, fileNumber: p.fileNumber }))}
+            categories={[
+              {
+                id: 'cat-default-exam',
+                specialtyCode: 'dental',
+                nameAr: 'كشف استشارة',
+                nameEn: 'Consultation',
+                defaultDurationMinutes: 30,
+                defaultPriceAmount: 250,
+                defaultPriceCurrency: 'EGP',
+              },
+            ]}
           />
         )}
 

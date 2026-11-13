@@ -235,6 +235,25 @@ public sealed class PlatformClinicsController : ControllerBase
             : Ok(PatientViewModelMapper.MapDetail(result.Value));
     }
 
+    [HttpGet("{clinicId:guid}/inspect/schedule")]
+    [ProducesResponseType(typeof(ClinicScheduleInspectViewModel), StatusCodes.Status200OK)]
+    public async Task<IActionResult> InspectSchedule(
+        Guid clinicId,
+        [FromQuery] string? date,
+        [FromServices] ISchedulingService schedulingService,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetAdminId(out Guid adminId))
+        {
+            return Unauthorized();
+        }
+
+        var result = await schedulingService.InspectScheduleAsSuperAdminAsync(adminId, clinicId, date, cancellationToken);
+        return result.IsFailure
+            ? ProblemDetailsMapper.ToProblemDetails(result.Error)
+            : Ok(SchedulingViewModelMapper.ToViewModel(result.Value));
+    }
+
     [HttpPost("{clinicId:guid}/inspect/{*subpath}")]
     [HttpPut("{clinicId:guid}/inspect/{*subpath}")]
     [HttpDelete("{clinicId:guid}/inspect/{*subpath}")]
