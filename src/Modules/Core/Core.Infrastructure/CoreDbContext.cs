@@ -78,6 +78,9 @@ public sealed class CoreDbContext : IdentityDbContext<AppUser, AppRole, Guid>
     public DbSet<TreatmentPlan> TreatmentPlans => Set<TreatmentPlan>();
     public DbSet<PlanSession> PlanSessions => Set<PlanSession>();
     public DbSet<PlanPaymentScheduleItem> PlanPaymentScheduleItems => Set<PlanPaymentScheduleItem>();
+    public DbSet<PatientAccount> PatientAccounts => Set<PatientAccount>();
+    public DbSet<PortalConsent> PortalConsents => Set<PortalConsent>();
+    public DbSet<ClinicPortalSetting> ClinicPortalSettings => Set<ClinicPortalSetting>();
 
     public CoreDbContext(DbContextOptions<CoreDbContext> options, ICurrentClinic currentClinic)
         : base(options)
@@ -477,6 +480,10 @@ public sealed class CoreDbContext : IdentityDbContext<AppUser, AppRole, Guid>
             b.Property(p => p.NationalId).HasMaxLength(40);
             b.Property(p => p.Address).HasMaxLength(400);
             b.Property(p => p.PrimarySpecialtyCode).HasMaxLength(64);
+            b.Property(p => p.Email).HasMaxLength(256);
+            b.Property(p => p.BloodType).HasMaxLength(16);
+            b.Property(p => p.GuardianName).HasMaxLength(200);
+            b.Property(p => p.GuardianEmail).HasMaxLength(256);
             b.Property(p => p.MedicalHistorySummary).HasMaxLength(2000);
             b.Property(p => p.ChronicConditionsJson).IsRequired();
             b.Property(p => p.CurrentMedicationsJson).IsRequired();
@@ -1078,6 +1085,57 @@ public sealed class CoreDbContext : IdentityDbContext<AppUser, AppRole, Guid>
             b.HasIndex(x => new { x.ClinicId, x.TreatmentPlanId, x.InstallmentNumber }).IsUnique();
             b.HasQueryFilter(x => _currentClinic.IsPlatformAdmin || x.ClinicId == _currentClinic.ClinicId);
         });
+
+        // PatientAccounts tenant table (portal schema)
+        builder.Entity<PatientAccount>(b =>
+        {
+            b.ToTable("PatientAccounts", "portal");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.Email).HasMaxLength(256);
+            b.Property(x => x.NormalizedEmail).HasMaxLength(256).IsRequired();
+            b.Property(x => x.PasswordHash).HasMaxLength(512);
+            b.Property(x => x.SecurityStamp).HasMaxLength(64).IsRequired();
+            b.Property(x => x.Status).HasConversion<string>().HasMaxLength(32).IsRequired();
+            b.Property(x => x.PrintedCodeHmac).HasMaxLength(128);
+            b.Property(x => x.GuardianName).HasMaxLength(200);
+            b.Property(x => x.VoidedBy).HasMaxLength(128);
+            b.Property(x => x.VoidReason).HasMaxLength(500);
+            b.Property(x => x.RowVersion).IsRowVersion();
+            b.HasIndex(x => new { x.ClinicId, x.PatientId }).IsUnique().HasFilter("[IsVoided] = 0");
+            b.HasIndex(x => new { x.ClinicId, x.NormalizedEmail });
+            b.HasQueryFilter(x => _currentClinic.IsPlatformAdmin || x.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // PortalConsents tenant table (portal schema)
+        builder.Entity<PortalConsent>(b =>
+        {
+            b.ToTable("PortalConsents", "portal");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.TermsVersion).HasMaxLength(64).IsRequired();
+            b.Property(x => x.Channel).HasMaxLength(64).IsRequired();
+            b.Property(x => x.Notes).HasMaxLength(500);
+            b.Property(x => x.VoidedBy).HasMaxLength(128);
+            b.Property(x => x.VoidReason).HasMaxLength(500);
+            b.Property(x => x.RowVersion).IsRowVersion();
+            b.HasIndex(x => new { x.ClinicId, x.PatientId });
+            b.HasQueryFilter(x => _currentClinic.IsPlatformAdmin || x.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // ClinicPortalSettings tenant table (portal schema)
+        builder.Entity<ClinicPortalSetting>(b =>
+        {
+            b.ToTable("ClinicPortalSettings", "portal");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.TermsTextAr).HasMaxLength(2000).IsRequired();
+            b.Property(x => x.TermsTextEn).HasMaxLength(2000).IsRequired();
+            b.Property(x => x.WelcomeMessageAr).HasMaxLength(1000).IsRequired();
+            b.Property(x => x.WelcomeMessageEn).HasMaxLength(1000).IsRequired();
+            b.Property(x => x.VoidedBy).HasMaxLength(128);
+            b.Property(x => x.VoidReason).HasMaxLength(500);
+            b.Property(x => x.RowVersion).IsRowVersion();
+            b.HasIndex(x => x.ClinicId).IsUnique().HasFilter("[IsVoided] = 0");
+            b.HasQueryFilter(x => _currentClinic.IsPlatformAdmin || x.ClinicId == _currentClinic.ClinicId);
+        });
     }
 
     /// <summary>
@@ -1214,7 +1272,13 @@ public sealed class CoreDbContext : IdentityDbContext<AppUser, AppRole, Guid>
                 ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON plans.PlanSessions,
                 ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON plans.PlanSessions,
                 ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON plans.PlanPaymentScheduleItems,
-                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON plans.PlanPaymentScheduleItems
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON plans.PlanPaymentScheduleItems,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON portal.PatientAccounts,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON portal.PatientAccounts,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON portal.PortalConsents,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON portal.PortalConsents,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON portal.ClinicPortalSettings,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON portal.ClinicPortalSettings
                 WITH (STATE = ON);
             ');
         ";

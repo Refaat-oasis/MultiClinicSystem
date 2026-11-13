@@ -24,6 +24,7 @@ import {
   Phase7ClinicalScreen,
   Phase8BillingScreen,
   Phase9TreatmentPlansScreen,
+  Phase10PortalScreen,
   type PatientSummaryItem,
   type PatientDetailData,
   type PatientScopingSettings,
@@ -88,6 +89,7 @@ type ActiveTab =
   | 'clinical'
   | 'billing'
   | 'treatmentPlans'
+  | 'portal'
   | 'portfolio'
   | 'profile'
   | 'health';
@@ -481,6 +483,14 @@ export const App: React.FC = () => {
           <ClipboardList size={16} />
           خطط العلاج
         </GlassButton>
+        <GlassButton
+          aria-label="تبويب بوابة المريض"
+          variant={activeTab === 'portal' ? 'prominent' : 'default'}
+          onClick={() => setActiveTab('portal')}
+        >
+          <Sparkles size={16} />
+          بوابة المريض
+        </GlassButton>
 
         <GlassButton
           aria-label="تبويب المحفظة والمؤشرات"
@@ -828,6 +838,9 @@ export const App: React.FC = () => {
         )}
         {activeTab === 'treatmentPlans' && (
           <Phase9TreatmentPlansScreen clinicId={activeClinic?.clinicId ?? 'clinic-1'} />
+        )}
+        {activeTab === 'portal' && (
+          <Phase10PortalScreen clinicId={activeClinic?.clinicId ?? 'clinic-1'} />
         )}
 
         {activeTab === 'portfolio' && (

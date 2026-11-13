@@ -22,6 +22,8 @@ public static class ProblemDetailsMapper
                        c.Contains("INVALID_CURRENT_PASSWORD", StringComparison.OrdinalIgnoreCase) ||
                        c.Contains("ACCOUNT_LOCKED", StringComparison.OrdinalIgnoreCase) ||
                        c.Contains("ACCOUNT_NOT_ACTIVATED", StringComparison.OrdinalIgnoreCase) ||
+                       c.Contains("PORTAL_SESSION_INVALID", StringComparison.OrdinalIgnoreCase) ||
+                       c.Contains("INVALID_OR_EXPIRED_DOWNLOAD_TOKEN", StringComparison.OrdinalIgnoreCase) ||
                        c.Contains("DEVICE_REVOKED", StringComparison.OrdinalIgnoreCase) ||
                        c.Contains("REFRESH_TOKEN", StringComparison.OrdinalIgnoreCase) => StatusCodes.Status401Unauthorized,
             var c when c.Contains("FORBIDDEN", StringComparison.OrdinalIgnoreCase) ||
@@ -54,6 +56,9 @@ public static class ProblemDetailsMapper
                        c.Contains("NUMBER_BLOCK_CONTENTION", StringComparison.OrdinalIgnoreCase) ||
                        c.Contains("NUMBER_BLOCK_EXHAUSTED", StringComparison.OrdinalIgnoreCase) ||
                        c.Contains("ALLERGY_WARNING_CONFIRMATION_REQUIRED", StringComparison.OrdinalIgnoreCase) ||
+                       c.Contains("PORTAL_EMAIL_IN_USE", StringComparison.OrdinalIgnoreCase) ||
+                       c.Contains("PORTAL_ACCOUNT_ALREADY_ACTIVE", StringComparison.OrdinalIgnoreCase) ||
+                       c.Contains("HOURLY_CODE_CAP_REACHED", StringComparison.OrdinalIgnoreCase) ||
                        c.Contains("DUPLICATE", StringComparison.OrdinalIgnoreCase) => StatusCodes.Status409Conflict,
             _ => StatusCodes.Status400BadRequest
         };

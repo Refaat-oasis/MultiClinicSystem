@@ -86,10 +86,27 @@ builder.Services.AddAuthentication(options =>
             if (string.IsNullOrEmpty(context.Token))
             {
                 bool isAdminHost = HostRoutingMiddleware.IsAdminHost(context.Request);
-                string cookieName = isAdminHost ? "__Host-Platform-Token" : "__Host-Staff-Token";
-                if (context.Request.Cookies.TryGetValue(cookieName, out var cookieToken))
+                if (isAdminHost)
                 {
-                    context.Token = cookieToken;
+                    if (context.Request.Cookies.TryGetValue("__Host-Platform-Token", out var adminToken))
+                    {
+                        context.Token = adminToken;
+                    }
+                }
+                else if (context.Request.Path.StartsWithSegments("/api/v1/c", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (context.Request.Cookies.TryGetValue("__Host-Portal-Token", out var portalToken))
+                    {
+                        context.Token = portalToken;
+                    }
+                    else if (context.Request.Cookies.TryGetValue("__Host-Staff-Token", out var staffFallbackToken))
+                    {
+                        context.Token = staffFallbackToken;
+                    }
+                }
+                else if (context.Request.Cookies.TryGetValue("__Host-Staff-Token", out var staffToken))
+                {
+                    context.Token = staffToken;
                 }
             }
 
@@ -111,7 +128,48 @@ builder.Services.AddAuthentication(options =>
                 return;
             }
 
-            if (!string.Equals(realm, "PlatformAdmin", StringComparison.Ordinal))
+            if (string.Equals(realm, "PatientPortal", StringComparison.Ordinal))
+            {
+                if (!context.HttpContext.Request.Path.StartsWithSegments("/api/v1/c", StringComparison.OrdinalIgnoreCase))
+                {
+                    context.Fail("Patient portal credentials are only permitted on portal routes.");
+                    return;
+                }
+
+                string? sub = context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier);
+                string? patientClaim = context.Principal?.FindFirst("patient_id")?.Value;
+                string? clinicClaim = context.Principal?.FindFirst("clinic_id")?.Value;
+                string? tokenStamp = context.Principal?.FindFirst("securityStamp")?.Value;
+
+                if (!Guid.TryParse(sub, out Guid accountId) ||
+                    !Guid.TryParse(patientClaim, out Guid patientId) ||
+                    !Guid.TryParse(clinicClaim, out Guid clinicGuid) ||
+                    string.IsNullOrEmpty(tokenStamp))
+                {
+                    context.Fail("Invalid patient portal token claims.");
+                    return;
+                }
+
+                var clinicContext = context.HttpContext.RequestServices.GetRequiredService<CurrentClinicContext>();
+                clinicContext.SetTenant(clinicGuid);
+
+                var db = context.HttpContext.RequestServices.GetRequiredService<CoreDbContext>();
+                var account = await db.PatientAccounts
+                    .AsNoTracking()
+                    .Where(a => a.ClinicId == clinicGuid && a.Id == accountId && a.PatientId == patientId && !a.IsVoided)
+                    .Select(a => new { a.Status, a.SecurityStamp })
+                    .FirstOrDefaultAsync(context.HttpContext.RequestAborted);
+
+                if (account == null ||
+                    account.Status != Core.Domain.PatientAccountStatus.Active ||
+                    !string.Equals(account.SecurityStamp, tokenStamp, StringComparison.Ordinal))
+                {
+                    clinicContext.Clear();
+                    context.Fail("Patient portal session is invalidated.");
+                    return;
+                }
+            }
+            else if (!string.Equals(realm, "PlatformAdmin", StringComparison.Ordinal))
             {
                 string? sub = context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier);
                 string? tokenStamp = context.Principal?.FindFirst("securityStamp")?.Value;
@@ -165,6 +223,10 @@ builder.Services.AddAuthorization(options =>
 
     options.AddPolicy("profile.self", policy =>
         policy.RequireAuthenticatedUser());
+
+    options.AddPolicy("portal.patient", policy =>
+        policy.RequireAuthenticatedUser()
+              .RequireClaim("realm", "PatientPortal"));
 });
 
 // Application & Infrastructure Services
@@ -190,9 +252,11 @@ builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<IOwnerPortfolio, OwnerPortfolioService>();
 builder.Services.AddScoped<IClinicStructureService, ClinicStructureService>();
 builder.Services.AddScoped<IPatientService, PatientService>();
+builder.Services.AddScoped<IPatientPortalQueries>(sp => (PatientService)sp.GetRequiredService<IPatientService>());
 builder.Services.AddScoped<IAvailabilityQueries, AvailabilityQueriesService>();
 builder.Services.AddScoped<ISchedulingService, SchedulingService>();
 builder.Services.AddScoped<IPortalBooking>(sp => (SchedulingService)sp.GetRequiredService<ISchedulingService>());
+builder.Services.AddScoped<ISchedulingPortalQueries>(sp => (SchedulingService)sp.GetRequiredService<ISchedulingService>());
 builder.Services.AddSingleton<ISpecialtyPlugin, DentalSpecialtyPlugin>();
 builder.Services.AddSingleton<ISpecialtyPlugin, OphthalmologySpecialtyPlugin>();
 builder.Services.AddScoped<IBillingService, BillingService>();
@@ -201,6 +265,7 @@ builder.Services.AddScoped<ITreatmentPlanService, TreatmentPlanService>();
 builder.Services.AddScoped<ITreatmentPlanPortalQueries>(sp => (TreatmentPlanService)sp.GetRequiredService<ITreatmentPlanService>());
 builder.Services.AddScoped<IClinicalService, ClinicalService>();
 builder.Services.AddScoped<IClinicalPortalQueries>(sp => (ClinicalService)sp.GetRequiredService<IClinicalService>());
+builder.Services.AddScoped<IPatientPortalService, PatientPortalService>();
 builder.Services.AddScoped<IScheduleRealtimeNotifier, Platform.Api.Hubs.SignalRScheduleRealtimeNotifier>();
 builder.Services.AddSignalR();
 

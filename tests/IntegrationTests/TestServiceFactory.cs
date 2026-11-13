@@ -112,10 +112,12 @@ public static class TestServiceFactory
         services.AddScoped<IOwnerPortfolio, OwnerPortfolioService>();
         services.AddScoped<IClinicStructureService, ClinicStructureService>();
         services.AddScoped<IPatientService, PatientService>();
+        services.AddScoped<IPatientPortalQueries>(sp => (PatientService)sp.GetRequiredService<IPatientService>());
         services.AddScoped<IScheduleRealtimeNotifier, NullScheduleRealtimeNotifier>();
         services.AddScoped<IAvailabilityQueries, AvailabilityQueriesService>();
         services.AddScoped<ISchedulingService, SchedulingService>();
         services.AddScoped<IPortalBooking>(sp => (SchedulingService)sp.GetRequiredService<ISchedulingService>());
+        services.AddScoped<ISchedulingPortalQueries>(sp => (SchedulingService)sp.GetRequiredService<ISchedulingService>());
         services.AddSingleton<ISpecialtyPlugin, DentalSpecialtyPlugin>();
         services.AddSingleton<ISpecialtyPlugin, OphthalmologySpecialtyPlugin>();
         services.AddScoped<IBillingService, BillingService>();
@@ -124,6 +126,7 @@ public static class TestServiceFactory
         services.AddScoped<ITreatmentPlanPortalQueries>(sp => (TreatmentPlanService)sp.GetRequiredService<ITreatmentPlanService>());
         services.AddScoped<IClinicalService, ClinicalService>();
         services.AddScoped<IClinicalPortalQueries>(sp => (ClinicalService)sp.GetRequiredService<IClinicalService>());
+        services.AddScoped<IPatientPortalService, PatientPortalService>();
 
         var provider = services.BuildServiceProvider();
         return (provider, emailSender);

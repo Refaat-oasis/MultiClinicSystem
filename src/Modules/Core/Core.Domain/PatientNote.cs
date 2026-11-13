@@ -13,6 +13,7 @@ public sealed class PatientNote : ITenantEntity, ISoftDeletable
     public Guid? DoctorUserId { get; private set; }
     public string NoteText { get; private set; }
     public bool IsPrivate { get; private set; }
+    public bool VisibleToPatient { get; private set; }
     public Guid CreatedByUserId { get; private set; }
     public DateTimeOffset CreatedAtUtc { get; private set; }
     public bool IsVoided { get; set; }
@@ -62,8 +63,14 @@ public sealed class PatientNote : ITenantEntity, ISoftDeletable
         DoctorUserId = doctorUserId;
         NoteText = noteText.Trim();
         IsPrivate = isPrivate;
+        VisibleToPatient = false;
         CreatedByUserId = createdByUserId;
         CreatedAtUtc = createdAtUtc;
+    }
+
+    public void SetVisibleToPatient(bool visible)
+    {
+        VisibleToPatient = !IsPrivate && visible;
     }
 
     public void Void(DateTimeOffset voidedAtUtc, string voidedBy, string? reason)

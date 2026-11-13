@@ -170,5 +170,15 @@ public interface IClinicalService
         Guid adminId,
         Guid clinicId,
         CancellationToken cancellationToken = default);
+
+    Task<Result<VisitSessionResult>> SetVisitPortalVisibilityAsync(
+        Guid userId,
+        Guid clinicId,
+        Guid visitId,
+        bool isVisibleToPatient,
+        string? deviceId,
+        string? ipAddress,
+        string? requestId,
+        CancellationToken cancellationToken = default);
 }
 

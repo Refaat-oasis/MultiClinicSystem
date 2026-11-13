@@ -171,5 +171,40 @@ public interface IPatientService
         Guid patientId,
         string reason,
         CancellationToken cancellationToken = default);
+
+    Task<Result> SetNotePortalVisibilityAsync(
+        Guid userId,
+        Guid clinicId,
+        Guid patientId,
+        Guid noteId,
+        bool visibleToPatient,
+        string? deviceId,
+        string? ipAddress,
+        string? requestId,
+        CancellationToken cancellationToken = default);
+
+    Task<Result> SetAttachmentPortalVisibilityAsync(
+        Guid userId,
+        Guid clinicId,
+        Guid patientId,
+        Guid attachmentId,
+        bool sharedWithPatient,
+        string? deviceId,
+        string? ipAddress,
+        string? requestId,
+        CancellationToken cancellationToken = default);
+
+    Task<Result> UpdatePatientPortalProfileAsync(
+        Guid userId,
+        Guid clinicId,
+        Guid patientId,
+        string? email,
+        string? bloodType,
+        string? guardianName,
+        string? guardianEmail,
+        string? deviceId,
+        string? ipAddress,
+        string? requestId,
+        CancellationToken cancellationToken = default);
 }
 

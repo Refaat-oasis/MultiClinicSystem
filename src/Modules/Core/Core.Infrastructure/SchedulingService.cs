@@ -15,7 +15,7 @@ namespace Core.Infrastructure;
 /// status state machine, rescheduling, day closures, doctor timetables, waiting queue, waiting list,
 /// portal booking contract, and Super Admin read-only inspection.
 /// </summary>
-public sealed class SchedulingService : ISchedulingService, IPortalBooking
+public sealed class SchedulingService : ISchedulingService, IPortalBooking, ISchedulingPortalQueries
 {
     private readonly CoreDbContext _dbContext;
     private readonly CurrentClinicContext _currentClinicContext;
@@ -1399,6 +1399,71 @@ public sealed class SchedulingService : ISchedulingService, IPortalBooking
         return hasConflict
             ? Result<bool>.Failure(Error.Conflict("APPOINTMENT_CONFLICT", "Doctor or room is already booked during the requested interval."))
             : Result<bool>.Success(true);
+    }
+
+    public async Task<Result<IReadOnlyList<PortalUpcomingAppointmentItemResult>>> ListUpcomingAppointmentsForPortalAsync(
+        Guid clinicId,
+        Guid patientId,
+        bool showDoctorNames,
+        CancellationToken cancellationToken = default)
+    {
+        return await ExecuteForClinicAsync(clinicId, async () =>
+        {
+            DateTimeOffset now = _clock.UtcNow;
+            List<Appointment> upcoming = await _dbContext.Appointments
+                .AsNoTracking()
+                .Where(a => a.ClinicId == clinicId
+                            && !a.IsVoided
+                            && a.PatientId == patientId
+                            && a.EndUtc >= now
+                            && (a.Status == AppointmentStatus.Booked
+                                || a.Status == AppointmentStatus.Arrived
+                                || a.Status == AppointmentStatus.Late
+                                || a.Status == AppointmentStatus.InSession))
+                .OrderBy(a => a.StartUtc)
+                .Take(50)
+                .ToListAsync(cancellationToken);
+
+            if (upcoming.Count == 0)
+            {
+                return Result<IReadOnlyList<PortalUpcomingAppointmentItemResult>>.Success(Array.Empty<PortalUpcomingAppointmentItemResult>());
+            }
+
+            HashSet<Guid> categoryIds = upcoming.Select(a => a.CategoryId).Distinct().ToHashSet();
+            Dictionary<Guid, AppointmentCategory> categories = await _dbContext.AppointmentCategories
+                .AsNoTracking()
+                .Where(c => c.ClinicId == clinicId && categoryIds.Contains(c.Id))
+                .ToDictionaryAsync(c => c.Id, cancellationToken);
+
+            Dictionary<Guid, string> doctorNames = new();
+            if (showDoctorNames)
+            {
+                HashSet<Guid> doctorIds = upcoming.Select(a => a.DoctorId).Distinct().ToHashSet();
+                doctorNames = await _dbContext.ClinicDoctors
+                    .AsNoTracking()
+                    .Where(d => d.ClinicId == clinicId && doctorIds.Contains(d.Id))
+                    .ToDictionaryAsync(d => d.Id, d => d.FullName, cancellationToken);
+            }
+
+            List<PortalUpcomingAppointmentItemResult> results = upcoming
+                .Select(a =>
+                {
+                    categories.TryGetValue(a.CategoryId, out AppointmentCategory? category);
+                    string? docName = showDoctorNames && doctorNames.TryGetValue(a.DoctorId, out string? dn) ? dn : null;
+                    return new PortalUpcomingAppointmentItemResult(
+                        a.Id,
+                        a.StartUtc,
+                        a.EndUtc,
+                        docName,
+                        category?.SpecialtyCode ?? "general",
+                        category?.NameAr ?? string.Empty,
+                        category?.NameEn ?? string.Empty,
+                        a.Status.ToString());
+                })
+                .ToList();
+
+            return Result<IReadOnlyList<PortalUpcomingAppointmentItemResult>>.Success(results);
+        });
     }
 
     private async Task<Guid?> ResolveScopedDoctorIdAsync(Guid userId, Guid clinicId, CancellationToken cancellationToken)

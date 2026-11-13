@@ -18,6 +18,7 @@ public sealed class PatientAttachment : ITenantEntity, ISoftDeletable
     public string StorageKey { get; private set; }
     public string? ThumbnailStorageKey { get; private set; }
     public string? Notes { get; private set; }
+    public bool SharedWithPatient { get; private set; }
     public Guid UploadedByUserId { get; private set; }
     public DateTimeOffset CreatedAtUtc { get; private set; }
     public bool IsVoided { get; set; }
@@ -86,8 +87,14 @@ public sealed class PatientAttachment : ITenantEntity, ISoftDeletable
         StorageKey = storageKey.Trim();
         ThumbnailStorageKey = string.IsNullOrWhiteSpace(thumbnailStorageKey) ? null : thumbnailStorageKey.Trim();
         Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
+        SharedWithPatient = false;
         UploadedByUserId = uploadedByUserId;
         CreatedAtUtc = createdAtUtc;
+    }
+
+    public void SetSharedWithPatient(bool shared)
+    {
+        SharedWithPatient = shared;
     }
 
     public void Void(DateTimeOffset voidedAtUtc, string voidedBy, string? reason)

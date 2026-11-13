@@ -523,22 +523,32 @@ public sealed class ModuleCatalogService : IModuleCatalogService
                 ModuleKey: "portal",
                 TitleAr: "بوابة المريض",
                 TitleEn: "Patient Portal",
-                DescriptionAr: "عرض السجلات والنتائج والفواتير للمريض.",
-                DescriptionEn: "Patient self-service portal for visits, files, and bills.",
+                DescriptionAr: "عرض السجلات والنتائج وخطط العلاج للمريض.",
+                DescriptionEn: "Patient self-service portal for visits, medical records, files, and treatment plans.",
                 Prerequisites: ["patients"],
                 Permissions:
                 [
-                    new("portal.manage", "portal", "Patient Portal", "إدارة بوابة المريض", "Manage Patient Portal", false)
+                    new("portal.invite", "portal", "Patient Portal", "دعوة وإدارة حسابات البوابة", "Invite & Manage Portal Accounts", false),
+                    new("portal.manage", "portal", "Patient Portal", "إدارة بوابة المريض", "Manage Patient Portal Settings", false),
+                    new("portal.dashboard.view", "portal", "Patient Portal", "عرض لوحة بوابة المريض", "View Portal Dashboard", false)
                 ],
                 MenuItems:
                 [
-                    new("portal.settings", "portal", "بوابة المريض", "Patient Portal", "/portal-admin", "portal.manage", 240)
+                    new("portal.dashboard", "portal", "لوحة بوابة المريض", "Portal Dashboard", "/portal/dashboard", "portal.dashboard.view", 238),
+                    new("portal.settings", "portal", "إعدادات بوابة المريض", "Patient Portal", "/portal-admin", "portal.manage", 240)
                 ],
                 SettingsSections:
                 [
                     new("portal-settings", "إعدادات بوابة المريض", "Patient Portal Settings", "clinic.settings.edit", "portal")
                 ],
-                DashboardWidgets: Array.Empty<DashboardWidgetDefinitionResult>()),
+                DashboardWidgets:
+                [
+                    new("portal.accounts-summary", "portal", "portal.dashboard.view", "Clinic", "حسابات بوابة المريض", "Portal Accounts Summary"),
+                    new("portal.logins-week", "portal", "portal.dashboard.view", "Clinic", "تسجيلات الدخول الأسبوعية", "Portal Logins This Week"),
+                    new("portal.failed-logins", "portal", "portal.dashboard.view", "Clinic", "محاولات الدخول الفاشلة", "Portal Failed Logins"),
+                    new("portal.record-views-month", "portal", "portal.dashboard.view", "Clinic", "قراءات السجلات هذا الشهر", "Patients Viewing Records This Month"),
+                    new("portal.access-log-summary", "portal", "portal.dashboard.view", "Clinic", "ملخص سجل وصول البوابة", "Portal Access Log Summary")
+                ]),
 
             new ModuleManifestEntry(
                 ModuleKey: "portal-booking",

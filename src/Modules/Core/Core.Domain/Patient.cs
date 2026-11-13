@@ -22,6 +22,10 @@ public sealed class Patient : ITenantEntity, ISoftDeletable
     public string? Address { get; private set; }
     public Guid? AssignedDoctorId { get; private set; }
     public string? PrimarySpecialtyCode { get; private set; }
+    public string? Email { get; private set; }
+    public string? BloodType { get; private set; }
+    public string? GuardianName { get; private set; }
+    public string? GuardianEmail { get; private set; }
     public bool IsMedicalHistoryReviewed { get; private set; }
     public string? MedicalHistorySummary { get; private set; }
     public string ChronicConditionsJson { get; private set; }
@@ -178,6 +182,20 @@ public sealed class Patient : ITenantEntity, ISoftDeletable
 
         LastHistoryUpdatedByUserId = updatedByUserId;
         LastHistoryUpdatedAtUtc = updatedAtUtc;
+        UpdatedAtUtc = updatedAtUtc;
+    }
+
+    public void SetPortalProfile(
+        string? email,
+        string? bloodType,
+        string? guardianName,
+        string? guardianEmail,
+        DateTimeOffset updatedAtUtc)
+    {
+        Email = string.IsNullOrWhiteSpace(email) ? null : email.Trim().ToLowerInvariant();
+        BloodType = string.IsNullOrWhiteSpace(bloodType) ? null : bloodType.Trim().ToUpperInvariant();
+        GuardianName = string.IsNullOrWhiteSpace(guardianName) ? null : guardianName.Trim();
+        GuardianEmail = string.IsNullOrWhiteSpace(guardianEmail) ? null : guardianEmail.Trim().ToLowerInvariant();
         UpdatedAtUtc = updatedAtUtc;
     }
 
