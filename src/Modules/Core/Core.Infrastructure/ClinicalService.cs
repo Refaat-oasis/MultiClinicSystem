@@ -133,6 +133,7 @@ public sealed class ClinicalService : IClinicalService, IClinicalPortalQueries
             Guid? roomId = input.RoomId;
             string specialtyCode = string.IsNullOrWhiteSpace(input.SpecialtyCode) ? "general" : input.SpecialtyCode.Trim().ToLowerInvariant();
             int plannedMinutes = input.PlannedDurationMinutes ?? 20;
+            Guid? categoryId = input.CategoryId;
 
             if (input.AppointmentId.HasValue && input.AppointmentId.Value != Guid.Empty)
             {
@@ -151,6 +152,7 @@ public sealed class ClinicalService : IClinicalService, IClinicalPortalQueries
                 patientId = appointment.PatientId;
                 doctorId = appointment.DoctorId;
                 roomId ??= appointment.RoomId;
+                categoryId ??= appointment.CategoryId;
                 plannedMinutes = Math.Max(5, (int)Math.Round((appointment.EndUtc - appointment.StartUtc).TotalMinutes));
 
                 AppointmentCategory? cat = await _dbContext.AppointmentCategories
@@ -214,6 +216,7 @@ public sealed class ClinicalService : IClinicalService, IClinicalPortalQueries
                 input.IsVisibleToPatient,
                 input.OperationId,
                 now);
+            visit.SetCategoryId(categoryId);
 
             _dbContext.Visits.Add(visit);
 
@@ -1037,16 +1040,23 @@ public sealed class ClinicalService : IClinicalService, IClinicalPortalQueries
 
             if (!alreadyOutboxed)
             {
+                int rawMinutes = Math.Max(1, (int)Math.Round((now - visit.StartedAtUtc).TotalMinutes, MidpointRounding.AwayFromZero));
                 string payload = JsonSerializer.Serialize(new
                 {
                     VisitId = visit.Id,
                     visit.ClinicId,
                     visit.AppointmentId,
+                    visit.CategoryId,
                     visit.PatientId,
                     visit.DoctorId,
                     visit.SpecialtyCode,
+                    RawMinutes = rawMinutes,
+                    visit.PlannedDurationMinutes,
                     visit.OvertimeMinutes,
+                    visit.IsOvertimeExcused,
+                    visit.OvertimeExcuseReason,
                     CompletedAtUtc = now,
+                    visit.OperationId,
                     ToolsUsed = input.ToolsUsed
                 });
                 _dbContext.OutboxMessages.Add(new OutboxMessage(GuidV7.NewGuid(), "SessionCompleted", payload, now));

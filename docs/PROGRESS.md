@@ -492,3 +492,27 @@ Status: 0 Errors, Clean Build
 - [x] Low-stock, near-expiry, and negative-stock alerts fire without duplication and honor clinic `NegativeStockPolicy` (`Block` vs `AllowWithWarning`).
 - [x] Inventory dashboard widgets match live stock/usage/valuation data and disappear cleanly when `"inventory"` is turned off without affecting unrelated modules.
 - [x] Phases 0 to 12 cumulative gates, architecture/RLS sweeps, and frontend test/lint/build pass 100% green.
+
+
+---
+
+## Phase 13: Adaptive Time Engine (Completed) (DONE)
+- **Branch**: `phase-13/time-engine`
+- **Completed Tasks**:
+  - **Contracts & Domain (`Core.Contracts`, `Core.Domain`)**: Added `ITimeEngineDurationProvider`, `TimeEngineSample`, `TimeEngineCalculationInput`, `TimeEngineCalculationResult`, `TimeEngineCalculator` (minimum sample threshold, symmetric outlier trimming, bounded step limit against baseline, `allowStepAdvance` guard), `SessionDuration`, `CategoryTimeStat`, `DoctorTimeEngineSetting`, and `ClinicTimeEngineSetting`; extended `Visit` (`CategoryId`) and `AvailabilityCalculator.ComputeFreeSlots` (`durationOverridesByDoctor`), plus 5 unit tests in `TimeEngineDomainTests`.
+  - **Application & Infrastructure (`Core.Application`, `Core.Infrastructure`)**: Added `ITimeEngineService` and 8 single-file input/result records; implemented `TimeEngineService` (`time_engine` schema tables with EF global query filters and SQL Server RLS `FILTER`/`BLOCK` predicates in `CoreDbContext`); wired `ClinicalService.CompleteVisitAsync` -> `OutboxService` (`"SessionCompleted"`) -> `TimeEngineService.ProcessCompletedSessionAsync` with `OperationId` idempotency; integrated `ITimeEngineDurationProvider` into `SchedulingService.BookAppointmentAsync` (`EndUtc == null`) and `AvailabilityQueriesService`; added `"time-engine"` manifest and 4 live `time-engine.*` widgets (`avg-wait`, `suggested-vs-applied`, `sample-counts`, `adoption-rate`) in `ModuleCatalogService` and `DashboardService`.
+  - **API & Inspect (`Platform.Api`)**: Added `TimeEngineController`, extended `ClinicalController` / `StartVisitDto` with `CategoryId`, added `PlatformClinicsController.InspectTimeEngine`, single-type DTOs/ViewModels & `TimeEngineViewModelMapper`, `Phase13TimeEngineTests`, and `Phase13Gate`.
+  - **Frontend (`web/`)**: Added `Phase13TimeEngineScreen.tsx` + `Phase13TimeEngineScreen.test.tsx` (stats table, session excused toggle, per-doctor engine toggle, clinic tuning settings, dashboard tiles, and Super Admin `readOnlyInspectMode`), mounted in `web/apps/clinic/src/App.tsx` (`timeEngine` tab) and `web/apps/admin/src/InspectClinicShell.tsx`.
+- **Verification Output Summary**:
+  - `dotnet test tests/UnitTests/UnitTests.csproj --no-restore`: `Passed! - Failed: 0, Passed: 162, Skipped: 0, Total: 162`
+  - `dotnet test tests/ArchitectureTests/ArchitectureTests.csproj --no-restore`: `Passed! - Failed: 0, Passed: 15, Skipped: 0, Total: 15`
+  - `dotnet test tests/IntegrationTests/IntegrationTests.csproj --no-restore`: `Passed! - Failed: 0, Passed: 33, Skipped: 0, Total: 33`
+  - `dotnet test tests/Gates/Gates.csproj --no-restore` (Phases 0–13 cumulative): `Passed! - Failed: 0, Passed: 26, Skipped: 0, Total: 26`
+  - Frontend `npm --prefix web test; npm --prefix web run lint; npm --prefix web run build`: `56/56` Vitest tests passed (`admin-app`: 7, `clinic-app`: 5, `api-client`: 3, `ui`: 3, `feature-core`: 38), `tsc --noEmit` 0 errors, Vite production builds succeeded for both apps.
+
+### Phase 13 Exit Checklist
+- [x] Category statistics require `MinSampleSize` unexcused sessions before learning and trim extreme outliers symmetrically.
+- [x] Step cap limits per-recalculation duration shifts (`MaxStepChangePercent`), and excused overtime sessions never distort averages or trigger step advances.
+- [x] Per-doctor time-engine toggle disables learned overrides immediately on bookings (`EndUtc == null`) and `free-slots`, reverting to category defaults.
+- [x] Disabling `time-engine` returns `403 MODULE_DISABLED` cleanly without disrupting clinical visits or staff scheduling.
+- [x] Phases 0 to 13 cumulative gates, SQL Server RLS/architecture sweeps, and frontend test/lint/build pass 100% green.

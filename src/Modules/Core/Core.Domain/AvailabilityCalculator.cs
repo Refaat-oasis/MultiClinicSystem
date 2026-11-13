@@ -77,7 +77,8 @@ public static class AvailabilityCalculator
         IReadOnlyList<AvailabilityDoctorProfile> doctors,
         IReadOnlyList<AvailabilityWorkingHourWindow> workingHours,
         IReadOnlyList<AvailabilityDayOffRange> daysOff,
-        IReadOnlyList<AvailabilityBusyInterval> busyIntervals)
+        IReadOnlyList<AvailabilityBusyInterval> busyIntervals,
+        IReadOnlyDictionary<Guid, int>? durationOverridesByDoctor = null)
     {
         if (toUtc <= fromUtc || durationMinutes <= 0 || slotStepMinutes <= 0 || doctors.Count == 0)
         {
@@ -128,11 +129,17 @@ public static class AvailabilityCalculator
                 DateTimeOffset utcWindowStart = new(localWindowStart, clinicTimeZone.GetUtcOffset(localWindowStart));
                 DateTimeOffset utcWindowEnd = new(localWindowEnd, clinicTimeZone.GetUtcOffset(localWindowEnd));
 
+                int doctorDuration = durationOverridesByDoctor != null &&
+                                     durationOverridesByDoctor.TryGetValue(doctor.DoctorId, out int customDuration) &&
+                                     customDuration >= 5
+                    ? customDuration
+                    : durationMinutes;
+
                 for (DateTimeOffset candidateStart = utcWindowStart;
-                     candidateStart.AddMinutes(durationMinutes) <= utcWindowEnd;
+                     candidateStart.AddMinutes(doctorDuration) <= utcWindowEnd;
                      candidateStart = candidateStart.AddMinutes(slotStepMinutes))
                 {
-                    DateTimeOffset candidateEnd = candidateStart.AddMinutes(durationMinutes);
+                    DateTimeOffset candidateEnd = candidateStart.AddMinutes(doctorDuration);
                     if (candidateStart < effectiveFromUtc || candidateEnd > toUtc)
                     {
                         continue;

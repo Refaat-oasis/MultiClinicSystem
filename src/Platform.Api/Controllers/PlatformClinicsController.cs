@@ -362,6 +362,24 @@ public sealed class PlatformClinicsController : ControllerBase
             : Ok(InventoryViewModelMapper.ToViewModel(result.Value));
     }
 
+    [HttpGet("{clinicId:guid}/inspect/time-engine")]
+    [ProducesResponseType(typeof(ClinicTimeEngineInspectViewModel), StatusCodes.Status200OK)]
+    public async Task<IActionResult> InspectTimeEngine(
+        Guid clinicId,
+        [FromServices] ITimeEngineService timeEngineService,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetAdminId(out Guid adminId))
+        {
+            return Unauthorized();
+        }
+
+        var result = await timeEngineService.InspectClinicTimeEngineAsync(adminId, clinicId, cancellationToken);
+        return result.IsFailure
+            ? ProblemDetailsMapper.ToProblemDetails(result.Error)
+            : Ok(TimeEngineViewModelMapper.ToViewModel(result.Value));
+    }
+
     [HttpPost("{clinicId:guid}/inspect/{*subpath}")]
     [HttpPut("{clinicId:guid}/inspect/{*subpath}")]
     [HttpDelete("{clinicId:guid}/inspect/{*subpath}")]

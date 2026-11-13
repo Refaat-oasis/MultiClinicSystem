@@ -72,36 +72,76 @@ public sealed class OutboxService : IOutbox
                 {
                     using var doc = JsonDocument.Parse(message.Content);
                     if (doc.RootElement.TryGetProperty("VisitId", out JsonElement visitIdEl) &&
+                        visitIdEl.ValueKind == JsonValueKind.String &&
                         visitIdEl.TryGetGuid(out Guid visitId) &&
                         doc.RootElement.TryGetProperty("ClinicId", out JsonElement clinicIdEl) &&
-                        clinicIdEl.TryGetGuid(out Guid clinicId) &&
-                        doc.RootElement.TryGetProperty("ToolsUsed", out JsonElement toolsEl) &&
-                        toolsEl.ValueKind == JsonValueKind.Array)
+                        clinicIdEl.ValueKind == JsonValueKind.String &&
+                        clinicIdEl.TryGetGuid(out Guid clinicId))
                     {
-                        var toolsUsed = new List<VisitToolUsageInput>();
-                        foreach (JsonElement itemEl in toolsEl.EnumerateArray())
+                        if (doc.RootElement.TryGetProperty("ToolsUsed", out JsonElement toolsEl) &&
+                            toolsEl.ValueKind == JsonValueKind.Array)
                         {
-                            if (itemEl.TryGetProperty("InventoryItemId", out JsonElement itemIdEl) &&
-                                itemIdEl.TryGetGuid(out Guid itemId) &&
-                                itemEl.TryGetProperty("Quantity", out JsonElement qtyEl) &&
-                                qtyEl.TryGetDecimal(out decimal qty) &&
-                                qty > 0m)
+                            var toolsUsed = new List<VisitToolUsageInput>();
+                            foreach (JsonElement itemEl in toolsEl.EnumerateArray())
                             {
-                                decimal? priceOverride = itemEl.TryGetProperty("PatientUnitPriceOverride", out JsonElement ovEl) &&
-                                    ovEl.ValueKind == JsonValueKind.Number
-                                    ? ovEl.GetDecimal()
-                                    : null;
-                                toolsUsed.Add(new VisitToolUsageInput(itemId, qty, priceOverride));
+                                if (itemEl.TryGetProperty("InventoryItemId", out JsonElement itemIdEl) &&
+                                    itemIdEl.ValueKind == JsonValueKind.String &&
+                                    itemIdEl.TryGetGuid(out Guid itemId) &&
+                                    itemEl.TryGetProperty("Quantity", out JsonElement qtyEl) &&
+                                    qtyEl.TryGetDecimal(out decimal qty) &&
+                                    qty > 0m)
+                                {
+                                    decimal? priceOverride = itemEl.TryGetProperty("PatientUnitPriceOverride", out JsonElement ovEl) &&
+                                        ovEl.ValueKind == JsonValueKind.Number
+                                        ? ovEl.GetDecimal()
+                                        : null;
+                                    toolsUsed.Add(new VisitToolUsageInput(itemId, qty, priceOverride));
+                                }
+                            }
+
+                            if (toolsUsed.Count > 0)
+                            {
+                                IInventoryService? inventoryService = _serviceProvider.GetService<IInventoryService>();
+                                if (inventoryService != null)
+                                {
+                                    await inventoryService.ConsumeVisitToolsAsync(
+                                        clinicId, visitId, "outbox", toolsUsed, null, cancellationToken);
+                                }
                             }
                         }
 
-                        if (toolsUsed.Count > 0)
+                        if (doc.RootElement.TryGetProperty("DoctorId", out JsonElement doctorIdEl) &&
+                            doctorIdEl.ValueKind == JsonValueKind.String &&
+                            doctorIdEl.TryGetGuid(out Guid doctorId) &&
+                            doc.RootElement.TryGetProperty("CategoryId", out JsonElement categoryIdEl) &&
+                            categoryIdEl.ValueKind == JsonValueKind.String &&
+                            categoryIdEl.TryGetGuid(out Guid categoryId) &&
+                            categoryId != Guid.Empty)
                         {
-                            IInventoryService? inventoryService = _serviceProvider.GetService<IInventoryService>();
-                            if (inventoryService != null)
+                            int rawMinutes = doc.RootElement.TryGetProperty("RawMinutes", out JsonElement rawEl) && rawEl.ValueKind == JsonValueKind.Number && rawEl.TryGetInt32(out int rm) ? rm : 0;
+                            int plannedMinutes = doc.RootElement.TryGetProperty("PlannedDurationMinutes", out JsonElement planEl) && planEl.ValueKind == JsonValueKind.Number && planEl.TryGetInt32(out int pm) ? pm : 0;
+                            bool isExcused = doc.RootElement.TryGetProperty("IsOvertimeExcused", out JsonElement exEl) && exEl.ValueKind == JsonValueKind.True;
+                            string? excuseReason = doc.RootElement.TryGetProperty("OvertimeExcuseReason", out JsonElement rsnEl) && rsnEl.ValueKind == JsonValueKind.String ? rsnEl.GetString() : null;
+                            DateTimeOffset occurredAt = doc.RootElement.TryGetProperty("CompletedAtUtc", out JsonElement tsEl) && tsEl.ValueKind == JsonValueKind.String && tsEl.TryGetDateTimeOffset(out DateTimeOffset dt)
+                                ? dt
+                                : _clock.UtcNow;
+                            Guid? operationId = doc.RootElement.TryGetProperty("OperationId", out JsonElement opEl) && opEl.ValueKind == JsonValueKind.String && opEl.TryGetGuid(out Guid opId) ? opId : null;
+
+                            ITimeEngineService? timeEngineService = _serviceProvider.GetService<ITimeEngineService>();
+                            if (timeEngineService != null)
                             {
-                                await inventoryService.ConsumeVisitToolsAsync(
-                                    clinicId, visitId, "outbox", toolsUsed, null, cancellationToken);
+                                await timeEngineService.ProcessCompletedSessionAsync(
+                                    clinicId,
+                                    visitId,
+                                    doctorId,
+                                    categoryId,
+                                    rawMinutes,
+                                    plannedMinutes,
+                                    isExcused,
+                                    excuseReason,
+                                    occurredAt,
+                                    operationId,
+                                    cancellationToken);
                             }
                         }
                     }

@@ -267,6 +267,8 @@ builder.Services.AddScoped<IClinicalService, ClinicalService>();
 builder.Services.AddScoped<IClinicalPortalQueries>(sp => (ClinicalService)sp.GetRequiredService<IClinicalService>());
 builder.Services.AddScoped<IPatientPortalService, PatientPortalService>();
 builder.Services.AddScoped<IInventoryService, InventoryService>();
+builder.Services.AddScoped<ITimeEngineService, TimeEngineService>();
+builder.Services.AddScoped<ITimeEngineDurationProvider>(sp => (TimeEngineService)sp.GetRequiredService<ITimeEngineService>());
 builder.Services.AddScoped<IScheduleRealtimeNotifier, Platform.Api.Hubs.SignalRScheduleRealtimeNotifier>();
 builder.Services.AddSignalR();
 

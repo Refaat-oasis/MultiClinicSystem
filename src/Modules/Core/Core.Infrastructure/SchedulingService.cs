@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Text.Json;
 using BuildingBlocks.Application;
 using BuildingBlocks.Domain;
+using Core.Contracts;
 using Core.Application;
 using Core.Domain;
 using Microsoft.Data.SqlClient;
@@ -24,6 +25,7 @@ public sealed class SchedulingService : ISchedulingService, IPortalBooking, ISch
     private readonly IAuditService _auditService;
     private readonly IScheduleRealtimeNotifier _realtimeNotifier;
     private readonly IClock _clock;
+    private readonly ITimeEngineDurationProvider? _timeEngineDurationProvider;
 
     public SchedulingService(
         CoreDbContext dbContext,
@@ -32,7 +34,8 @@ public sealed class SchedulingService : ISchedulingService, IPortalBooking, ISch
         IPlatformAccess platformAccess,
         IAuditService auditService,
         IScheduleRealtimeNotifier realtimeNotifier,
-        IClock clock)
+        IClock clock,
+        ITimeEngineDurationProvider? timeEngineDurationProvider = null)
     {
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _currentClinicContext = currentClinicContext ?? throw new ArgumentNullException(nameof(currentClinicContext));
@@ -41,6 +44,7 @@ public sealed class SchedulingService : ISchedulingService, IPortalBooking, ISch
         _auditService = auditService ?? throw new ArgumentNullException(nameof(auditService));
         _realtimeNotifier = realtimeNotifier ?? throw new ArgumentNullException(nameof(realtimeNotifier));
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
+        _timeEngineDurationProvider = timeEngineDurationProvider;
     }
 
     public async Task<Result<ClinicSchedulingSettingResult>> GetSchedulingSettingsAsync(
@@ -1393,7 +1397,21 @@ public sealed class SchedulingService : ISchedulingService, IPortalBooking, ISch
                 }
             }
 
-            DateTimeOffset endUtc = input.EndUtc ?? input.StartUtc.AddMinutes(category.DefaultDurationMinutes);
+            int effectiveDurationMinutes = category.DefaultDurationMinutes;
+            if (!input.EndUtc.HasValue && _timeEngineDurationProvider != null)
+            {
+                int? appliedDuration = await _timeEngineDurationProvider.GetAppliedDurationMinutesAsync(
+                    clinicId,
+                    doctor.Id,
+                    category.Id,
+                    cancellationToken);
+                if (appliedDuration.HasValue)
+                {
+                    effectiveDurationMinutes = appliedDuration.Value;
+                }
+            }
+
+            DateTimeOffset endUtc = input.EndUtc ?? input.StartUtc.AddMinutes(effectiveDurationMinutes);
             if (endUtc <= input.StartUtc)
             {
                 return Result<AppointmentItemResult>.Failure(Error.Validation("INVALID_INTERVAL", "EndUtc must be after StartUtc."));

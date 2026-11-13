@@ -12,5 +12,6 @@ public sealed record StartVisitInput(
     Guid? RoomId,
     int? PlannedDurationMinutes,
     bool IsVisibleToPatient,
-    Guid? OperationId);
+    Guid? OperationId,
+    Guid? CategoryId = null);
 
