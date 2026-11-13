@@ -969,6 +969,192 @@ public sealed class DashboardService : IDashboardService
                     breakdown["totalActiveDoctors"] = doctors.Count;
                     break;
                 }
+                case "finance.income-vs-expenses":
+                {
+                    unit = "amount";
+                    DateOnly startDate = DateOnly.FromDateTime(start.UtcDateTime);
+                    DateOnly endDate = DateOnly.FromDateTime(end.UtcDateTime);
+
+                    List<LedgerEntry> ledgerRows = await _dbContext.LedgerEntries
+                        .AsNoTracking()
+                        .Where(l => l.ClinicId == clinicId && l.OccurredAtUtc >= start && l.OccurredAtUtc <= end)
+                        .ToListAsync(cancellationToken);
+
+                    decimal grossPayments = ledgerRows.Where(l => l.EntryType == LedgerEntryType.Payment).Sum(l => -l.SignedAmount);
+                    decimal refunds = ledgerRows.Where(l => l.EntryType == LedgerEntryType.Refund).Sum(l => l.SignedAmount);
+
+                    List<Expense> expenses = await _dbContext.Expenses
+                        .AsNoTracking()
+                        .Where(e => e.ClinicId == clinicId && !e.IsVoided && e.OccurredAtUtc >= start && e.OccurredAtUtc <= end)
+                        .ToListAsync(cancellationToken);
+                    decimal operatingExpenses = expenses.Where(e => e.CountsAsCashOut).Sum(e => e.Amount);
+                    decimal supplierAccruals = expenses.Where(e => !e.CountsAsCashOut).Sum(e => e.Amount);
+
+                    decimal supplierPayments = await _dbContext.SupplierPayments
+                        .AsNoTracking()
+                        .Where(sp => sp.ClinicId == clinicId && sp.PaidAtUtc >= start && sp.PaidAtUtc <= end)
+                        .SumAsync(sp => (decimal?)sp.Amount, cancellationToken) ?? 0m;
+
+                    List<FixedCost> fixedDefs = await _dbContext.FixedCosts
+                        .AsNoTracking()
+                        .Where(fc => fc.ClinicId == clinicId && !fc.IsVoided && fc.IsActive)
+                        .ToListAsync(cancellationToken);
+                    decimal fixedCostsTotal = FinanceCalculator.ExpandFixedCosts(fixedDefs, startDate, endDate).Sum(o => o.Amount);
+
+                    List<PayrollRun> payrollRuns = await _dbContext.PayrollRuns
+                        .AsNoTracking()
+                        .Where(pr => pr.ClinicId == clinicId && !pr.IsVoided && pr.Status == PayrollRunStatus.Finalized)
+                        .ToListAsync(cancellationToken);
+                    int startYm = (startDate.Year * 12) + startDate.Month;
+                    int endYm = (endDate.Year * 12) + endDate.Month;
+                    decimal payrollTotal = payrollRuns
+                        .Where(pr => ((pr.PeriodYear * 12) + pr.PeriodMonth) >= startYm && ((pr.PeriodYear * 12) + pr.PeriodMonth) <= endYm)
+                        .Sum(pr => pr.TotalNetPay);
+
+                    var summary = FinanceCalculator.ComputeIncomeVsExpenses(
+                        grossPayments,
+                        refunds,
+                        operatingExpenses,
+                        supplierPayments,
+                        supplierAccruals,
+                        fixedCostsTotal,
+                        payrollTotal);
+
+                    primary = summary.NetProfit;
+                    breakdown["netIncome"] = summary.NetIncome;
+                    breakdown["operatingExpenses"] = summary.OperatingExpenses;
+                    breakdown["supplierPayments"] = summary.SupplierPayments;
+                    breakdown["fixedCostsTotal"] = summary.FixedCostsTotal;
+                    breakdown["payrollTotal"] = summary.PayrollTotal;
+                    breakdown["totalExpenses"] = summary.TotalExpenses;
+                    breakdown["netProfit"] = summary.NetProfit;
+                    break;
+                }
+                case "finance.supplier-balances":
+                {
+                    unit = "amount";
+                    int supplierCount = await _dbContext.Suppliers
+                        .AsNoTracking()
+                        .CountAsync(s => s.ClinicId == clinicId && !s.IsVoided, cancellationToken);
+                    decimal accrued = await _dbContext.Expenses
+                        .AsNoTracking()
+                        .Where(e => e.ClinicId == clinicId && !e.IsVoided && e.SupplierId.HasValue && !e.CountsAsCashOut)
+                        .SumAsync(e => (decimal?)e.Amount, cancellationToken) ?? 0m;
+                    decimal paid = await _dbContext.SupplierPayments
+                        .AsNoTracking()
+                        .Where(sp => sp.ClinicId == clinicId)
+                        .SumAsync(sp => (decimal?)sp.Amount, cancellationToken) ?? 0m;
+                    decimal balanceDue = Math.Round(accrued - paid, 2, MidpointRounding.AwayFromZero);
+
+                    primary = balanceDue;
+                    breakdown["accrued"] = Math.Round(accrued, 2, MidpointRounding.AwayFromZero);
+                    breakdown["paid"] = Math.Round(paid, 2, MidpointRounding.AwayFromZero);
+                    breakdown["supplierCount"] = supplierCount;
+                    break;
+                }
+                case "finance.fixed-costs-due":
+                {
+                    unit = "amount";
+                    DateOnly startDate = DateOnly.FromDateTime(start.UtcDateTime);
+                    DateOnly endDate = DateOnly.FromDateTime(end.UtcDateTime);
+                    List<FixedCost> defs = await _dbContext.FixedCosts
+                        .AsNoTracking()
+                        .Where(fc => fc.ClinicId == clinicId && !fc.IsVoided && fc.IsActive)
+                        .ToListAsync(cancellationToken);
+                    var occurrences = FinanceCalculator.ExpandFixedCosts(defs, startDate, endDate);
+                    decimal totalDue = Math.Round(occurrences.Sum(o => o.Amount), 2, MidpointRounding.AwayFromZero);
+
+                    primary = totalDue;
+                    breakdown["occurrencesCount"] = occurrences.Count;
+                    breakdown["activeDefinitions"] = defs.Count;
+                    break;
+                }
+                case "finance.payroll-summary":
+                {
+                    unit = "amount";
+                    DateOnly startDate = DateOnly.FromDateTime(start.UtcDateTime);
+                    DateOnly endDate = DateOnly.FromDateTime(end.UtcDateTime);
+                    int startYm = (startDate.Year * 12) + startDate.Month;
+                    int endYm = (endDate.Year * 12) + endDate.Month;
+
+                    int activeEmployees = await _dbContext.Employees
+                        .AsNoTracking()
+                        .CountAsync(e => e.ClinicId == clinicId && !e.IsVoided && e.IsActive, cancellationToken);
+                    List<PayrollRun> runs = await _dbContext.PayrollRuns
+                        .AsNoTracking()
+                        .Where(r => r.ClinicId == clinicId && !r.IsVoided)
+                        .ToListAsync(cancellationToken);
+                    List<PayrollRun> inRange = runs
+                        .Where(r => ((r.PeriodYear * 12) + r.PeriodMonth) >= startYm && ((r.PeriodYear * 12) + r.PeriodMonth) <= endYm)
+                        .ToList();
+                    List<PayrollRun> finalized = inRange.Where(r => r.Status == PayrollRunStatus.Finalized).ToList();
+
+                    decimal totalNet = Math.Round(finalized.Sum(r => r.TotalNetPay), 2, MidpointRounding.AwayFromZero);
+                    primary = totalNet;
+                    breakdown["finalizedRuns"] = finalized.Count;
+                    breakdown["draftRuns"] = inRange.Count(r => r.Status == PayrollRunStatus.Draft);
+                    breakdown["activeEmployees"] = activeEmployees;
+                    breakdown["totalBaseSalary"] = Math.Round(finalized.Sum(r => r.TotalBaseSalary), 2, MidpointRounding.AwayFromZero);
+                    breakdown["totalBonuses"] = Math.Round(finalized.Sum(r => r.TotalBonuses), 2, MidpointRounding.AwayFromZero);
+                    breakdown["totalDeductions"] = Math.Round(finalized.Sum(r => r.TotalDeductions), 2, MidpointRounding.AwayFromZero);
+                    breakdown["totalAdvances"] = Math.Round(finalized.Sum(r => r.TotalAdvances), 2, MidpointRounding.AwayFromZero);
+                    break;
+                }
+                case "reports.exports-run":
+                {
+                    unit = "exports";
+                    List<ReportExportLog> exports = await _dbContext.ReportExportLogs
+                        .AsNoTracking()
+                        .Where(l => l.ClinicId == clinicId && l.ExportedAtUtc >= start && l.ExportedAtUtc <= end)
+                        .ToListAsync(cancellationToken);
+
+                    primary = exports.Count;
+                    breakdown["excelExports"] = exports.Count(l => l.Format == ReportExportFormat.Excel);
+                    breakdown["pdfExports"] = exports.Count(l => l.Format == ReportExportFormat.Pdf);
+                    break;
+                }
+                case "reports.scheduled-reports":
+                {
+                    unit = "schedules";
+                    List<ScheduledReportConfig> configs = await _dbContext.ScheduledReportConfigs
+                        .AsNoTracking()
+                        .Where(c => c.ClinicId == clinicId && !c.IsVoided)
+                        .ToListAsync(cancellationToken);
+
+                    int enabled = configs.Count(c => c.IsEnabled);
+                    primary = enabled;
+                    breakdown["activeConfigs"] = enabled;
+                    breakdown["totalConfigs"] = configs.Count;
+                    break;
+                }
+                case "excel-import.history":
+                {
+                    unit = "imports";
+                    List<ImportBatchLog> logs = await _dbContext.ImportBatchLogs
+                        .AsNoTracking()
+                        .Where(b => b.ClinicId == clinicId && b.ExecutedAtUtc >= start && b.ExecutedAtUtc <= end)
+                        .ToListAsync(cancellationToken);
+
+                    primary = logs.Count;
+                    breakdown["committedBatches"] = logs.Count(b => b.IsCommitted);
+                    breakdown["totalRowsProcessed"] = logs.Sum(b => b.TotalRows);
+                    breakdown["acceptedRows"] = logs.Where(b => b.IsCommitted).Sum(b => b.AcceptedRows);
+                    break;
+                }
+                case "excel-import.rejected-rows":
+                {
+                    unit = "rows";
+                    List<ImportBatchLog> logs = await _dbContext.ImportBatchLogs
+                        .AsNoTracking()
+                        .Where(b => b.ClinicId == clinicId && b.ExecutedAtUtc >= start && b.ExecutedAtUtc <= end)
+                        .ToListAsync(cancellationToken);
+
+                    int rejected = logs.Sum(b => b.RejectedRows);
+                    primary = rejected;
+                    breakdown["batchesWithErrors"] = logs.Count(b => b.RejectedRows > 0);
+                    breakdown["acceptedRows"] = logs.Sum(b => b.AcceptedRows);
+                    break;
+                }
                 default:
                 {
                     breakdown["configured"] = 1m;

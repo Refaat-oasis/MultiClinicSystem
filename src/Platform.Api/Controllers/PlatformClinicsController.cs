@@ -380,6 +380,28 @@ public sealed class PlatformClinicsController : ControllerBase
             : Ok(TimeEngineViewModelMapper.ToViewModel(result.Value));
     }
 
+    [HttpGet("{clinicId:guid}/inspect/finance-reports")]
+    [ProducesResponseType(typeof(ClinicFinanceReportsInspectViewModel), StatusCodes.Status200OK)]
+    public async Task<IActionResult> InspectFinanceReports(
+        Guid clinicId,
+        [FromQuery] DateOnly? fromDate,
+        [FromQuery] DateOnly? toDate,
+        [FromServices] IReportsService reportsService,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetAdminId(out Guid adminId))
+        {
+            return Unauthorized();
+        }
+
+        DateOnly end = toDate ?? DateOnly.FromDateTime(DateTime.UtcNow);
+        DateOnly start = fromDate ?? end.AddDays(-30);
+        var result = await reportsService.InspectClinicFinanceReportsAsync(adminId, clinicId, start, end, cancellationToken);
+        return result.IsFailure
+            ? ProblemDetailsMapper.ToProblemDetails(result.Error)
+            : Ok(FinanceReportsViewModelMapper.ToViewModel(result.Value));
+    }
+
     [HttpPost("{clinicId:guid}/inspect/{*subpath}")]
     [HttpPut("{clinicId:guid}/inspect/{*subpath}")]
     [HttpDelete("{clinicId:guid}/inspect/{*subpath}")]

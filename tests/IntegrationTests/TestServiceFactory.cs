@@ -130,6 +130,9 @@ public static class TestServiceFactory
         services.AddScoped<IInventoryService, InventoryService>();
         services.AddScoped<ITimeEngineService, TimeEngineService>();
         services.AddScoped<ITimeEngineDurationProvider>(sp => (TimeEngineService)sp.GetRequiredService<ITimeEngineService>());
+        services.AddScoped<IFinanceExtendedService, FinanceExtendedService>();
+        services.AddScoped<IReportsService, ReportsService>();
+        services.AddScoped<IExcelImportService, ExcelImportService>();
 
         var provider = services.BuildServiceProvider();
         return (provider, emailSender);
