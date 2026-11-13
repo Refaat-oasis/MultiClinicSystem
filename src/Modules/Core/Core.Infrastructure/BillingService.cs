@@ -456,6 +456,24 @@ public sealed class BillingService : IBillingService, IBillingPortalQueries
         });
     }
 
+    public Task CreateDraftChargeForCompletedVisitAsync(
+        Guid clinicId,
+        Guid visitId,
+        Guid patientId,
+        Guid? appointmentId,
+        Guid doctorId,
+        string actorUserId,
+        CancellationToken cancellationToken = default) =>
+        CreateDraftChargeForCompletedVisitAsync(
+            clinicId,
+            visitId,
+            patientId,
+            appointmentId,
+            doctorId,
+            actorUserId,
+            null,
+            cancellationToken);
+
     public async Task CreateDraftChargeForCompletedVisitAsync(
         Guid clinicId,
         Guid visitId,
@@ -463,6 +481,7 @@ public sealed class BillingService : IBillingService, IBillingPortalQueries
         Guid? appointmentId,
         Guid doctorId,
         string actorUserId,
+        IReadOnlyList<ChargeToolLineInput>? toolLines,
         CancellationToken cancellationToken = default)
     {
         bool billingEnabled = await _dbContext.ClinicModules
@@ -493,7 +512,7 @@ public sealed class BillingService : IBillingService, IBillingPortalQueries
 
             decimal standardPrice = await ResolveStandardSessionPriceAsync(clinicId, appointmentId, null, cancellationToken);
             ChargeCalculationResult calc = BillingCalculator.CalculateCharge(
-                standardPrice, false, null, null, null, null, null, clinic.RoundingRule);
+                standardPrice, false, null, toolLines, null, null, null, clinic.RoundingRule);
 
             DateTimeOffset now = _clock.UtcNow;
             var draft = new Charge(
@@ -523,6 +542,26 @@ public sealed class BillingService : IBillingService, IBillingPortalQueries
                 now);
 
             _dbContext.Charges.Add(draft);
+            if (toolLines != null)
+            {
+                foreach (ChargeToolLineInput toolLine in toolLines)
+                {
+                    _dbContext.ChargeLines.Add(new ChargeLine(
+                        GuidV7.NewGuid(),
+                        clinicId,
+                        draft.Id,
+                        toolLine.Kind,
+                        null,
+                        toolLine.InventoryItemId,
+                        toolLine.Description,
+                        toolLine.Quantity,
+                        toolLine.UnitCost,
+                        toolLine.UnitChargedPrice,
+                        clinic.Currency,
+                        now));
+                }
+            }
+
             await _dbContext.SaveChangesAsync(cancellationToken);
             return true;
         });
@@ -2408,6 +2447,81 @@ public sealed class BillingService : IBillingService, IBillingPortalQueries
         dc.ReopenReason,
         rows.Select(m => new ClosingMethodTotalResult(
             m.Method, m.PaymentsTotal, m.RefundsTotal, m.ExpensesTotal, m.ExpectedTotal, m.CountedTotal, m.VarianceAmount, m.Currency)).ToList());
+
+    public async Task<Result<bool>> RecordSupplierPurchaseInvoiceExpenseAsync(
+        Guid clinicId,
+        Guid supplierId,
+        Guid purchaseInvoiceId,
+        string invoiceNumber,
+        string supplierName,
+        Money totalAmount,
+        Money paidAmount,
+        PaymentMethod? paymentMethod,
+        string recordedByUserId,
+        Guid? operationId,
+        CancellationToken cancellationToken = default)
+    {
+        return await ExecuteForClinicAsync(clinicId, async () =>
+        {
+            bool financeEnabled = await _dbContext.ClinicModules
+                .AsNoTracking()
+                .AnyAsync(m => m.ClinicId == clinicId && m.ModuleKey == "finance" && m.Enabled, cancellationToken);
+            if (!financeEnabled)
+            {
+                return Result<bool>.Success(false);
+            }
+
+            Supplier? supplier = await _dbContext.Suppliers
+                .AsNoTracking()
+                .FirstOrDefaultAsync(s => s.ClinicId == clinicId && !s.IsVoided && s.Id == supplierId, cancellationToken);
+            if (supplier == null)
+            {
+                return Result<bool>.Failure(Error.NotFound("SUPPLIER_NOT_FOUND", "Supplier was not found in this clinic."));
+            }
+
+            Clinic? clinic = await _dbContext.Clinics.FirstOrDefaultAsync(c => c.Id == clinicId, cancellationToken);
+            if (clinic == null)
+            {
+                return Result<bool>.Failure(Error.NotFound("CLINIC_NOT_FOUND", "Clinic was not found."));
+            }
+
+            DateTimeOffset now = _clock.UtcNow;
+            var expense = new Expense(
+                GuidV7.NewGuid(),
+                clinicId,
+                "SupplierInvoice",
+                $"Purchase Invoice #{invoiceNumber.Trim()} ({supplierName.Trim()}) [{purchaseInvoiceId:D}]",
+                null,
+                totalAmount,
+                supplierId,
+                null,
+                false,
+                recordedByUserId,
+                now,
+                operationId);
+            _dbContext.Expenses.Add(expense);
+
+            if (paidAmount.Amount > 0m)
+            {
+                PaymentMethod method = paymentMethod ?? PaymentMethod.Cash;
+                var supplierPayment = new SupplierPayment(
+                    GuidV7.NewGuid(),
+                    clinicId,
+                    supplierId,
+                    method,
+                    paidAmount,
+                    $"Purchase Invoice #{invoiceNumber.Trim()}",
+                    recordedByUserId,
+                    now,
+                    operationId);
+                _dbContext.SupplierPayments.Add(supplierPayment);
+            }
+
+            clinic.MarkHasFinancialEntries();
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            return Result<bool>.Success(true);
+        });
+    }
 
     private async Task<T> ExecuteForClinicAsync<T>(Guid clinicId, Func<Task<T>> action)
     {

@@ -44,6 +44,16 @@ public interface IBillingService
         string actorUserId,
         CancellationToken cancellationToken = default);
 
+    Task CreateDraftChargeForCompletedVisitAsync(
+        Guid clinicId,
+        Guid visitId,
+        Guid patientId,
+        Guid? appointmentId,
+        Guid doctorId,
+        string actorUserId,
+        IReadOnlyList<Core.Domain.ChargeToolLineInput>? toolLines,
+        CancellationToken cancellationToken = default);
+
     Task<Result<ChargeResult>> PostDraftChargeAsync(
         Guid userId,
         Guid clinicId,
@@ -184,6 +194,19 @@ public interface IBillingService
     Task<Result<ClinicBillingInspectResult>> InspectClinicBillingAsync(
         Guid adminId,
         Guid clinicId,
+        CancellationToken cancellationToken = default);
+
+    Task<Result<bool>> RecordSupplierPurchaseInvoiceExpenseAsync(
+        Guid clinicId,
+        Guid supplierId,
+        Guid purchaseInvoiceId,
+        string invoiceNumber,
+        string supplierName,
+        BuildingBlocks.Domain.Money totalAmount,
+        BuildingBlocks.Domain.Money paidAmount,
+        Core.Domain.PaymentMethod? paymentMethod,
+        string recordedByUserId,
+        Guid? operationId,
         CancellationToken cancellationToken = default);
 }
 

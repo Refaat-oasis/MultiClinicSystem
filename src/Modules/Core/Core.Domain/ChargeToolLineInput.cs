@@ -8,5 +8,6 @@ public sealed record ChargeToolLineInput(
     string Description,
     decimal Quantity,
     decimal UnitCost,
-    decimal UnitChargedPrice);
+    decimal UnitChargedPrice,
+    Guid? InventoryItemId = null);
 

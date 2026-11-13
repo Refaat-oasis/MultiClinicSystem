@@ -8,5 +8,6 @@ public sealed class CompleteVisitDto
     public bool IsOvertimeExcused { get; set; }
     public string? OvertimeExcuseReason { get; set; }
     public Guid? OperationId { get; set; }
+    public IReadOnlyList<VisitToolUsageDto>? ToolsUsed { get; set; }
 }
 

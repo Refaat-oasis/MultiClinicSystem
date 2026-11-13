@@ -32,6 +32,7 @@ public sealed class ClinicalService : IClinicalService, IClinicalPortalQueries
     private readonly IAuditService _auditService;
     private readonly IClock _clock;
     private readonly IBillingService? _billingService;
+    private readonly IInventoryService? _inventoryService;
     private readonly Dictionary<string, ISpecialtyPlugin> _pluginsByCode;
 
     public ClinicalService(
@@ -41,7 +42,8 @@ public sealed class ClinicalService : IClinicalService, IClinicalPortalQueries
         IAuditService auditService,
         IClock clock,
         IEnumerable<ISpecialtyPlugin> specialtyPlugins,
-        IBillingService? billingService = null)
+        IBillingService? billingService = null,
+        IInventoryService? inventoryService = null)
     {
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _currentClinicContext = currentClinicContext ?? throw new ArgumentNullException(nameof(currentClinicContext));
@@ -49,6 +51,7 @@ public sealed class ClinicalService : IClinicalService, IClinicalPortalQueries
         _auditService = auditService ?? throw new ArgumentNullException(nameof(auditService));
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         _billingService = billingService;
+        _inventoryService = inventoryService;
         _pluginsByCode = (specialtyPlugins ?? Array.Empty<ISpecialtyPlugin>())
             .ToDictionary(p => p.SpecialtyCode, StringComparer.OrdinalIgnoreCase);
     }
@@ -988,6 +991,25 @@ public sealed class ClinicalService : IClinicalService, IClinicalPortalQueries
             }
 
             DateTimeOffset now = _clock.UtcNow;
+
+            IReadOnlyList<ChargeToolLineInput>? consumedToolLines = null;
+            if (_inventoryService != null && input.ToolsUsed is { Count: > 0 })
+            {
+                Result<IReadOnlyList<ChargeToolLineInput>> consumeResult = await _inventoryService.ConsumeVisitToolsAsync(
+                    clinicId,
+                    visit.Id,
+                    userId.ToString(),
+                    input.ToolsUsed,
+                    input.OperationId,
+                    cancellationToken);
+                if (consumeResult.IsFailure)
+                {
+                    return Result<VisitSessionResult>.Failure(consumeResult.Error);
+                }
+
+                consumedToolLines = consumeResult.Value;
+            }
+
             visit.Complete(now, input.IsOvertimeExcused, input.OvertimeExcuseReason, now);
 
             if (visit.AppointmentId.HasValue)
@@ -1024,7 +1046,8 @@ public sealed class ClinicalService : IClinicalService, IClinicalPortalQueries
                     visit.DoctorId,
                     visit.SpecialtyCode,
                     visit.OvertimeMinutes,
-                    CompletedAtUtc = now
+                    CompletedAtUtc = now,
+                    ToolsUsed = input.ToolsUsed
                 });
                 _dbContext.OutboxMessages.Add(new OutboxMessage(GuidV7.NewGuid(), "SessionCompleted", payload, now));
             }
@@ -1046,6 +1069,7 @@ public sealed class ClinicalService : IClinicalService, IClinicalPortalQueries
                     visit.AppointmentId,
                     visit.DoctorId,
                     userId.ToString(),
+                    consumedToolLines,
                     cancellationToken);
             }
 

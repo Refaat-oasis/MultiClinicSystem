@@ -752,6 +752,119 @@ public sealed class DashboardService : IDashboardService
                     breakdown["totalBookings"] = total;
                     break;
                 }
+                case "inventory.low-stock":
+                {
+                    unit = "items";
+                    List<InventoryItem> items = await _dbContext.InventoryItems
+                        .AsNoTracking()
+                        .Where(i => i.ClinicId == clinicId && !i.IsVoided && i.IsActive)
+                        .ToListAsync(cancellationToken);
+
+                    int lowStock = items.Count(i => i.IsAtOrBelowLowStockThreshold());
+                    int zeroOrNegative = items.Count(i => i.QuantityOnHand <= 0m);
+                    primary = lowStock;
+                    breakdown["lowStockCount"] = lowStock;
+                    breakdown["outOfStockOrNegativeCount"] = zeroOrNegative;
+                    breakdown["activeItemsCount"] = items.Count;
+                    break;
+                }
+                case "inventory.near-expiry":
+                {
+                    unit = "batches";
+                    Clinic? clinic = await _dbContext.Clinics.AsNoTracking().FirstOrDefaultAsync(c => c.Id == clinicId, cancellationToken);
+                    TimeZoneInfo tz = ClinicTimeZoneResolver.Resolve(clinic?.TimeZone);
+                    DateOnly todayLocal = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(_clock.UtcNow, tz).DateTime);
+                    ClinicInventorySetting? settings = await _dbContext.ClinicInventorySettings
+                        .AsNoTracking()
+                        .FirstOrDefaultAsync(s => s.ClinicId == clinicId && !s.IsVoided, cancellationToken);
+                    int warningDays = settings?.NearExpiryWarningDays ?? 30;
+
+                    List<InventoryItemBatch> batches = await _dbContext.InventoryItemBatches
+                        .AsNoTracking()
+                        .Where(b => b.ClinicId == clinicId && !b.IsVoided && b.QuantityRemaining > 0m && b.ExpiryDate.HasValue)
+                        .ToListAsync(cancellationToken);
+
+                    int nearExpiry = batches.Count(b => b.IsNearExpiry(todayLocal, warningDays));
+                    int expired = batches.Count(b => b.IsExpired(todayLocal));
+                    primary = nearExpiry;
+                    breakdown["nearExpiryCount"] = nearExpiry;
+                    breakdown["expiredWithStockCount"] = expired;
+                    breakdown["warningDays"] = warningDays;
+                    break;
+                }
+                case "inventory.stock-value":
+                {
+                    Clinic? clinic = await _dbContext.Clinics.AsNoTracking().FirstOrDefaultAsync(c => c.Id == clinicId, cancellationToken);
+                    unit = clinic?.Currency ?? Money.DefaultCurrency;
+                    List<InventoryItem> items = await _dbContext.InventoryItems
+                        .AsNoTracking()
+                        .Where(i => i.ClinicId == clinicId && !i.IsVoided && i.IsActive)
+                        .ToListAsync(cancellationToken);
+
+                    decimal totalValue = decimal.Round(
+                        items.Sum(i => Math.Max(0m, i.QuantityOnHand) * i.UnitCostAmount),
+                        2,
+                        MidpointRounding.AwayFromZero);
+                    decimal totalUnits = decimal.Round(items.Sum(i => Math.Max(0m, i.QuantityOnHand)), 2, MidpointRounding.AwayFromZero);
+                    primary = totalValue;
+                    breakdown["totalValuationAmount"] = totalValue;
+                    breakdown["totalUnitsOnHand"] = totalUnits;
+                    breakdown["activeSkuCount"] = items.Count;
+                    break;
+                }
+                case "inventory.usage-by-item":
+                {
+                    unit = "units";
+                    List<StockMovement> usages = await _dbContext.StockMovements
+                        .AsNoTracking()
+                        .Where(m => m.ClinicId == clinicId
+                                    && !m.IsVoided
+                                    && m.MovementType == StockMovementType.SessionUsed
+                                    && m.OccurredAtUtc >= start
+                                    && m.OccurredAtUtc <= end)
+                        .ToListAsync(cancellationToken);
+
+                    decimal totalUnits = decimal.Round(usages.Sum(u => Math.Abs(u.QuantityDelta)), 2, MidpointRounding.AwayFromZero);
+                    decimal totalCost = decimal.Round(usages.Sum(u => Math.Abs(u.QuantityDelta) * u.UnitCostAmount), 2, MidpointRounding.AwayFromZero);
+                    int distinctItems = usages.Select(u => u.ItemId).Distinct().Count();
+                    primary = totalUnits;
+                    breakdown["consumptionUnits"] = totalUnits;
+                    breakdown["consumptionCostAmount"] = totalCost;
+                    breakdown["distinctItemsUsed"] = distinctItems;
+                    breakdown["movementCount"] = usages.Count;
+                    break;
+                }
+                case "inventory.negative-stock-events":
+                {
+                    unit = "events";
+                    int alertsCount = await _dbContext.InventoryAlerts
+                        .AsNoTracking()
+                        .CountAsync(
+                            a => a.ClinicId == clinicId
+                                 && !a.IsVoided
+                                 && a.Kind == InventoryAlertKind.NegativeStock
+                                 && a.CreatedAtUtc >= start
+                                 && a.CreatedAtUtc <= end,
+                            cancellationToken);
+                    int negativeMoves = await _dbContext.StockMovements
+                        .AsNoTracking()
+                        .CountAsync(
+                            m => m.ClinicId == clinicId
+                                 && !m.IsVoided
+                                 && m.BalanceAfter < 0m
+                                 && m.OccurredAtUtc >= start
+                                 && m.OccurredAtUtc <= end,
+                            cancellationToken);
+                    int currentlyNegative = await _dbContext.InventoryItems
+                        .AsNoTracking()
+                        .CountAsync(i => i.ClinicId == clinicId && !i.IsVoided && i.QuantityOnHand < 0m, cancellationToken);
+
+                    primary = Math.Max(alertsCount, negativeMoves);
+                    breakdown["negativeAlertsInRange"] = alertsCount;
+                    breakdown["negativeMovementsInRange"] = negativeMoves;
+                    breakdown["itemsCurrentlyNegative"] = currentlyNegative;
+                    break;
+                }
                 default:
                 {
                     breakdown["configured"] = 1m;
