@@ -2,6 +2,19 @@ import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { GlassCard, AlertBanner } from '@clinic/ui';
 import { apiClient } from '@clinic/api-client';
+import {
+  Phase6SchedulingScreen,
+  type AppointmentItem,
+  type QueueEntryItem,
+  type WaitingListItem,
+} from '@clinic/feature-core';
+
+interface InspectClinicScheduleSnapshot {
+  clinicId: string;
+  appointments: AppointmentItem[];
+  queueEntries: QueueEntryItem[];
+  waitingList: WaitingListItem[];
+}
 import { Eye, Lock } from 'lucide-react';
 
 export interface InspectClinicSnapshot {
@@ -26,6 +39,13 @@ export const InspectClinicShell: React.FC<InspectClinicShellProps> = ({ clinicId
   const { data, isLoading, error } = useQuery<InspectClinicSnapshot>({
     queryKey: ['platform-inspect', clinicId],
     queryFn: () => apiClient.get<InspectClinicSnapshot>(`/platform/clinics/${clinicId}/inspect`),
+    enabled: Boolean(clinicId),
+    retry: false,
+  });
+
+  const { data: scheduleSnapshot } = useQuery<InspectClinicScheduleSnapshot>({
+    queryKey: ['platform-inspect-schedule', clinicId],
+    queryFn: () => apiClient.get<InspectClinicScheduleSnapshot>(`/platform/clinics/${clinicId}/inspect/schedule`),
     enabled: Boolean(clinicId),
     retry: false,
   });
@@ -96,6 +116,15 @@ export const InspectClinicShell: React.FC<InspectClinicShellProps> = ({ clinicId
           </div>
         )}
       </GlassCard>
+
+      {clinicId && scheduleSnapshot && (
+        <Phase6SchedulingScreen
+          appointments={scheduleSnapshot.appointments}
+          queueEntries={scheduleSnapshot.queueEntries}
+          waitingList={scheduleSnapshot.waitingList}
+          readOnlyInspectMode={true}
+        />
+      )}
     </div>
   );
 };

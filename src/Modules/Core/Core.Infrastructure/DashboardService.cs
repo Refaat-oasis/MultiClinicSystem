@@ -223,6 +223,87 @@ public sealed class DashboardService : IDashboardService
                     breakdown["totalKilobytes"] = Math.Round(totalBytes / 1024m, 2);
                     break;
                 }
+                case "scheduling.appointments-summary":
+                {
+                    unit = "appointments";
+                    List<Appointment> appts = await _dbContext.Appointments
+                        .AsNoTracking()
+                        .Where(a => a.ClinicId == clinicId && !a.IsVoided && a.StartUtc >= start && a.StartUtc <= end)
+                        .ToListAsync(cancellationToken);
+
+                    primary = appts.Count;
+                    breakdown["booked"] = appts.Count(a => a.Status == AppointmentStatus.Booked);
+                    breakdown["arrived"] = appts.Count(a => a.Status == AppointmentStatus.Arrived);
+                    breakdown["inSession"] = appts.Count(a => a.Status == AppointmentStatus.InSession);
+                    breakdown["completed"] = appts.Count(a => a.Status == AppointmentStatus.Completed);
+                    breakdown["cancelled"] = appts.Count(a => a.Status == AppointmentStatus.Cancelled);
+                    breakdown["noShow"] = appts.Count(a => a.Status == AppointmentStatus.NoShow);
+                    breakdown["late"] = appts.Count(a => a.Status == AppointmentStatus.Late);
+                    breakdown["staffSource"] = appts.Count(a => a.Source == AppointmentSource.Staff);
+                    breakdown["portalSource"] = appts.Count(a => a.Source == AppointmentSource.Portal);
+                    DateTimeOffset next14End = _clock.UtcNow.AddDays(14);
+                    breakdown["next14DaysLoad"] = await _dbContext.Appointments
+                        .AsNoTracking()
+                        .CountAsync(a => a.ClinicId == clinicId && !a.IsVoided && a.StartUtc >= _clock.UtcNow && a.StartUtc <= next14End, cancellationToken);
+                    break;
+                }
+                case "scheduling.utilization":
+                {
+                    unit = "minutes";
+                    List<Appointment> activeAppts = await _dbContext.Appointments
+                        .AsNoTracking()
+                        .Where(a => a.ClinicId == clinicId
+                                    && !a.IsVoided
+                                    && a.StartUtc >= start
+                                    && a.StartUtc <= end
+                                    && a.Status != AppointmentStatus.Cancelled
+                                    && a.Status != AppointmentStatus.NoShow)
+                        .ToListAsync(cancellationToken);
+
+                    decimal totalMinutes = activeAppts.Sum(a => (decimal)(a.EndUtc - a.StartUtc).TotalMinutes);
+                    int activeDoctors = await _dbContext.ClinicDoctors.AsNoTracking().CountAsync(d => d.ClinicId == clinicId && !d.IsVoided && d.IsActive, cancellationToken);
+                    int activeRooms = await _dbContext.ClinicRooms.AsNoTracking().CountAsync(r => r.ClinicId == clinicId && !r.IsVoided && r.IsActive, cancellationToken);
+                    primary = totalMinutes;
+                    breakdown["bookedMinutes"] = totalMinutes;
+                    breakdown["activeDoctors"] = activeDoctors;
+                    breakdown["activeRooms"] = activeRooms;
+                    breakdown["roomAssignedSessions"] = activeAppts.Count(a => a.RoomId.HasValue);
+                    break;
+                }
+                case "queue.waiting-count":
+                {
+                    unit = "patients";
+                    List<QueueEntry> entries = await _dbContext.QueueEntries
+                        .AsNoTracking()
+                        .Where(q => q.ClinicId == clinicId && !q.IsVoided && q.CreatedAtUtc >= start && q.CreatedAtUtc <= end)
+                        .ToListAsync(cancellationToken);
+
+                    List<QueueEntry> waitingNow = entries.Where(q => q.Status == QueueEntryStatus.Waiting).ToList();
+                    primary = waitingNow.Count;
+                    breakdown["waiting"] = waitingNow.Count;
+                    breakdown["inSession"] = entries.Count(q => q.Status == QueueEntryStatus.InSession);
+                    breakdown["served"] = entries.Count(q => q.Status == QueueEntryStatus.Served);
+                    breakdown["lateOrNoShow"] = entries.Count(q => q.Status is QueueEntryStatus.Late or QueueEntryStatus.NoShow);
+                    breakdown["totalPushes"] = entries.Sum(q => q.PushCount);
+                    break;
+                }
+                case "queue.waiting-list":
+                {
+                    unit = "entries";
+                    int unfulfilledWaitingList = await _dbContext.WaitingListEntries
+                        .AsNoTracking()
+                        .CountAsync(w => w.ClinicId == clinicId && !w.IsVoided && !w.IsFulfilled, cancellationToken);
+                    List<SlotOffer> offers = await _dbContext.SlotOffers
+                        .AsNoTracking()
+                        .Where(o => o.ClinicId == clinicId && !o.IsVoided && o.OfferedAtUtc >= start && o.OfferedAtUtc <= end)
+                        .ToListAsync(cancellationToken);
+
+                    primary = unfulfilledWaitingList;
+                    breakdown["waitingListActive"] = unfulfilledWaitingList;
+                    breakdown["offersPending"] = offers.Count(o => o.Status == SlotOfferStatus.Pending);
+                    breakdown["offersAccepted"] = offers.Count(o => o.Status == SlotOfferStatus.Accepted);
+                    break;
+                }
                 default:
                 {
                     breakdown["configured"] = 1m;

@@ -190,11 +190,11 @@ builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<IOwnerPortfolio, OwnerPortfolioService>();
 builder.Services.AddScoped<IClinicStructureService, ClinicStructureService>();
 builder.Services.AddScoped<IPatientService, PatientService>();
-builder.Services.AddScoped<IClinicAuthorizationService, ClinicAuthorizationService>();
-builder.Services.AddScoped<IDashboardService, DashboardService>();
-builder.Services.AddScoped<IOwnerPortfolio, OwnerPortfolioService>();
-builder.Services.AddScoped<IClinicStructureService, ClinicStructureService>();
-builder.Services.AddScoped<IPatientService, PatientService>();
+builder.Services.AddScoped<IAvailabilityQueries, AvailabilityQueriesService>();
+builder.Services.AddScoped<ISchedulingService, SchedulingService>();
+builder.Services.AddScoped<IPortalBooking>(sp => (SchedulingService)sp.GetRequiredService<ISchedulingService>());
+builder.Services.AddScoped<IScheduleRealtimeNotifier, Platform.Api.Hubs.SignalRScheduleRealtimeNotifier>();
+builder.Services.AddSignalR();
 
 // Configure ProblemDetails and Controllers
 builder.Services.AddProblemDetails();
@@ -238,6 +238,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHub<Platform.Api.Hubs.ClinicScheduleHub>("/hubs/schedule");
 
 app.Run();
 

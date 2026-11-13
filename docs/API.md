@@ -329,3 +329,17 @@
 - `POST /api/v1/clinics/{clinicId}/patients/{patientId}/notes`: Add patient clinical/shared or doctor-private note.
 - `POST /api/v1/clinics/{clinicId}/patients/{patientId}/attachments` & `GET /api/v1/clinics/{clinicId}/patients/{patientId}/attachments/{attachmentId}/download` & `DELETE .../{attachmentId}`: Upload/download/soft-void attachments (`attachments`) behind `IFileStorage` with magic-byte validation, SHA-256 hash, and image thumbnails.
 - `GET /api/v1/platform/clinics/{clinicId}/inspect/patients/{patientId}`: Super Admin read-only patient inspect endpoint logging `PatientAccessLog` via `IPlatformAccess`.
+
+
+## 8. Phase 6: Scheduling, Availability, Real-Time Queue & Waiting List Endpoints
+- `GET /api/v1/clinics/{clinicId}/scheduling/settings` & `PUT .../scheduling/settings`: Read/update VIP jump limit, late grace minutes, max queue pushes, default slot step, min booking lead minutes, and reschedule preset options.
+- `GET /api/v1/clinics/{clinicId}/scheduling/categories` & `POST .../categories` & `PUT .../categories/{categoryId}`: Manage specialty appointment categories (`DefaultDurationMinutes`, `DefaultPrice`, `BookableOnline`).
+- `PUT /api/v1/clinics/{clinicId}/scheduling/doctors/{doctorId}/booking-settings`: Per-doctor online booking opt-out and max daily online bookings cap.
+- `GET /api/v1/clinics/{clinicId}/scheduling/free-slots`: Live availability query merging clinic/doctor working hours, days off, active non-cancelled/non-rescheduled appointments, and doctor buffers.
+- `GET /api/v1/clinics/{clinicId}/scheduling/appointments` & `GET .../appointments/{appointmentId}` & `POST .../appointments`: List (doctor-scoped when required), read (`404` out-of-scope), and concurrency-safe appointment booking (`OperationId` idempotent, `sp_getapplock` + Serializable double-booking protection, `scheduling.priority` required for `Vip`/`Rush`).
+- `POST /api/v1/clinics/{clinicId}/scheduling/appointments/{appointmentId}/status`: Explicit state-machine transition (`Booked -> Confirmed/Arrived/NoShow/Cancelled`, auto-enqueues into `queue` on `Arrived`, triggers `SlotOffer` generation on `Cancelled`).
+- `POST /api/v1/clinics/{clinicId}/scheduling/appointments/{appointmentId}/reschedule` & `POST .../scheduling/close-day` & `GET .../scheduling/doctors/{doctorId}/timetable`: Close-day cascade, preset (`after_week`/`after_month`) or custom rescheduling, and daily doctor timetable view.
+- `GET /api/v1/clinics/{clinicId}/queue/board` & `POST .../queue/walk-in` & `POST .../queue/entries/{queueEntryId}/push-late` & `POST .../queue/entries/{queueEntryId}/call-next`: Live queue board (`queue` module, degrades gracefully when off), bounded VIP jump insertion, late push-back / `NoShow` threshold, and patient call-next.
+- `GET /api/v1/clinics/{clinicId}/queue/waiting-list` & `POST .../queue/waiting-list` & `GET .../queue/slot-offers` & `POST .../queue/slot-offers/{offerId}/accept`: Waiting list enrollment, cancellation-triggered `SlotOffer` listing, and one-click slot offer booking.
+- `SignalR Hub /hubs/schedule` (`JoinClinic(clinicId)` / `LeaveClinic(clinicId)`): Tenant-verified real-time broadcasts (`PatientArrived`, `QueueChanged`, `SlotFreed`) isolated to `clinic:{clinicId}` group using zero-PII IDs only.
+- `GET /api/v1/platform/clinics/{clinicId}/inspect/schedule`: Super Admin read-only schedule & queue inspect snapshot via `IPlatformAccess`.

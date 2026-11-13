@@ -44,6 +44,13 @@ public sealed class CoreDbContext : IdentityDbContext<AppUser, AppRole, Guid>
     public DbSet<PatientAllergy> PatientAllergies => Set<PatientAllergy>();
     public DbSet<PatientNote> PatientNotes => Set<PatientNote>();
     public DbSet<PatientAttachment> PatientAttachments => Set<PatientAttachment>();
+    public DbSet<AppointmentCategory> AppointmentCategories => Set<AppointmentCategory>();
+    public DbSet<DoctorBookingSetting> DoctorBookingSettings => Set<DoctorBookingSetting>();
+    public DbSet<ClinicSchedulingSetting> ClinicSchedulingSettings => Set<ClinicSchedulingSetting>();
+    public DbSet<Appointment> Appointments => Set<Appointment>();
+    public DbSet<QueueEntry> QueueEntries => Set<QueueEntry>();
+    public DbSet<WaitingListEntry> WaitingListEntries => Set<WaitingListEntry>();
+    public DbSet<SlotOffer> SlotOffers => Set<SlotOffer>();
 
     public CoreDbContext(DbContextOptions<CoreDbContext> options, ICurrentClinic currentClinic)
         : base(options)
@@ -494,6 +501,95 @@ public sealed class CoreDbContext : IdentityDbContext<AppUser, AppRole, Guid>
             b.HasIndex(a => new { a.ClinicId, a.PatientId });
             b.HasQueryFilter(a => _currentClinic.IsPlatformAdmin || a.ClinicId == _currentClinic.ClinicId);
         });
+
+        // AppointmentCategories tenant table (scheduling schema)
+        builder.Entity<AppointmentCategory>(b =>
+        {
+            b.ToTable("AppointmentCategories", "scheduling");
+            b.HasKey(c => c.Id);
+            b.Property(c => c.SpecialtyCode).IsRequired().HasMaxLength(64);
+            b.Property(c => c.NameAr).IsRequired().HasMaxLength(200);
+            b.Property(c => c.NameEn).IsRequired().HasMaxLength(200);
+            b.Property(c => c.DefaultPriceAmount).HasColumnType("decimal(18,2)");
+            b.Property(c => c.DefaultPriceCurrency).IsRequired().HasMaxLength(10);
+            b.Property(c => c.RowVersion).IsRowVersion();
+            b.HasIndex(c => new { c.ClinicId, c.SpecialtyCode });
+            b.HasQueryFilter(c => _currentClinic.IsPlatformAdmin || c.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // DoctorBookingSettings tenant table (scheduling schema)
+        builder.Entity<DoctorBookingSetting>(b =>
+        {
+            b.ToTable("DoctorBookingSettings", "scheduling");
+            b.HasKey(s => s.Id);
+            b.Property(s => s.RowVersion).IsRowVersion();
+            b.HasIndex(s => new { s.ClinicId, s.DoctorId }).IsUnique();
+            b.HasQueryFilter(s => _currentClinic.IsPlatformAdmin || s.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // ClinicSchedulingSettings tenant table (scheduling schema)
+        builder.Entity<ClinicSchedulingSetting>(b =>
+        {
+            b.ToTable("ClinicSchedulingSettings", "scheduling");
+            b.HasKey(s => s.Id);
+            b.Property(s => s.RescheduleOptionsJson).IsRequired();
+            b.Property(s => s.RowVersion).IsRowVersion();
+            b.HasIndex(s => s.ClinicId).IsUnique();
+            b.HasQueryFilter(s => _currentClinic.IsPlatformAdmin || s.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // Appointments tenant table (scheduling schema)
+        builder.Entity<Appointment>(b =>
+        {
+            b.ToTable("Appointments", "scheduling");
+            b.HasKey(a => a.Id);
+            b.Property(a => a.Status).HasConversion<string>().HasMaxLength(32).IsRequired();
+            b.Property(a => a.Priority).HasConversion<string>().HasMaxLength(16).IsRequired();
+            b.Property(a => a.Source).HasConversion<string>().HasMaxLength(16).IsRequired();
+            b.Property(a => a.Notes).HasMaxLength(1000);
+            b.Property(a => a.CancelReason).HasMaxLength(500);
+            b.Property(a => a.RowVersion).IsRowVersion();
+            b.HasIndex(a => new { a.ClinicId, a.DoctorId, a.StartUtc, a.EndUtc });
+            b.HasIndex(a => new { a.ClinicId, a.RoomId, a.StartUtc, a.EndUtc });
+            b.HasIndex(a => new { a.ClinicId, a.PatientId, a.StartUtc });
+            b.HasQueryFilter(a => _currentClinic.IsPlatformAdmin || a.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // QueueEntries tenant table (queue schema)
+        builder.Entity<QueueEntry>(b =>
+        {
+            b.ToTable("QueueEntries", "queue");
+            b.HasKey(q => q.Id);
+            b.Property(q => q.QueueDate).IsRequired().HasMaxLength(16);
+            b.Property(q => q.Priority).HasConversion<string>().HasMaxLength(16).IsRequired();
+            b.Property(q => q.Status).HasConversion<string>().HasMaxLength(24).IsRequired();
+            b.Property(q => q.RowVersion).IsRowVersion();
+            b.HasIndex(q => new { q.ClinicId, q.QueueDate, q.DoctorId, q.OrderIndex });
+            b.HasQueryFilter(q => _currentClinic.IsPlatformAdmin || q.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // WaitingListEntries tenant table (queue schema)
+        builder.Entity<WaitingListEntry>(b =>
+        {
+            b.ToTable("WaitingListEntries", "queue");
+            b.HasKey(w => w.Id);
+            b.Property(w => w.PreferredDate).IsRequired().HasMaxLength(16);
+            b.Property(w => w.Notes).HasMaxLength(500);
+            b.Property(w => w.RowVersion).IsRowVersion();
+            b.HasIndex(w => new { w.ClinicId, w.PreferredDate, w.IsFulfilled });
+            b.HasQueryFilter(w => _currentClinic.IsPlatformAdmin || w.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // SlotOffers tenant table (queue schema)
+        builder.Entity<SlotOffer>(b =>
+        {
+            b.ToTable("SlotOffers", "queue");
+            b.HasKey(o => o.Id);
+            b.Property(o => o.Status).HasConversion<string>().HasMaxLength(24).IsRequired();
+            b.Property(o => o.RowVersion).IsRowVersion();
+            b.HasIndex(o => new { o.ClinicId, o.Status, o.OfferedAtUtc });
+            b.HasQueryFilter(o => _currentClinic.IsPlatformAdmin || o.ClinicId == _currentClinic.ClinicId);
+        });
     }
 
     /// <summary>
@@ -562,7 +658,21 @@ public sealed class CoreDbContext : IdentityDbContext<AppUser, AppRole, Guid>
                 ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON patients.PatientNotes,
                 ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON patients.PatientNotes,
                 ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON patients.PatientAttachments,
-                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON patients.PatientAttachments
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON patients.PatientAttachments,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON scheduling.AppointmentCategories,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON scheduling.AppointmentCategories,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON scheduling.DoctorBookingSettings,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON scheduling.DoctorBookingSettings,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON scheduling.ClinicSchedulingSettings,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON scheduling.ClinicSchedulingSettings,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON scheduling.Appointments,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON scheduling.Appointments,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON queue.QueueEntries,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON queue.QueueEntries,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON queue.WaitingListEntries,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON queue.WaitingListEntries,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON queue.SlotOffers,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON queue.SlotOffers
                 WITH (STATE = ON);
             ');
         ";

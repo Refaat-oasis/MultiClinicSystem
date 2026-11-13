@@ -327,3 +327,28 @@ Status: 0 Errors, Clean Build
 - [x] Chronic medical history, allergy tracking (with UI allergy banner), doctor-private notes isolation, and SHA-256 deduplicated attachments behind `IFileStorage` with thumbnails.
 - [x] Per-clinic doctor & specialty scoping returning `404`, clean degradation when `patient-history` or `attachments` is off, and Super Admin read-only inspect logging `PatientAccessLog`.
 - [x] Phases 0 to 5 integration gates, architecture sweeps, and frontend test/lint/build pass 100% green.
+
+
+---
+
+## Phase 6: Scheduling, Real-Time Queue, and Waiting List (DONE)
+- **Branch**: `phase-6/scheduling-and-queue`
+- **Completed Tasks**:
+  - **Domain (`src/Modules/Core/Core.Domain/`)**: Added scheduling & queue state machines/enums (`AppointmentStatus`, `AppointmentPriority`, `AppointmentSource`, `QueueEntryStatus`, `SlotOfferStatus`, `AppointmentStateMachine`), entities (`AppointmentCategory`, `DoctorBookingSetting`, `ClinicSchedulingSetting`, `Appointment`, `QueueEntry`, `WaitingListEntry`, `SlotOffer`), pure calculators (`AvailabilityCalculator` + working-hour/day-off/busy-interval/candidate value objects, `QueueReorderCalculator` + entry input/output value objects), and unit tests `SchedulingDomainTests`.
+  - **Application & Infrastructure**: Added `ISchedulingService`, `IAvailabilityQueries`, `IPortalBooking`, `IScheduleRealtimeNotifier` + Phase 6 input/result records, `AvailabilityQueriesService`, `ClinicTimeZoneResolver`, `SchedulingProjectionHelper`, `QueueWorkflowHelper`, `SchedulingService` (`sp_getapplock` + `Serializable` double-booking prevention, doctor scoping returning `404`, `scheduling.priority` enforcement for VIP/Rush, VIP jump limit enforcement, late push-back / `NoShow`, close-day cascade & `after_week`/`after_month` reschedule, waiting-list `SlotOffer` generation/acceptance, graceful `queue`-off isolation), and live dashboard widgets (`scheduling.appointments-summary`, `scheduling.utilization`, `queue.waiting-count`, `queue.waiting-list`) in `ModuleCatalogService` + `DashboardService`.
+  - **API & Real-Time (`src/Platform.Api/`)**: Added `ClinicScheduleHub` (`/hubs/schedule`, clinic-group access verified via `IClinicAuthorizationService`) + `SignalRScheduleRealtimeNotifier`, `SchedulingController` (thin transport + DTOs/ViewModels + `SchedulingViewModelMapper`), Super Admin inspect endpoint `InspectSchedule` on `PlatformClinicsController`, and SignalR client packages for tests.
+  - **Frontend (`web/`)**: Added `Phase6SchedulingScreen` + `Phase6SchedulingScreen.test.tsx`, wired into `web/apps/clinic/src/App.tsx` and read-only inspect view in `web/apps/admin/src/InspectClinicShell.tsx`.
+- **Verification Output Summary**:
+  - `dotnet test tests/UnitTests/UnitTests.csproj`: `Passed! - Failed: 0, Passed: 120, Skipped: 0, Total: 120`
+  - `dotnet test tests/ArchitectureTests/ArchitectureTests.csproj`: `Passed! - Failed: 0, Passed: 12, Skipped: 0, Total: 12`
+  - `dotnet test tests/IntegrationTests/IntegrationTests.csproj`: `Passed! - Failed: 0, Passed: 26, Skipped: 0, Total: 26`
+  - `dotnet test tests/Gates/Gates.csproj` (Phases 0–6 cumulative): `Passed! - Failed: 0, Passed: 19, Skipped: 0, Total: 19`
+  - Frontend `npm --prefix web test; npm --prefix web run lint; npm --prefix web run build`: `35/35` Vitest tests passed (`admin-app`: 7, `clinic-app`: 2, `api-client`: 3, `ui`: 3, `feature-core`: 20), `tsc --noEmit` 0 errors, Vite production builds succeeded for both apps.
+
+### Phase 6 Exit Checklist
+- [x] Availability engine computes free slots merging clinic/doctor hours, days off, active appointments, and buffers, and updates immediately upon concurrent bookings.
+- [x] Double-booking prevented under concurrency (`sp_getapplock` + `Serializable`), VIP/Rush priority gated on `scheduling.priority`, and doctor scoping returns `404` across doctors.
+- [x] Real-time SignalR `/hubs/schedule` broadcasts zero-PII events (`PatientArrived`, `QueueChanged`, `SlotFreed`) strictly isolated to verified clinic groups.
+- [x] Queue push-back + `NoShow` threshold, VIP jump limit, waiting-list cancellation `SlotOffer` generation/acceptance, close-day cascade, and `after_week` reschedule verified end-to-end.
+- [x] `queue` module toggle cleanly disables queue/waiting-list endpoints and dashboard widgets without breaking `scheduling`, and Super Admin read-only schedule inspect logs `PatientAccessLog`.
+- [x] Phases 0 to 6 integration gates, all architecture sweeps, and frontend test/lint/build pass 100% green.
