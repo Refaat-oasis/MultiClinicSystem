@@ -6,5 +6,6 @@ namespace Core.Application;
 public sealed record CompleteVisitInput(
     bool IsOvertimeExcused,
     string? OvertimeExcuseReason,
-    Guid? OperationId);
+    Guid? OperationId,
+    IReadOnlyList<VisitToolUsageInput>? ToolsUsed = null);
 

@@ -127,6 +127,7 @@ public static class TestServiceFactory
         services.AddScoped<IClinicalService, ClinicalService>();
         services.AddScoped<IClinicalPortalQueries>(sp => (ClinicalService)sp.GetRequiredService<IClinicalService>());
         services.AddScoped<IPatientPortalService, PatientPortalService>();
+        services.AddScoped<IInventoryService, InventoryService>();
 
         var provider = services.BuildServiceProvider();
         return (provider, emailSender);

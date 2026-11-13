@@ -62,6 +62,7 @@ public static class ProblemDetailsMapper
                        c.Contains("PORTAL_EMAIL_IN_USE", StringComparison.OrdinalIgnoreCase) ||
                        c.Contains("PORTAL_ACCOUNT_ALREADY_ACTIVE", StringComparison.OrdinalIgnoreCase) ||
                        c.Contains("HOURLY_CODE_CAP_REACHED", StringComparison.OrdinalIgnoreCase) ||
+                       c.Contains("INSUFFICIENT_STOCK", StringComparison.OrdinalIgnoreCase) ||
                        c.Contains("DUPLICATE", StringComparison.OrdinalIgnoreCase) => StatusCodes.Status409Conflict,
             _ => StatusCodes.Status400BadRequest
         };

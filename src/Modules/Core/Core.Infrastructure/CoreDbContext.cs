@@ -82,6 +82,13 @@ public sealed class CoreDbContext : IdentityDbContext<AppUser, AppRole, Guid>
     public DbSet<PortalConsent> PortalConsents => Set<PortalConsent>();
     public DbSet<ClinicPortalSetting> ClinicPortalSettings => Set<ClinicPortalSetting>();
     public DbSet<ClinicPortalBookingSetting> ClinicPortalBookingSettings => Set<ClinicPortalBookingSetting>();
+    public DbSet<InventoryItem> InventoryItems => Set<InventoryItem>();
+    public DbSet<InventoryItemBatch> InventoryItemBatches => Set<InventoryItemBatch>();
+    public DbSet<StockMovement> StockMovements => Set<StockMovement>();
+    public DbSet<PurchaseInvoice> PurchaseInvoices => Set<PurchaseInvoice>();
+    public DbSet<PurchaseInvoiceLine> PurchaseInvoiceLines => Set<PurchaseInvoiceLine>();
+    public DbSet<ClinicInventorySetting> ClinicInventorySettings => Set<ClinicInventorySetting>();
+    public DbSet<InventoryAlert> InventoryAlerts => Set<InventoryAlert>();
 
     public CoreDbContext(DbContextOptions<CoreDbContext> options, ICurrentClinic currentClinic)
         : base(options)
@@ -1152,6 +1159,135 @@ public sealed class CoreDbContext : IdentityDbContext<AppUser, AppRole, Guid>
             b.HasIndex(x => x.ClinicId).IsUnique().HasFilter("[IsVoided] = 0");
             b.HasQueryFilter(x => _currentClinic.IsPlatformAdmin || x.ClinicId == _currentClinic.ClinicId);
         });
+
+        // InventoryItems tenant table (inventory schema)
+        builder.Entity<InventoryItem>(b =>
+        {
+            b.ToTable("InventoryItems", "inventory");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.Code).HasMaxLength(64).IsRequired();
+            b.Property(x => x.NameAr).HasMaxLength(200).IsRequired();
+            b.Property(x => x.NameEn).HasMaxLength(200).IsRequired();
+            b.Property(x => x.NormalizedSearchName).HasMaxLength(420).IsRequired();
+            b.Property(x => x.UnitName).HasMaxLength(64).IsRequired();
+            b.Property(x => x.UnitCostAmount).HasPrecision(18, 2);
+            b.Property(x => x.DefaultMarkupPercent).HasPrecision(9, 2);
+            b.Property(x => x.Currency).HasMaxLength(8).IsRequired();
+            b.Property(x => x.LowStockThreshold).HasPrecision(18, 2);
+            b.Property(x => x.QuantityOnHand).HasPrecision(18, 2);
+            b.Property(x => x.SpecialtyCode).HasMaxLength(64);
+            b.Property(x => x.StorageLocation).HasMaxLength(200);
+            b.Property(x => x.VoidedBy).HasMaxLength(128);
+            b.Property(x => x.VoidReason).HasMaxLength(500);
+            b.Property(x => x.RowVersion).IsRowVersion();
+            b.HasIndex(x => new { x.ClinicId, x.Code }).IsUnique().HasFilter("[IsVoided] = 0");
+            b.HasIndex(x => new { x.ClinicId, x.NormalizedSearchName });
+            b.HasQueryFilter(x => _currentClinic.IsPlatformAdmin || x.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // InventoryItemBatches tenant table (inventory schema)
+        builder.Entity<InventoryItemBatch>(b =>
+        {
+            b.ToTable("InventoryItemBatches", "inventory");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.BatchNumber).HasMaxLength(100).IsRequired();
+            b.Property(x => x.QuantityReceived).HasPrecision(18, 2);
+            b.Property(x => x.QuantityRemaining).HasPrecision(18, 2);
+            b.Property(x => x.UnitCostAmount).HasPrecision(18, 2);
+            b.Property(x => x.Currency).HasMaxLength(8).IsRequired();
+            b.Property(x => x.VoidedBy).HasMaxLength(128);
+            b.Property(x => x.VoidReason).HasMaxLength(500);
+            b.Property(x => x.RowVersion).IsRowVersion();
+            b.HasIndex(x => new { x.ClinicId, x.ItemId, x.ExpiryDate });
+            b.HasQueryFilter(x => _currentClinic.IsPlatformAdmin || x.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // StockMovements tenant table (inventory schema, append-only)
+        builder.Entity<StockMovement>(b =>
+        {
+            b.ToTable("StockMovements", "inventory");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.MovementType).HasConversion<string>().HasMaxLength(32).IsRequired();
+            b.Property(x => x.QuantityDelta).HasPrecision(18, 2);
+            b.Property(x => x.BalanceAfter).HasPrecision(18, 2);
+            b.Property(x => x.UnitCostAmount).HasPrecision(18, 2);
+            b.Property(x => x.Currency).HasMaxLength(8).IsRequired();
+            b.Property(x => x.Reason).HasMaxLength(500);
+            b.Property(x => x.CreatedByUserId).HasMaxLength(128).IsRequired();
+            b.Property(x => x.VoidedBy).HasMaxLength(128);
+            b.Property(x => x.VoidReason).HasMaxLength(500);
+            b.Property(x => x.RowVersion).IsRowVersion();
+            b.HasIndex(x => new { x.ClinicId, x.ItemId, x.OccurredAtUtc });
+            b.HasIndex(x => new { x.ClinicId, x.ReferenceVisitId });
+            b.HasQueryFilter(x => _currentClinic.IsPlatformAdmin || x.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // PurchaseInvoices tenant table (inventory schema)
+        builder.Entity<PurchaseInvoice>(b =>
+        {
+            b.ToTable("PurchaseInvoices", "inventory");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.SupplierName).HasMaxLength(200).IsRequired();
+            b.Property(x => x.InvoiceNumber).HasMaxLength(100).IsRequired();
+            b.Property(x => x.TotalAmount).HasPrecision(18, 2);
+            b.Property(x => x.PaidAmount).HasPrecision(18, 2);
+            b.Property(x => x.RemainingAmount).HasPrecision(18, 2);
+            b.Property(x => x.Currency).HasMaxLength(8).IsRequired();
+            b.Property(x => x.Notes).HasMaxLength(1000);
+            b.Property(x => x.RecordedByUserId).HasMaxLength(128).IsRequired();
+            b.Property(x => x.VoidedBy).HasMaxLength(128);
+            b.Property(x => x.VoidReason).HasMaxLength(500);
+            b.Property(x => x.RowVersion).IsRowVersion();
+            b.HasIndex(x => new { x.ClinicId, x.SupplierId, x.InvoiceDate });
+            b.HasIndex(x => new { x.ClinicId, x.InvoiceNumber }).IsUnique().HasFilter("[IsVoided] = 0");
+            b.HasQueryFilter(x => _currentClinic.IsPlatformAdmin || x.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // PurchaseInvoiceLines tenant table (inventory schema)
+        builder.Entity<PurchaseInvoiceLine>(b =>
+        {
+            b.ToTable("PurchaseInvoiceLines", "inventory");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.TotalUnits).HasPrecision(18, 2);
+            b.Property(x => x.PackPriceAmount).HasPrecision(18, 2);
+            b.Property(x => x.LineTotalAmount).HasPrecision(18, 2);
+            b.Property(x => x.UnitCostAmount).HasPrecision(18, 2);
+            b.Property(x => x.Currency).HasMaxLength(8).IsRequired();
+            b.Property(x => x.BatchNumber).HasMaxLength(100).IsRequired();
+            b.Property(x => x.VoidedBy).HasMaxLength(128);
+            b.Property(x => x.VoidReason).HasMaxLength(500);
+            b.Property(x => x.RowVersion).IsRowVersion();
+            b.HasIndex(x => new { x.ClinicId, x.PurchaseInvoiceId });
+            b.HasQueryFilter(x => _currentClinic.IsPlatformAdmin || x.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // ClinicInventorySettings tenant table (inventory schema)
+        builder.Entity<ClinicInventorySetting>(b =>
+        {
+            b.ToTable("ClinicInventorySettings", "inventory");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.NegativeStockPolicy).HasConversion<string>().HasMaxLength(32).IsRequired();
+            b.Property(x => x.VoidedBy).HasMaxLength(128);
+            b.Property(x => x.VoidReason).HasMaxLength(500);
+            b.Property(x => x.RowVersion).IsRowVersion();
+            b.HasIndex(x => x.ClinicId).IsUnique().HasFilter("[IsVoided] = 0");
+            b.HasQueryFilter(x => _currentClinic.IsPlatformAdmin || x.ClinicId == _currentClinic.ClinicId);
+        });
+
+        // InventoryAlerts tenant table (inventory schema)
+        builder.Entity<InventoryAlert>(b =>
+        {
+            b.ToTable("InventoryAlerts", "inventory");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.Kind).HasConversion<string>().HasMaxLength(32).IsRequired();
+            b.Property(x => x.MessageAr).HasMaxLength(500).IsRequired();
+            b.Property(x => x.MessageEn).HasMaxLength(500).IsRequired();
+            b.Property(x => x.VoidedBy).HasMaxLength(128);
+            b.Property(x => x.VoidReason).HasMaxLength(500);
+            b.Property(x => x.RowVersion).IsRowVersion();
+            b.HasIndex(x => new { x.ClinicId, x.IsResolved, x.Kind });
+            b.HasQueryFilter(x => _currentClinic.IsPlatformAdmin || x.ClinicId == _currentClinic.ClinicId);
+        });
     }
 
     /// <summary>
@@ -1296,7 +1432,21 @@ public sealed class CoreDbContext : IdentityDbContext<AppUser, AppRole, Guid>
                 ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON portal.ClinicPortalSettings,
                 ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON portal.ClinicPortalSettings,
                 ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON portal.ClinicPortalBookingSettings,
-                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON portal.ClinicPortalBookingSettings
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON portal.ClinicPortalBookingSettings,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON inventory.InventoryItems,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON inventory.InventoryItems,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON inventory.InventoryItemBatches,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON inventory.InventoryItemBatches,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON inventory.StockMovements,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON inventory.StockMovements,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON inventory.PurchaseInvoices,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON inventory.PurchaseInvoices,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON inventory.PurchaseInvoiceLines,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON inventory.PurchaseInvoiceLines,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON inventory.ClinicInventorySettings,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON inventory.ClinicInventorySettings,
+                ADD FILTER PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON inventory.InventoryAlerts,
+                ADD BLOCK PREDICATE sec.fn_tenantSecurityPredicate(ClinicId) ON inventory.InventoryAlerts
                 WITH (STATE = ON);
             ');
         ";

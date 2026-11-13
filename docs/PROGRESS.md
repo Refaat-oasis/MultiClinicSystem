@@ -469,3 +469,26 @@ Status: 0 Errors, Clean Build
 - [x] Three `NoShow` transitions automatically block online booking (`PATIENT_ONLINE_BOOKING_BLOCKED`) until reception unblocks; turning `portal-booking` off returns `MODULE_DISABLED` without affecting staff scheduling.
 - [x] Phases 0 to 11 cumulative gates, portal isolation & architecture sweeps, and frontend test/lint/build pass 100% green.
 
+
+---
+
+## Phase 12: Inventory Module (Stock, Pack Purchasing, FEFO Deduction & Alerts) (DONE)
+- **Branch**: `phase-12/inventory`
+- **Completed Tasks**:
+  - **Domain (`src/Modules/Core/Core.Domain/`)**: Added `NegativeStockPolicy` (`Block`, `AllowWithWarning`), `StockMovementType` (`PurchaseReceived`, `SessionUsed`, `ManualAdjustment`), `InventoryAlertKind` (`LowStock`, `NearExpiry`, `NegativeStock`), `InventoryItem` (with `ArabicNormalizer.NormalizeText`, pack definition, unit cost, markup, threshold, active flag), `InventoryItemBatch` (`IsNearExpiry`, `IsExpired`), `StockMovement` (append-only ledger), `PurchaseInvoice`, `PurchaseInvoiceLine`, `ClinicInventorySetting`, `InventoryAlert`, and `InventoryFefoAllocator` (FEFO batch allocation, pack unit-cost rounding, weighted-average unit cost, patient markup price calculation, and `INSUFFICIENT_STOCK` enforcement), plus 4 domain unit tests in `InventoryDomainTests`.
+  - **Application & Infrastructure**: Added `IInventoryService` and 15 single-file DTO/input/result models; implemented `InventoryService` (`UpsertItemAsync`, `ListItemsAsync`, `ListBatchesAsync`, `ListMovementsAsync`, `ReceivePurchaseInvoiceAsync`, `ListPurchaseInvoicesAsync`, `AdjustStockAsync`, `ListAlertsAsync`, `ResolveAlertAsync`, `GetSettingsAsync`, `UpdateSettingsAsync`, `GetSupplierStatementAsync`, `ConsumeVisitToolsAsync`, and `InspectClinicInventoryAsync`); added `"inventory"` schema EF mappings and SQL Server RLS `FILTER`/`BLOCK` predicates on all 7 inventory tables in `CoreDbContext`; integrated tool consumption + marked-up `ChargeToolLineInput` into `ClinicalService.CompleteVisitAsync` / `OutboxService` / `BillingService.CreateDraftChargeForCompletedVisitAsync` & `RecordSupplierPurchaseInvoiceExpenseAsync`; registered `"inventory"` manifest & 5 live `inventory.*` widgets (`low-stock`, `near-expiry`, `stock-value`, `usage-by-item`, `negative-stock-events`) in `ModuleCatalogService` and `DashboardService`.
+  - **API & Architecture**: Added `InventoryController` (`/api/v1/clinics/{clinicId}/inventory/...`), `PlatformClinicsController.InspectInventory`, `ClinicalController` `ToolsUsed` mapping, `INSUFFICIENT_STOCK` (`409 Conflict`) in `ProblemDetailsMapper`, and single-type DTOs/ViewModels (`InventoryItemViewModel.ItemCode` preserving `VerificationCodeSweepTests`).
+  - **Frontend (`web/`)**: Added `Phase12InventoryScreen.tsx` + `Phase12InventoryScreen.test.tsx` (SKU catalog, live pack-size/pack-price unit cost calculator, FEFO batch viewer, manual stock adjustment, alert resolution, negative stock policy settings, supplier statement reconciliation, and Super Admin `readOnlyInspectMode`), mounted in `web/apps/clinic/src/App.tsx` (`inventory` tab) and `web/apps/admin/src/InspectClinicShell.tsx`.
+- **Verification Output Summary**:
+  - `dotnet test tests/UnitTests/UnitTests.csproj --no-restore`: `Passed! - Failed: 0, Passed: 157, Skipped: 0, Total: 157`
+  - `dotnet test tests/ArchitectureTests/ArchitectureTests.csproj --no-build`: `Passed! - Failed: 0, Passed: 15, Skipped: 0, Total: 15`
+  - `dotnet test tests/IntegrationTests/IntegrationTests.csproj --no-build`: `Passed! - Failed: 0, Passed: 32, Skipped: 0, Total: 32`
+  - `dotnet test tests/Gates/Gates.csproj --no-build` (Phases 0–12 cumulative): `Passed! - Failed: 0, Passed: 25, Skipped: 0, Total: 25`
+  - Frontend `npm --prefix web test; npm --prefix web run lint; npm --prefix web run build`: `53/53` Vitest tests passed (`admin-app`: 7, `clinic-app`: 5, `api-client`: 3, `ui`: 3, `feature-core`: 35), `tsc --noEmit` 0 errors, Vite production builds succeeded.
+
+### Phase 12 Exit Checklist
+- [x] Pack-based purchasing allows pack size & price edits, recomputes unit cost cleanly, and reconciles balances with Finance supplier payables (`Expense` + `SupplierPayment`).
+- [x] Clinical visit tool usage deducts FEFO batches once per `OperationId`, posts marked-up `ChargeLine` tool charges to `BillingService`, and ignores inventory safely when `"inventory"` is disabled.
+- [x] Low-stock, near-expiry, and negative-stock alerts fire without duplication and honor clinic `NegativeStockPolicy` (`Block` vs `AllowWithWarning`).
+- [x] Inventory dashboard widgets match live stock/usage/valuation data and disappear cleanly when `"inventory"` is turned off without affecting unrelated modules.
+- [x] Phases 0 to 12 cumulative gates, architecture/RLS sweeps, and frontend test/lint/build pass 100% green.

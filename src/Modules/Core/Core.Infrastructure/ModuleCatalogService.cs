@@ -450,7 +450,8 @@ public sealed class ModuleCatalogService : IModuleCatalogService
                 ],
                 MenuItems:
                 [
-                    new("inventory.items", "inventory", "المخزون", "Inventory", "/inventory", "inventory.read", 200)
+                    new("inventory.items", "inventory", "المخزون", "Inventory", "/inventory", "inventory.read", 200),
+                    new("inventory.dashboard", "inventory", "لوحة المخزون", "Inventory Dashboard", "/inventory/dashboard", "inventory.read", 205)
                 ],
                 SettingsSections:
                 [
@@ -458,7 +459,11 @@ public sealed class ModuleCatalogService : IModuleCatalogService
                 ],
                 DashboardWidgets:
                 [
-                    new("inventory.low-stock", "inventory", "inventory.read", "Clinic", "تنبيهات انخفاض المخزون", "Low Stock Items")
+                    new("inventory.low-stock", "inventory", "inventory.read", "Clinic", "تنبيهات انخفاض المخزون", "Low Stock Items"),
+                    new("inventory.near-expiry", "inventory", "inventory.read", "Clinic", "دفعات قريبة الانتهاء", "Near Expiry Batches"),
+                    new("inventory.stock-value", "inventory", "inventory.read", "Clinic", "قيمة المخزون الحالية", "Current Stock Valuation"),
+                    new("inventory.usage-by-item", "inventory", "inventory.read", "Clinic", "الاستهلاك حسب الصنف", "Tool Consumption Volume"),
+                    new("inventory.negative-stock-events", "inventory", "inventory.read", "Clinic", "أحداث الرصيد السالب", "Negative Stock Events")
                 ]),
 
             new ModuleManifestEntry(

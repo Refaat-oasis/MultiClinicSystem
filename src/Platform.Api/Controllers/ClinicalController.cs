@@ -411,7 +411,10 @@ public sealed class ClinicalController : ControllerBase
             return Unauthorized();
         }
 
-        var input = new CompleteVisitInput(dto.IsOvertimeExcused, dto.OvertimeExcuseReason, dto.OperationId);
+        var toolsUsed = dto.ToolsUsed?
+            .Select(t => new VisitToolUsageInput(t.InventoryItemId, t.Quantity, t.PatientUnitPriceOverride))
+            .ToList();
+        var input = new CompleteVisitInput(dto.IsOvertimeExcused, dto.OvertimeExcuseReason, dto.OperationId, toolsUsed);
         var result = await _clinicalService.CompleteVisitAsync(
             userId, clinicId, visitId, input, GetDeviceId(), GetIp(), GetRequestId(), cancellationToken);
 
