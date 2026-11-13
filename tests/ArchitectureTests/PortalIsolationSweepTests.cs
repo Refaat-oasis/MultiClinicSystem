@@ -97,7 +97,7 @@ public sealed class PortalIsolationSweepTests
     [Fact]
     public void Given_PortalDomainTables_When_CheckingTenantContract_Then_ImplementTenantAndSoftDelete()
     {
-        Type[] portalEntities = { typeof(PatientAccount), typeof(PortalConsent), typeof(ClinicPortalSetting) };
+        Type[] portalEntities = { typeof(PatientAccount), typeof(PortalConsent), typeof(ClinicPortalSetting), typeof(ClinicPortalBookingSetting) };
         foreach (Type entity in portalEntities)
         {
             typeof(ITenantEntity).IsAssignableFrom(entity).Should().BeTrue($"{entity.Name} must implement ITenantEntity.");

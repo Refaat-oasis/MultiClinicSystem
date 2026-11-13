@@ -326,6 +326,24 @@ public sealed class PlatformClinicsController : ControllerBase
             : Ok(PatientPortalViewModelMapper.ToViewModel(result.Value));
     }
 
+    [HttpGet("{clinicId:guid}/inspect/portal-booking")]
+    [ProducesResponseType(typeof(ClinicPortalBookingInspectViewModel), StatusCodes.Status200OK)]
+    public async Task<IActionResult> InspectPortalBooking(
+        Guid clinicId,
+        [FromServices] IPatientPortalService portalService,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetAdminId(out Guid adminId))
+        {
+            return Unauthorized();
+        }
+
+        var result = await portalService.InspectClinicPortalBookingAsync(adminId.ToString(), clinicId, cancellationToken);
+        return result.IsFailure
+            ? ProblemDetailsMapper.ToProblemDetails(result.Error)
+            : Ok(PatientPortalViewModelMapper.ToViewModel(result.Value));
+    }
+
     [HttpPost("{clinicId:guid}/inspect/{*subpath}")]
     [HttpPut("{clinicId:guid}/inspect/{*subpath}")]
     [HttpDelete("{clinicId:guid}/inspect/{*subpath}")]

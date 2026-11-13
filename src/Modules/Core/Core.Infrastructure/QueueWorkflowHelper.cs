@@ -160,6 +160,7 @@ internal static class QueueWorkflowHelper
                     if (markNoShowOnExceed)
                     {
                         linked.MarkNoShow(now);
+                        await PortalBookingHelper.RecordPatientNoShowAsync(dbContext, clinicId, linked.PatientId, now, cancellationToken);
                     }
                     else
                     {

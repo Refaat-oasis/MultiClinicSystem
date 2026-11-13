@@ -121,8 +121,9 @@ public sealed class AvailabilityQueriesService : IAvailabilityQueries
                 .Where(a => a.ClinicId == clinicId && !a.IsVoided && a.EndUtc > fromUtc && a.StartUtc < toUtc)
                 .ToListAsync(cancellationToken);
 
+            DateTimeOffset nowUtc = _clock.UtcNow;
             List<AvailabilityBusyInterval> busy = existingAppointments
-                .Where(a => AppointmentStateMachine.IsOccupyingStatus(a.Status))
+                .Where(a => AppointmentStateMachine.IsOccupying(a, nowUtc))
                 .Select(a => new AvailabilityBusyInterval(a.DoctorId, a.RoomId, a.StartUtc, a.EndUtc))
                 .ToList();
 

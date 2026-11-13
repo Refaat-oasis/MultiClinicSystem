@@ -33,7 +33,14 @@ public static class AppointmentStateMachine
         ],
         [AppointmentStatus.Completed] = [],
         [AppointmentStatus.NoShow] = [],
-        [AppointmentStatus.Cancelled] = []
+        [AppointmentStatus.Cancelled] = [],
+        [AppointmentStatus.Requested] =
+        [
+            AppointmentStatus.Booked,
+            AppointmentStatus.Declined,
+            AppointmentStatus.Cancelled
+        ],
+        [AppointmentStatus.Declined] = []
     };
 
     public static bool CanTransition(AppointmentStatus from, AppointmentStatus to)
@@ -51,7 +58,7 @@ public static class AppointmentStateMachine
 
     /// <summary>
     /// Returns true if the appointment occupies a doctor/room calendar slot.
-    /// Cancelled and NoShow release the slot.
+    /// Cancelled, Declined, and NoShow release the slot. Requested holds the slot while pending approval.
     /// </summary>
     public static bool IsOccupyingStatus(AppointmentStatus status)
     {
@@ -59,7 +66,22 @@ public static class AppointmentStateMachine
             or AppointmentStatus.Arrived
             or AppointmentStatus.InSession
             or AppointmentStatus.Completed
-            or AppointmentStatus.Late;
+            or AppointmentStatus.Late
+            or AppointmentStatus.Requested;
+    }
+
+    /// <summary>
+    /// Evaluates slot occupancy accounting for unapproved portal request expiry.
+    /// </summary>
+    public static bool IsOccupying(Appointment appointment, DateTimeOffset nowUtc)
+    {
+        ArgumentNullException.ThrowIfNull(appointment);
+        if (!IsOccupyingStatus(appointment.Status))
+        {
+            return false;
+        }
+
+        return !appointment.IsPortalRequestExpired(nowUtc);
     }
 }
 

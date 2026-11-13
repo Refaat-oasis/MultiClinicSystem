@@ -24,6 +24,10 @@ public sealed class Appointment : ITenantEntity, ISoftDeletable
     public string? Notes { get; private set; }
     public string? CancelReason { get; private set; }
     public Guid? CreatedByUserId { get; private set; }
+    public DateTimeOffset? ApprovalExpiresAtUtc { get; private set; }
+    public Guid? ReviewedByUserId { get; private set; }
+    public DateTimeOffset? ReviewedAtUtc { get; private set; }
+    public string? ReviewNotes { get; private set; }
     public bool IsVoided { get; set; }
     public DateTimeOffset? VoidedAtUtc { get; set; }
     public string? VoidedBy { get; set; }
@@ -175,6 +179,51 @@ public sealed class Appointment : ITenantEntity, ISoftDeletable
             Status = AppointmentStatus.NoShow;
             UpdatedAtUtc = now;
         }
+    }
+
+    public void MarkAsPendingPortalRequest(DateTimeOffset approvalExpiresAtUtc, DateTimeOffset nowUtc)
+    {
+        Status = AppointmentStatus.Requested;
+        ApprovalExpiresAtUtc = approvalExpiresAtUtc.ToUniversalTime();
+        UpdatedAtUtc = nowUtc.ToUniversalTime();
+    }
+
+    public bool IsPortalRequestExpired(DateTimeOffset nowUtc)
+    {
+        return Status == AppointmentStatus.Requested
+               && ApprovalExpiresAtUtc.HasValue
+               && nowUtc.ToUniversalTime() >= ApprovalExpiresAtUtc.Value;
+    }
+
+    public bool ApprovePortalRequest(Guid reviewedByUserId, string? reviewNotes, DateTimeOffset nowUtc)
+    {
+        if (Status != AppointmentStatus.Requested || IsPortalRequestExpired(nowUtc))
+        {
+            return false;
+        }
+
+        Status = AppointmentStatus.Booked;
+        ReviewedByUserId = reviewedByUserId == Guid.Empty ? null : reviewedByUserId;
+        ReviewedAtUtc = nowUtc.ToUniversalTime();
+        ReviewNotes = string.IsNullOrWhiteSpace(reviewNotes) ? null : reviewNotes.Trim();
+        ApprovalExpiresAtUtc = null;
+        UpdatedAtUtc = ReviewedAtUtc.Value;
+        return true;
+    }
+
+    public bool DeclinePortalRequest(Guid? reviewedByUserId, string? reviewNotes, DateTimeOffset nowUtc)
+    {
+        if (Status != AppointmentStatus.Requested)
+        {
+            return false;
+        }
+
+        Status = AppointmentStatus.Declined;
+        ReviewedByUserId = reviewedByUserId == Guid.Empty ? null : reviewedByUserId;
+        ReviewedAtUtc = nowUtc.ToUniversalTime();
+        ReviewNotes = string.IsNullOrWhiteSpace(reviewNotes) ? null : reviewNotes.Trim();
+        UpdatedAtUtc = ReviewedAtUtc.Value;
+        return true;
     }
 
     public void Void(DateTimeOffset voidedAtUtc, string voidedBy, string? reason = null)

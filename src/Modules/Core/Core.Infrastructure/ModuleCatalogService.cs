@@ -554,16 +554,33 @@ public sealed class ModuleCatalogService : IModuleCatalogService
                 ModuleKey: "portal-booking",
                 TitleAr: "حجز المواعيد من البوابة",
                 TitleEn: "Portal Online Booking",
-                DescriptionAr: "تمكين المرضى من حجز وإلغاء المواعيد ذاتياً.",
-                DescriptionEn: "Allow patients to self-book and cancel appointments.",
+                DescriptionAr: "تمكين المرضى من حجز وإلغاء المواعيد ذاتياً ومراجعة الطلبات.",
+                DescriptionEn: "Allow patients to self-book and cancel appointments online.",
                 Prerequisites: ["portal", "scheduling"],
                 Permissions:
                 [
-                    new("portal.booking.manage", "portal-booking", "Patient Portal", "إدارة الحجز الذاتي", "Manage Portal Self-Booking", false)
+                    new("portal.booking.manage", "portal-booking", "Patient Portal", "إدارة الحجز الذاتي", "Manage Portal Self-Booking", false),
+                    new("portal.booking.requests.review", "portal-booking", "Patient Portal", "مراجعة طلبات الحجز", "Review Portal Booking Requests", false),
+                    new("portal.booking.dashboard.view", "portal-booking", "Patient Portal", "عرض لوحة الحجز الذاتي", "View Portal Booking Dashboard", false)
                 ],
-                MenuItems: Array.Empty<ModuleMenuItemResult>(),
-                SettingsSections: Array.Empty<SettingsSectionResult>(),
-                DashboardWidgets: Array.Empty<DashboardWidgetDefinitionResult>()),
+                MenuItems:
+                [
+                    new("portal-booking.dashboard", "portal-booking", "لوحة الحجز الذاتي", "Portal Booking Dashboard", "/portal-booking/dashboard", "portal.booking.dashboard.view", 242),
+                    new("portal-booking.requests", "portal-booking", "طلبات الحجز من البوابة", "Portal Booking Requests", "/portal-booking/requests", "portal.booking.requests.review", 244)
+                ],
+                SettingsSections:
+                [
+                    new("portal-booking-settings", "إعدادات الحجز الذاتي من البوابة", "Portal Booking Rules", "clinic.settings.edit", "portal-booking")
+                ],
+                DashboardWidgets:
+                [
+                    new("portal-booking.daily-count", "portal-booking", "portal.booking.dashboard.view", "Clinic", "حجوزات البوابة", "Portal Bookings Count"),
+                    new("portal-booking.cancellations", "portal-booking", "portal.booking.dashboard.view", "Clinic", "إلغاءات البوابة", "Portal Cancellations"),
+                    new("portal-booking.pending-requests", "portal-booking", "portal.booking.dashboard.view", "Clinic", "طلبات الحجز المعلقة", "Pending Approval Requests"),
+                    new("portal-booking.no-shows", "portal-booking", "portal.booking.dashboard.view", "Clinic", "حالات عدم الحضور من البوابة", "Portal No-Shows & Blocks"),
+                    new("portal-booking.slot-utilization", "portal-booking", "portal.booking.dashboard.view", "Clinic", "استخدام الحصة اليومية للبوابة", "Portal Daily Cap Utilization (%)"),
+                    new("portal-booking.portal-share", "portal-booking", "portal.booking.dashboard.view", "Clinic", "نسبة الحجز الذاتي من البوابة", "Portal Share of Total Bookings (%)")
+                ]),
 
             new ModuleManifestEntry(
                 ModuleKey: "offline-sync",

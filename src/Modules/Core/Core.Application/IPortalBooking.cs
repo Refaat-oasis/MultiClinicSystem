@@ -24,5 +24,28 @@ public interface IPortalBooking
         Guid appointmentId,
         string? reason,
         CancellationToken cancellationToken = default);
+
+    Task<Result<AppointmentItemResult>> ApprovePortalBookingRequestAsync(
+        Guid staffUserId,
+        Guid clinicId,
+        Guid appointmentId,
+        string? reviewNotes,
+        string? ipAddress,
+        string? requestId,
+        CancellationToken cancellationToken = default);
+
+    Task<Result<AppointmentItemResult>> DeclinePortalBookingRequestAsync(
+        Guid staffUserId,
+        Guid clinicId,
+        Guid appointmentId,
+        string? reviewNotes,
+        string? ipAddress,
+        string? requestId,
+        CancellationToken cancellationToken = default);
+
+    Task<Result<int>> ExpireStalePortalBookingRequestsAsync(
+        Guid clinicId,
+        Guid? actorUserId,
+        CancellationToken cancellationToken = default);
 }
 

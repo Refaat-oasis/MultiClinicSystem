@@ -138,7 +138,10 @@ public static class PatientPortalViewModelMapper
         s.ConsentTermsVersion,
         s.LastLoginAtUtc,
         s.GeneratedPrintedPin,
-        s.PrintedPinExpiresAtUtc);
+        s.PrintedPinExpiresAtUtc,
+        s.NoShowCount,
+        s.IsOnlineBookingBlocked,
+        s.OnlineBookingBlockReason);
 
     public static ClinicPortalSettingViewModel ToViewModel(ClinicPortalSettingResult s) => new(
         s.ClinicId,
@@ -167,5 +170,83 @@ public static class PatientPortalViewModelMapper
         r.DisabledAccountsCount,
         r.PatientViewsLast30DaysCount,
         ToViewModel(r.Settings));
+
+    public static PortalBookableCategoryItemViewModel ToViewModel(PortalBookableCategoryItemResult c) => new(
+        c.CategoryId,
+        c.SpecialtyCode,
+        c.NameAr,
+        c.NameEn,
+        c.DurationMinutes,
+        c.PriceAmount,
+        c.PriceCurrency);
+
+    public static PortalBookableDoctorItemViewModel ToViewModel(PortalBookableDoctorItemResult d) => new(
+        d.DoctorId,
+        d.DisplayName,
+        d.SpecialtyCode);
+
+    public static PortalAvailableSlotItemViewModel ToViewModel(PortalAvailableSlotItemResult s) => new(
+        s.DoctorId,
+        s.DoctorName,
+        s.RoomId,
+        s.LocalDate,
+        s.StartAtUtc,
+        s.EndAtUtc,
+        s.DurationMinutes);
+
+    public static PortalAvailabilityViewModel ToViewModel(PortalAvailabilityResult a) => new(
+        a.ClinicId,
+        a.ClinicTimeZone,
+        a.BookingMode,
+        a.CancellationCutoffHours,
+        a.MaxActiveFutureBookingsPerPatient,
+        a.ActiveFutureBookingsCount,
+        a.IsPatientOnlineBookingBlocked,
+        a.OnlineBookingBlockReason,
+        a.Categories.Select(ToViewModel).ToList(),
+        a.Doctors.Select(ToViewModel).ToList(),
+        a.Slots.Select(ToViewModel).ToList());
+
+    public static ClinicPortalBookingSettingViewModel ToViewModel(ClinicPortalBookingSettingResult s) => new(
+        s.ClinicId,
+        s.Mode,
+        s.MinLeadTimeMinutes,
+        s.MaxDaysAhead,
+        s.SlotStepMinutes,
+        s.MaxActiveFutureBookingsPerPatient,
+        s.MaxBookingsPerDay,
+        s.CancellationCutoffHours,
+        s.AutoBlockAfterNoShows,
+        s.ApprovalHoldHours,
+        s.ShowPricesWhenAvailable,
+        s.UpdatedAtUtc);
+
+    public static PortalBookingRequestItemViewModel ToViewModel(PortalBookingRequestItemResult r) => new(
+        r.AppointmentId,
+        r.ClinicId,
+        r.PatientId,
+        r.PatientFileNumber,
+        r.PatientName,
+        r.DoctorId,
+        r.DoctorName,
+        r.CategoryId,
+        r.CategoryNameAr,
+        r.CategoryNameEn,
+        r.StartAtUtc,
+        r.EndAtUtc,
+        r.Status,
+        r.ApprovalExpiresAtUtc,
+        r.IsExpired,
+        r.Notes,
+        r.ReviewNotes,
+        r.CreatedAtUtc);
+
+    public static ClinicPortalBookingInspectViewModel ToViewModel(ClinicPortalBookingInspectResult i) => new(
+        i.ClinicId,
+        ToViewModel(i.Settings),
+        i.PendingRequestsCount,
+        i.TodayPortalBookingsCount,
+        i.BlockedPatientsCount,
+        i.PendingRequests.Select(ToViewModel).ToList());
 }
 

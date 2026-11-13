@@ -298,6 +298,88 @@ public sealed class PatientPortalController : ControllerBase
         return File(result.Value.Content, result.Value.ContentType, result.Value.FileName);
     }
 
+    [HttpGet("availability")]
+    [Authorize(Policy = "portal.patient")]
+    [ProducesResponseType(typeof(PortalAvailabilityViewModel), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetAvailability(
+        string slug,
+        [FromQuery] Guid? categoryId,
+        [FromQuery] Guid? doctorId,
+        [FromQuery] DateTimeOffset? fromUtc,
+        [FromQuery] DateTimeOffset? toUtc,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetPortalIdentity(out Guid accountId, out Guid clinicId, out Guid patientId))
+        {
+            return Unauthorized();
+        }
+
+        var result = await _portalService.GetPortalAvailabilityAsync(
+            accountId, clinicId, patientId, slug, categoryId, doctorId, fromUtc, toUtc, cancellationToken);
+
+        return result.IsFailure
+            ? ProblemDetailsMapper.ToProblemDetails(result.Error)
+            : Ok(PatientPortalViewModelMapper.ToViewModel(result.Value));
+    }
+
+    [HttpPost("appointments")]
+    [Authorize(Policy = "portal.patient")]
+    [ProducesResponseType(typeof(PortalUpcomingAppointmentItemViewModel), StatusCodes.Status200OK)]
+    public async Task<IActionResult> BookAppointment(
+        string slug,
+        [FromBody] PortalBookAppointmentDto dto,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetPortalIdentity(out Guid accountId, out Guid clinicId, out Guid patientId))
+        {
+            return Unauthorized();
+        }
+
+        var result = await _portalService.BookAppointmentFromPortalAsync(
+            accountId,
+            clinicId,
+            patientId,
+            slug,
+            new PortalBookAppointmentInput(dto.DoctorId, dto.CategoryId, dto.StartAtUtc, dto.Notes, dto.OperationId),
+            GetIp(),
+            GetRequestId(),
+            cancellationToken);
+
+        return result.IsFailure
+            ? ProblemDetailsMapper.ToProblemDetails(result.Error)
+            : Ok(PatientPortalViewModelMapper.ToViewModel(result.Value));
+    }
+
+    [HttpPost("appointments/{appointmentId:guid}/cancel")]
+    [Authorize(Policy = "portal.patient")]
+    [ProducesResponseType(typeof(PortalUpcomingAppointmentItemViewModel), StatusCodes.Status200OK)]
+    public async Task<IActionResult> CancelAppointment(
+        string slug,
+        Guid appointmentId,
+        [FromBody] CancelPortalAppointmentDto? dto,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetPortalIdentity(out Guid accountId, out Guid clinicId, out Guid patientId))
+        {
+            return Unauthorized();
+        }
+
+        var result = await _portalService.CancelAppointmentFromPortalAsync(
+            accountId,
+            clinicId,
+            patientId,
+            slug,
+            appointmentId,
+            dto?.Reason,
+            GetIp(),
+            GetRequestId(),
+            cancellationToken);
+
+        return result.IsFailure
+            ? ProblemDetailsMapper.ToProblemDetails(result.Error)
+            : Ok(PatientPortalViewModelMapper.ToViewModel(result.Value));
+    }
+
     private void SetPortalCookie(string accessToken, DateTimeOffset expiresAtUtc)
     {
         Response.Cookies.Append(PortalCookieName, accessToken, new CookieOptions

@@ -140,19 +140,77 @@ export interface PortalHomeOverviewData {
   treatmentPlans?: PortalTreatmentPlan[] | null;
 }
 
+export interface PortalBookableCategoryItem {
+  categoryId: string;
+  specialtyCode: string;
+  nameAr: string;
+  nameEn: string;
+  durationMinutes: number;
+  priceAmount?: number | null;
+  priceCurrency?: string | null;
+}
+
+export interface PortalBookableDoctorItem {
+  doctorId: string;
+  displayName?: string | null;
+  specialtyCode: string;
+}
+
+export interface PortalAvailableSlotItem {
+  doctorId: string;
+  doctorName?: string | null;
+  roomId?: string | null;
+  localDate: string;
+  startAtUtc: string;
+  endAtUtc: string;
+  durationMinutes: number;
+}
+
+export interface PortalAvailabilityData {
+  clinicId: string;
+  clinicTimeZone: string;
+  bookingMode: 'AutoConfirm' | 'RequiresApproval' | string;
+  cancellationCutoffHours: number;
+  maxActiveFutureBookingsPerPatient: number;
+  activeFutureBookingsCount: number;
+  isPatientOnlineBookingBlocked: boolean;
+  onlineBookingBlockReason?: string | null;
+  categories: PortalBookableCategoryItem[];
+  doctors: PortalBookableDoctorItem[];
+  slots: PortalAvailableSlotItem[];
+}
+
+export interface PortalBookAppointmentPayload {
+  slug: string;
+  doctorId: string;
+  categoryId: string;
+  startAtUtc: string;
+  notes: string | null;
+  operationId: string;
+}
+
+export interface PortalCancelAppointmentPayload {
+  slug: string;
+  appointmentId: string;
+  reason: string | null;
+}
+
 export interface PortalAppProps {
   slug?: string;
   initialLanding?: PublicClinicLandingData | null;
   initialOverview?: PortalHomeOverviewData | null;
+  initialAvailability?: PortalAvailabilityData | null;
   onLoginSubmit?: (payload: { slug: string; email: string; password: string }) => Promise<PortalHomeOverviewData | null> | void;
   onActivateEmailSubmit?: (payload: { slug: string; email: string; code: string; newPassword: string }) => Promise<PortalHomeOverviewData | null> | void;
   onRegisterPinSubmit?: (payload: { slug: string; fileNumber: string; dateOfBirth: string; printedPin: string; email: string }) => Promise<void> | void;
   onDownloadSignedResource?: (kind: 'prescription' | 'attachment', id: string) => Promise<string> | void;
+  onBookAppointment?: (payload: PortalBookAppointmentPayload) => Promise<PortalUpcomingAppointment | null> | void;
+  onCancelAppointment?: (payload: PortalCancelAppointmentPayload) => Promise<PortalUpcomingAppointment | null> | void;
   onLogout?: () => void;
 }
 
 type PortalAuthMode = 'login' | 'activate' | 'pin' | 'forgot' | 'reset';
-type PortalTab = 'overview' | 'medical' | 'visits' | 'plans';
+type PortalTab = 'overview' | 'booking' | 'medical' | 'visits' | 'plans';
 
 const resolveSlugFromLocation = (propSlug?: string): string => {
   if (propSlug) return propSlug;
@@ -167,15 +225,27 @@ export const PortalApp: React.FC<PortalAppProps> = ({
   slug: propSlug,
   initialLanding = null,
   initialOverview = null,
+  initialAvailability = null,
   onLoginSubmit,
   onActivateEmailSubmit,
   onRegisterPinSubmit,
   onDownloadSignedResource,
+  onBookAppointment,
+  onCancelAppointment,
   onLogout,
 }) => {
   const slug = resolveSlugFromLocation(propSlug);
   const [landing, setLanding] = useState<PublicClinicLandingData | null>(initialLanding);
   const [overview, setOverview] = useState<PortalHomeOverviewData | null>(initialOverview);
+  const [availability, setAvailability] = useState<PortalAvailabilityData | null>(initialAvailability);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>(
+    initialAvailability?.categories[0]?.categoryId ?? '',
+  );
+  const [selectedDoctorId, setSelectedDoctorId] = useState<string>('');
+  const [selectedSlotStartUtc, setSelectedSlotStartUtc] = useState<string>(
+    initialAvailability?.slots[0]?.startAtUtc ?? '',
+  );
+  const [bookingNotes, setBookingNotes] = useState('');
   const [authMode, setAuthMode] = useState<PortalAuthMode>('login');
   const [activeTab, setActiveTab] = useState<PortalTab>('overview');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -314,8 +384,192 @@ export const PortalApp: React.FC<PortalAppProps> = ({
     }
   };
 
+  useEffect(() => {
+    if (
+      !overview ||
+      availability ||
+      !overview.availableSections?.includes('portal-booking') ||
+      typeof fetch === 'undefined' ||
+      (typeof window !== 'undefined' && !window.location.pathname.startsWith('/c/'))
+    ) {
+      return;
+    }
+    const qs = selectedCategoryId ? `?categoryId=${encodeURIComponent(selectedCategoryId)}` : '';
+    void fetch(`/api/v1/c/${encodeURIComponent(slug)}/portal/availability${qs}`, { credentials: 'include' })
+      .then(async (res) => (res.ok ? ((await res.json()) as PortalAvailabilityData) : null))
+      .then((data) => {
+        if (data) {
+          setAvailability(data);
+          if (!selectedCategoryId && data.categories[0]) {
+            setSelectedCategoryId(data.categories[0].categoryId);
+          }
+          if (!selectedSlotStartUtc && data.slots[0]) {
+            setSelectedSlotStartUtc(data.slots[0].startAtUtc);
+          }
+        }
+      })
+      .catch(() => undefined);
+  }, [overview, availability, selectedCategoryId, selectedSlotStartUtc, slug]);
+
+  const handleBookSlotSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg(null);
+    setInfoMsg(null);
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      setErrorMsg('هذه الخدمة تتطلب اتصالاً نشطاً بالإنترنت (ONLINE_REQUIRED).');
+      return;
+    }
+    if (!availability || !overview) {
+      return;
+    }
+    const chosenSlot =
+      availability.slots.find(
+        (s) =>
+          s.startAtUtc === selectedSlotStartUtc &&
+          (!selectedDoctorId || s.doctorId === selectedDoctorId),
+      ) ?? availability.slots.find((s) => !selectedDoctorId || s.doctorId === selectedDoctorId);
+    if (!chosenSlot) {
+      setErrorMsg('يرجى اختيار موعد متاح أولاً.');
+      return;
+    }
+    const categoryId = selectedCategoryId || availability.categories[0]?.categoryId;
+    if (!categoryId) {
+      setErrorMsg('يرجى اختيار نوع الزيارة.');
+      return;
+    }
+    const operationId =
+      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const payload: PortalBookAppointmentPayload = {
+      slug,
+      doctorId: chosenSlot.doctorId,
+      categoryId,
+      startAtUtc: chosenSlot.startAtUtc,
+      notes: bookingNotes.trim() || null,
+      operationId,
+    };
+    if (onBookAppointment) {
+      const created = await onBookAppointment(payload);
+      if (created) {
+        setOverview((prev) =>
+          prev
+            ? {
+                ...prev,
+                upcomingAppointments: [created, ...(prev.upcomingAppointments ?? [])],
+              }
+            : prev,
+        );
+        setAvailability((prev) =>
+          prev
+            ? {
+                ...prev,
+                activeFutureBookingsCount: prev.activeFutureBookingsCount + 1,
+                slots: prev.slots.filter(
+                  (s) => !(s.doctorId === payload.doctorId && s.startAtUtc === created.startAtUtc),
+                ),
+              }
+            : prev,
+        );
+        setInfoMsg(
+          created.status === 'Requested'
+            ? 'تم إرسال طلب الحجز وهو بانتظار موافقة العيادة.'
+            : 'تم تأكيد حجز الموعد بنجاح.',
+        );
+      }
+      return;
+    }
+    const res = await fetch(`/api/v1/c/${encodeURIComponent(slug)}/portal/appointments`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        doctorId: payload.doctorId,
+        categoryId: payload.categoryId,
+        startAtUtc: payload.startAtUtc,
+        notes: payload.notes,
+        operationId: payload.operationId,
+      }),
+    });
+    if (!res.ok) {
+      setErrorMsg('تعذر إتمام الحجز؛ قد يكون الموعد محجوزاً أو تم بلوغ الحد المسموح.');
+      return;
+    }
+    const created = (await res.json()) as PortalUpcomingAppointment;
+    setOverview((prev) =>
+      prev
+        ? {
+            ...prev,
+            upcomingAppointments: [created, ...(prev.upcomingAppointments ?? [])],
+          }
+        : prev,
+    );
+    setInfoMsg(
+      created.status === 'Requested'
+        ? 'تم إرسال طلب الحجز وهو بانتظار موافقة العيادة.'
+        : 'تم تأكيد حجز الموعد بنجاح.',
+    );
+  };
+
+  const handleCancelBookingClick = async (appointmentId: string) => {
+    setErrorMsg(null);
+    setInfoMsg(null);
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      setErrorMsg('إلغاء الموعد يتطلب اتصالاً نشطاً بالإنترنت (ONLINE_REQUIRED).');
+      return;
+    }
+    const payload: PortalCancelAppointmentPayload = {
+      slug,
+      appointmentId,
+      reason: 'Cancelled by patient from portal',
+    };
+    if (onCancelAppointment) {
+      const updated = await onCancelAppointment(payload);
+      setOverview((prev) =>
+        prev
+          ? {
+              ...prev,
+              upcomingAppointments: (prev.upcomingAppointments ?? []).map((a) =>
+                a.appointmentId === appointmentId
+                  ? updated ?? { ...a, status: 'Cancelled' }
+                  : a,
+              ),
+            }
+          : prev,
+      );
+      setInfoMsg('تم إلغاء الموعد وإتاحة الوقت للمرضى الآخرين.');
+      return;
+    }
+    const res = await fetch(
+      `/api/v1/c/${encodeURIComponent(slug)}/portal/appointments/${encodeURIComponent(appointmentId)}/cancel`,
+      {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: payload.reason }),
+      },
+    );
+    if (!res.ok) {
+      setErrorMsg('تعذر إلغاء الموعد؛ قد تكون تجاوزت مهلة الإلغاء المسموحة.');
+      return;
+    }
+    const updated = (await res.json()) as PortalUpcomingAppointment;
+    setOverview((prev) =>
+      prev
+        ? {
+            ...prev,
+            upcomingAppointments: (prev.upcomingAppointments ?? []).map((a) =>
+              a.appointmentId === appointmentId ? updated : a,
+            ),
+          }
+        : prev,
+    );
+    setInfoMsg('تم إلغاء الموعد وإتاحة الوقت.');
+  };
+
   const handleLogoutClick = () => {
     setOverview(null);
+    setAvailability(null);
     onLogout?.();
   };
 
@@ -517,6 +771,12 @@ export const PortalApp: React.FC<PortalAppProps> = ({
               <CalendarClock size={16} />
               <span>الرئيسية</span>
             </GlassButton>
+            {overview.availableSections?.includes('portal-booking') && (
+              <GlassButton variant={activeTab === 'booking' ? 'prominent' : 'default'} onClick={() => setActiveTab('booking')}>
+                <CalendarClock size={16} />
+                <span>حجز موعد أونلاين</span>
+              </GlassButton>
+            )}
             <GlassButton variant={activeTab === 'medical' ? 'prominent' : 'default'} onClick={() => setActiveTab('medical')}>
               <HeartPulse size={16} />
               <span>الملف الطبي</span>
@@ -546,10 +806,135 @@ export const PortalApp: React.FC<PortalAppProps> = ({
                 <div style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)' }}>لا توجد مواعيد قادمة.</div>
               ) : (
                 overview.upcomingAppointments!.map((appt) => (
-                  <div key={appt.appointmentId} style={{ paddingBlock: '0.5rem', borderBottom: '1px solid rgba(148,163,184,0.2)' }}>
-                    <strong>{appt.categoryNameAr}</strong> — {appt.doctorName ?? 'الطبيب'} ({appt.status})
+                  <div
+                    key={appt.appointmentId}
+                    data-testid={`portal-upcoming-${appt.appointmentId}`}
+                    style={{
+                      paddingBlock: '0.5rem',
+                      borderBottom: '1px solid rgba(148,163,184,0.2)',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    <div>
+                      <strong>{appt.categoryNameAr}</strong> — {appt.doctorName ?? 'الطبيب'} (
+                      <span data-testid={`portal-appt-status-${appt.appointmentId}`}>{appt.status}</span>)
+                    </div>
+                    {(appt.status === 'Booked' || appt.status === 'Requested') && (
+                      <GlassButton
+                        type="button"
+                        onClick={() => void handleCancelBookingClick(appt.appointmentId)}
+                      >
+                        <span>إلغاء الموعد</span>
+                      </GlassButton>
+                    )}
                   </div>
                 ))
+              )}
+            </GlassCard>
+          )}
+
+          {activeTab === 'booking' && overview.availableSections?.includes('portal-booking') && (
+            <GlassCard style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
+              <h2 style={{ fontSize: '1.0625rem', fontWeight: 700 }}>حجز موعد عبر بوابة المريض</h2>
+              {!availability ? (
+                <div style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)' }}>
+                  جاري تحميل المواعيد المتاحة...
+                </div>
+              ) : (
+                <>
+                  {availability.isPatientOnlineBookingBlocked && (
+                    <AlertBanner
+                      variant="error"
+                      title="الحجز الأونلاين موقوف مؤقتاً"
+                      message={availability.onlineBookingBlockReason ?? 'يرجى التواصل مع استقبال العيادة لإعادة التفعيل.'}
+                    />
+                  )}
+                  <div style={{ fontSize: '0.8125rem', color: 'var(--color-text-secondary)', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                    <span data-testid="portal-booking-mode">
+                      النظام: {availability.bookingMode === 'RequiresApproval' ? 'يتطلب موافقة العيادة (RequiresApproval)' : 'تأكيد فوري (AutoConfirm)'}
+                    </span>
+                    <span data-testid="portal-active-limit">
+                      حجوزاتك النشطة: {availability.activeFutureBookingsCount} / {availability.maxActiveFutureBookingsPerPatient}
+                    </span>
+                    <span>مهلة الإلغاء: {availability.cancellationCutoffHours} ساعة</span>
+                  </div>
+
+                  <form onSubmit={handleBookSlotSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    <label style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', fontSize: '0.875rem' }}>
+                      <span>نوع الكشف / الزيارة</span>
+                      <select
+                        aria-label="نوع الكشف"
+                        value={selectedCategoryId || availability.categories[0]?.categoryId || ''}
+                        onChange={(e) => setSelectedCategoryId(e.target.value)}
+                        style={{ padding: '0.5rem', borderRadius: '0.5rem', border: '1px solid rgba(148,163,184,0.35)' }}
+                      >
+                        {availability.categories.map((cat) => (
+                          <option key={cat.categoryId} value={cat.categoryId}>
+                            {cat.nameAr} ({cat.durationMinutes} د)
+                            {cat.priceAmount != null ? ` — ${cat.priceAmount} ${cat.priceCurrency ?? ''}` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <label style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', fontSize: '0.875rem' }}>
+                      <span>الطبيب</span>
+                      <select
+                        aria-label="اختر الطبيب"
+                        value={selectedDoctorId}
+                        onChange={(e) => setSelectedDoctorId(e.target.value)}
+                        style={{ padding: '0.5rem', borderRadius: '0.5rem', border: '1px solid rgba(148,163,184,0.35)' }}
+                      >
+                        <option value="">كل الأطباء المتاحين</option>
+                        {availability.doctors.map((doc) => (
+                          <option key={doc.doctorId} value={doc.doctorId}>
+                            {doc.displayName ?? doc.specialtyCode}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                      {availability.slots
+                        .filter((slot) => !selectedDoctorId || slot.doctorId === selectedDoctorId)
+                        .map((slot) => {
+                          const isSelected = selectedSlotStartUtc === slot.startAtUtc;
+                          return (
+                            <GlassButton
+                              key={`${slot.doctorId}-${slot.startAtUtc}`}
+                              type="button"
+                              data-testid={`portal-slot-${slot.startAtUtc}`}
+                              variant={isSelected ? 'prominent' : 'default'}
+                              onClick={() => setSelectedSlotStartUtc(slot.startAtUtc)}
+                            >
+                              <span dir="ltr">{slot.startAtUtc.slice(0, 16).replace('T', ' ')}</span>
+                              {slot.doctorName ? ` — ${slot.doctorName}` : ''}
+                            </GlassButton>
+                          );
+                        })}
+                    </div>
+
+                    <GlassInput
+                      label="ملاحظات الحجز (اختياري)"
+                      value={bookingNotes}
+                      onChange={(e) => setBookingNotes(e.target.value)}
+                    />
+
+                    <div>
+                      <GlassButton
+                        type="submit"
+                        variant="prominent"
+                        disabled={availability.isPatientOnlineBookingBlocked}
+                      >
+                        {availability.bookingMode === 'RequiresApproval' ? 'إرسال طلب الحجز' : 'احجز الموعد الآن'}
+                      </GlassButton>
+                    </div>
+                  </form>
+                </>
               )}
             </GlassCard>
           )}

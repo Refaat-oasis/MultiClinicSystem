@@ -626,6 +626,132 @@ public sealed class DashboardService : IDashboardService
                     breakdown["downloads"] = logs.Count(l => l.Reason == "PortalDownloadPrescriptionPdf" || l.Reason == "PortalDownloadAttachment");
                     break;
                 }
+                case "portal-booking.daily-count":
+                {
+                    unit = "bookings";
+                    List<Appointment> portalAppts = await _dbContext.Appointments
+                        .AsNoTracking()
+                        .Where(a => a.ClinicId == clinicId
+                                    && !a.IsVoided
+                                    && a.Source == AppointmentSource.Portal
+                                    && a.StartUtc >= start
+                                    && a.StartUtc <= end)
+                        .ToListAsync(cancellationToken);
+
+                    primary = portalAppts.Count;
+                    breakdown["confirmed"] = portalAppts.Count(a => a.Status is AppointmentStatus.Booked or AppointmentStatus.Arrived or AppointmentStatus.InSession or AppointmentStatus.Completed);
+                    breakdown["pending"] = portalAppts.Count(a => a.Status == AppointmentStatus.Requested);
+                    breakdown["cancelledOrDeclined"] = portalAppts.Count(a => a.Status is AppointmentStatus.Cancelled or AppointmentStatus.Declined);
+                    break;
+                }
+                case "portal-booking.cancellations":
+                {
+                    unit = "cancellations";
+                    int cancelledCount = await _dbContext.Appointments
+                        .AsNoTracking()
+                        .CountAsync(
+                            a => a.ClinicId == clinicId
+                                 && !a.IsVoided
+                                 && a.Source == AppointmentSource.Portal
+                                 && a.Status == AppointmentStatus.Cancelled
+                                 && a.UpdatedAtUtc >= start
+                                 && a.UpdatedAtUtc <= end,
+                            cancellationToken);
+
+                    primary = cancelledCount;
+                    breakdown["cancelledCount"] = cancelledCount;
+                    break;
+                }
+                case "portal-booking.pending-requests":
+                {
+                    unit = "requests";
+                    DateTimeOffset nowUtc = _clock.UtcNow;
+                    List<Appointment> requested = await _dbContext.Appointments
+                        .AsNoTracking()
+                        .Where(a => a.ClinicId == clinicId
+                                    && !a.IsVoided
+                                    && a.Source == AppointmentSource.Portal
+                                    && a.Status == AppointmentStatus.Requested)
+                        .ToListAsync(cancellationToken);
+
+                    int activePending = requested.Count(a => !a.IsPortalRequestExpired(nowUtc));
+                    int expired = requested.Count(a => a.IsPortalRequestExpired(nowUtc));
+                    primary = activePending;
+                    breakdown["pending"] = activePending;
+                    breakdown["expired"] = expired;
+                    break;
+                }
+                case "portal-booking.no-shows":
+                {
+                    unit = "no-shows";
+                    int portalNoShows = await _dbContext.Appointments
+                        .AsNoTracking()
+                        .CountAsync(
+                            a => a.ClinicId == clinicId
+                                 && !a.IsVoided
+                                 && a.Source == AppointmentSource.Portal
+                                 && a.Status == AppointmentStatus.NoShow
+                                 && a.StartUtc >= start
+                                 && a.StartUtc <= end,
+                            cancellationToken);
+                    int blockedAccounts = await _dbContext.PatientAccounts
+                        .AsNoTracking()
+                        .CountAsync(a => a.ClinicId == clinicId && !a.IsVoided && a.IsOnlineBookingBlocked, cancellationToken);
+
+                    primary = portalNoShows;
+                    breakdown["portalNoShows"] = portalNoShows;
+                    breakdown["blockedAccounts"] = blockedAccounts;
+                    break;
+                }
+                case "portal-booking.slot-utilization":
+                {
+                    unit = "%";
+                    DateTimeOffset nowUtc = _clock.UtcNow;
+                    Clinic? clinic = await _dbContext.Clinics.AsNoTracking().FirstOrDefaultAsync(c => c.Id == clinicId, cancellationToken);
+                    TimeZoneInfo tz = ClinicTimeZoneResolver.Resolve(clinic?.TimeZone);
+                    DateTimeOffset localNow = TimeZoneInfo.ConvertTime(nowUtc, tz);
+                    DateTime localDayStartUnspecified = new(localNow.Year, localNow.Month, localNow.Day, 0, 0, 0, DateTimeKind.Unspecified);
+                    DateTimeOffset dayStartUtc = new DateTimeOffset(localDayStartUnspecified, tz.GetUtcOffset(localDayStartUnspecified)).ToUniversalTime();
+                    DateTimeOffset dayEndUtc = new DateTimeOffset(localDayStartUnspecified.AddDays(1), tz.GetUtcOffset(localDayStartUnspecified.AddDays(1))).ToUniversalTime();
+
+                    ClinicPortalBookingSetting bookingSettings = await PortalBookingHelper.GetOrBuildDefaultBookingSettingsAsync(
+                        _dbContext, clinicId, nowUtc, cancellationToken);
+                    List<Appointment> todayPortal = await _dbContext.Appointments
+                        .AsNoTracking()
+                        .Where(a => a.ClinicId == clinicId
+                                    && !a.IsVoided
+                                    && a.Source == AppointmentSource.Portal
+                                    && a.StartUtc >= dayStartUtc
+                                    && a.StartUtc < dayEndUtc)
+                        .ToListAsync(cancellationToken);
+
+                    int occupiedToday = todayPortal.Count(a => AppointmentStateMachine.IsOccupying(a, nowUtc));
+                    decimal cap = Math.Max(1, bookingSettings.MaxBookingsPerDay);
+                    decimal utilization = Math.Min(100m, Math.Round((occupiedToday / cap) * 100m, 2));
+                    primary = utilization;
+                    breakdown["occupiedToday"] = occupiedToday;
+                    breakdown["maxBookingsPerDay"] = bookingSettings.MaxBookingsPerDay;
+                    break;
+                }
+                case "portal-booking.portal-share":
+                {
+                    unit = "%";
+                    List<Appointment> allRange = await _dbContext.Appointments
+                        .AsNoTracking()
+                        .Where(a => a.ClinicId == clinicId
+                                    && !a.IsVoided
+                                    && a.StartUtc >= start
+                                    && a.StartUtc <= end)
+                        .ToListAsync(cancellationToken);
+
+                    int total = allRange.Count;
+                    int portalCount = allRange.Count(a => a.Source == AppointmentSource.Portal);
+                    decimal sharePct = total == 0 ? 0m : Math.Round((portalCount * 100m) / total, 2);
+                    primary = sharePct;
+                    breakdown["portalBookings"] = portalCount;
+                    breakdown["totalBookings"] = total;
+                    break;
+                }
                 default:
                 {
                     breakdown["configured"] = 1m;

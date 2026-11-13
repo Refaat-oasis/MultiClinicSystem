@@ -33,6 +33,7 @@ public sealed class PatientPortalService : IPatientPortalService
     private readonly IClinicAuthorizationService _authorizationService;
     private readonly IPatientPortalQueries _patientQueries;
     private readonly ISchedulingPortalQueries _schedulingQueries;
+    private readonly IPortalBooking _portalBooking;
     private readonly IClinicalPortalQueries _clinicalQueries;
     private readonly ITreatmentPlanPortalQueries _treatmentPlanQueries;
     private readonly IVerificationCodes _verificationCodes;
@@ -51,6 +52,7 @@ public sealed class PatientPortalService : IPatientPortalService
         IClinicAuthorizationService authorizationService,
         IPatientPortalQueries patientQueries,
         ISchedulingPortalQueries schedulingQueries,
+        IPortalBooking portalBooking,
         IClinicalPortalQueries clinicalQueries,
         ITreatmentPlanPortalQueries treatmentPlanQueries,
         IVerificationCodes verificationCodes,
@@ -64,6 +66,7 @@ public sealed class PatientPortalService : IPatientPortalService
         _authorizationService = authorizationService ?? throw new ArgumentNullException(nameof(authorizationService));
         _patientQueries = patientQueries ?? throw new ArgumentNullException(nameof(patientQueries));
         _schedulingQueries = schedulingQueries ?? throw new ArgumentNullException(nameof(schedulingQueries));
+        _portalBooking = portalBooking ?? throw new ArgumentNullException(nameof(portalBooking));
         _clinicalQueries = clinicalQueries ?? throw new ArgumentNullException(nameof(clinicalQueries));
         _treatmentPlanQueries = treatmentPlanQueries ?? throw new ArgumentNullException(nameof(treatmentPlanQueries));
         _verificationCodes = verificationCodes ?? throw new ArgumentNullException(nameof(verificationCodes));
@@ -1155,7 +1158,10 @@ public sealed class PatientPortalService : IPatientPortalService
                 ConsentTermsVersion: consent?.TermsVersion,
                 LastLoginAtUtc: account?.LastLoginAtUtc,
                 GeneratedPrintedPin: null,
-                PrintedPinExpiresAtUtc: account?.PrintedCodeExpiresAtUtc));
+                PrintedPinExpiresAtUtc: account?.PrintedCodeExpiresAtUtc,
+                NoShowCount: account?.NoShowCount ?? 0,
+                IsOnlineBookingBlocked: account?.IsOnlineBookingBlocked ?? false,
+                OnlineBookingBlockReason: account?.OnlineBookingBlockReason));
         });
     }
 
@@ -1723,6 +1729,809 @@ public sealed class PatientPortalService : IPatientPortalService
         });
     }
 
+    public async Task<Result<PortalAvailabilityResult>> GetPortalAvailabilityAsync(
+        Guid accountId,
+        Guid clinicId,
+        Guid patientId,
+        string slug,
+        Guid? categoryId,
+        Guid? doctorId,
+        DateTimeOffset? fromUtc,
+        DateTimeOffset? toUtc,
+        CancellationToken cancellationToken = default)
+    {
+        var access = await EnsureActivePortalSessionForSlugAsync(accountId, clinicId, patientId, slug, cancellationToken);
+        if (access.IsFailure)
+        {
+            return Result<PortalAvailabilityResult>.Failure(access.Error);
+        }
+
+        HashSet<string> enabled = access.Value.ClinicResolution.EnabledModules;
+        if (!enabled.Contains("portal-booking") || !enabled.Contains("scheduling"))
+        {
+            return Result<PortalAvailabilityResult>.Failure(Error.Forbidden(
+                "MODULE_DISABLED",
+                "Portal booking is disabled for this clinic."));
+        }
+
+        Clinic clinic = access.Value.ClinicResolution.Clinic;
+        PatientAccount account = access.Value.Account;
+        DateTimeOffset now = _clock.UtcNow;
+
+        return await ExecuteForClinicAsync(clinicId, async () =>
+        {
+            ClinicPortalSetting portalSettings = await GetOrBuildDefaultSettingsAsync(clinicId, cancellationToken);
+            ClinicPortalBookingSetting bookingSettings = await PortalBookingHelper.GetOrBuildDefaultBookingSettingsAsync(
+                _dbContext, clinicId, now, cancellationToken);
+            ClinicSchedulingSetting schedSettings = await SchedulingProjectionHelper.GetOrCreateDefaultSettingsAsync(
+                _dbContext, clinicId, now, cancellationToken);
+
+            bool showPrices = portalSettings.ShowPricesByDefault
+                              && bookingSettings.ShowPricesWhenAvailable
+                              && enabled.Contains("billing");
+
+            List<AppointmentCategory> bookableCategories = await _dbContext.AppointmentCategories
+                .AsNoTracking()
+                .Where(c => c.ClinicId == clinicId && !c.IsVoided && c.IsActive && c.BookableOnline)
+                .OrderBy(c => c.NameEn)
+                .ToListAsync(cancellationToken);
+
+            AppointmentCategory? selectedCategory = null;
+            if (categoryId.HasValue)
+            {
+                selectedCategory = bookableCategories.FirstOrDefault(c => c.Id == categoryId.Value);
+                if (selectedCategory == null)
+                {
+                    return Result<PortalAvailabilityResult>.Failure(Error.Forbidden(
+                        "ONLINE_BOOKING_DISABLED",
+                        "Selected appointment category is not available for online booking."));
+                }
+            }
+            else if (bookableCategories.Count > 0)
+            {
+                selectedCategory = bookableCategories[0];
+            }
+
+            List<DoctorBookingSetting> docSettings = await _dbContext.DoctorBookingSettings
+                .AsNoTracking()
+                .Where(s => s.ClinicId == clinicId && !s.IsVoided && s.AcceptsOnlineBooking)
+                .ToListAsync(cancellationToken);
+
+            HashSet<Guid> bookableDoctorIds = docSettings.Select(s => s.DoctorId).ToHashSet();
+            Dictionary<Guid, DoctorBookingSetting> docSettingMap = docSettings.ToDictionary(s => s.DoctorId);
+
+            List<ClinicDoctor> bookableDoctors = await _dbContext.ClinicDoctors
+                .AsNoTracking()
+                .Where(d => d.ClinicId == clinicId
+                            && !d.IsVoided
+                            && d.IsActive
+                            && bookableDoctorIds.Contains(d.Id))
+                .OrderBy(d => d.FullName)
+                .ToListAsync(cancellationToken);
+
+            List<Appointment> futurePortalAppts = await _dbContext.Appointments
+                .AsNoTracking()
+                .Where(a => a.ClinicId == clinicId
+                            && !a.IsVoided
+                            && a.PatientId == patientId
+                            && a.Source == AppointmentSource.Portal
+                            && a.StartUtc >= now)
+                .ToListAsync(cancellationToken);
+
+            int activeFutureCount = futurePortalAppts.Count(a => AppointmentStateMachine.IsOccupying(a, now));
+
+            List<PortalBookableCategoryItemResult> categoryDtos = bookableCategories
+                .Select(c => new PortalBookableCategoryItemResult(
+                    c.Id,
+                    c.SpecialtyCode,
+                    c.NameAr,
+                    c.NameEn,
+                    c.DefaultDurationMinutes,
+                    showPrices ? c.DefaultPriceAmount : null,
+                    showPrices ? c.DefaultPriceCurrency : null))
+                .ToList();
+
+            List<PortalBookableDoctorItemResult> doctorDtos = bookableDoctors
+                .Select(d => new PortalBookableDoctorItemResult(
+                    d.Id,
+                    portalSettings.ShowDoctorNames ? d.FullName : null,
+                    SchedulingProjectionHelper.GetPrimarySpecialty(d)))
+                .ToList();
+
+            IReadOnlyList<PortalAvailableSlotItemResult> slots = Array.Empty<PortalAvailableSlotItemResult>();
+            TimeZoneInfo tz = ClinicTimeZoneResolver.Resolve(clinic.TimeZone);
+
+            if (selectedCategory != null && bookableDoctors.Count > 0 && !account.IsOnlineBookingBlocked)
+            {
+                List<ClinicDoctor> targetDoctors = doctorId.HasValue
+                    ? bookableDoctors.Where(d => d.Id == doctorId.Value).ToList()
+                    : bookableDoctors;
+
+                if (targetDoctors.Count > 0)
+                {
+                    DateTimeOffset maxAllowedEnd = now.AddDays(bookingSettings.MaxDaysAhead);
+                    DateTimeOffset effectiveFrom = fromUtc.HasValue && fromUtc.Value > now ? fromUtc.Value : now;
+                    DateTimeOffset defaultEnd = effectiveFrom.AddDays(Math.Min(7, bookingSettings.MaxDaysAhead));
+                    DateTimeOffset effectiveTo = toUtc.HasValue ? toUtc.Value : defaultEnd;
+                    if (effectiveTo > maxAllowedEnd)
+                    {
+                        effectiveTo = maxAllowedEnd;
+                    }
+
+                    if (effectiveFrom < effectiveTo)
+                    {
+                        List<AvailabilityWorkingHourWindow> workingHours = await _dbContext.ClinicWorkingHours
+                            .AsNoTracking()
+                            .Where(w => w.ClinicId == clinicId && !w.IsVoided)
+                            .Select(w => new AvailabilityWorkingHourWindow(w.DoctorId, w.DayOfWeek, w.StartTime, w.EndTime, w.IsClosed))
+                            .ToListAsync(cancellationToken);
+
+                        List<AvailabilityDayOffRange> daysOff = await _dbContext.ClinicDaysOff
+                            .AsNoTracking()
+                            .Where(d => d.ClinicId == clinicId && !d.IsVoided)
+                            .Select(d => new AvailabilityDayOffRange(d.DoctorId, d.StartDate, d.EndDate))
+                            .ToListAsync(cancellationToken);
+
+                        List<Appointment> existingRange = await _dbContext.Appointments
+                            .AsNoTracking()
+                            .Where(a => a.ClinicId == clinicId
+                                        && !a.IsVoided
+                                        && a.EndUtc > effectiveFrom.AddDays(-1)
+                                        && a.StartUtc < effectiveTo.AddDays(1))
+                            .ToListAsync(cancellationToken);
+
+                        List<Appointment> occupying = existingRange
+                            .Where(a => AppointmentStateMachine.IsOccupying(a, now))
+                            .ToList();
+
+                        List<AvailabilityBusyInterval> busy = occupying
+                            .Select(a => new AvailabilityBusyInterval(a.DoctorId, a.RoomId, a.StartUtc, a.EndUtc))
+                            .ToList();
+
+                        Dictionary<string, int> clinicDailyPortalCounts = new(StringComparer.Ordinal);
+                        Dictionary<(string LocalDate, Guid DoctorId), int> doctorDailyPortalCounts = new();
+                        foreach (Appointment item in occupying.Where(a => a.Source == AppointmentSource.Portal))
+                        {
+                            string ld = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(item.StartUtc, tz).DateTime)
+                                .ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+                            clinicDailyPortalCounts[ld] = clinicDailyPortalCounts.GetValueOrDefault(ld) + 1;
+                            (string ld, Guid DoctorId) key = (ld, item.DoctorId);
+                            doctorDailyPortalCounts[key] = doctorDailyPortalCounts.GetValueOrDefault(key) + 1;
+                        }
+
+                        List<AvailabilityDoctorProfile> doctorProfiles = targetDoctors
+                            .Select(d => new AvailabilityDoctorProfile(
+                                d.Id,
+                                SchedulingProjectionHelper.GetDefaultRoomId(d),
+                                SchedulingProjectionHelper.GetPrimarySpecialty(d)))
+                            .ToList();
+
+                        int effectiveLead = Math.Max(schedSettings.MinBookingLeadMinutes, bookingSettings.MinLeadTimeMinutes);
+                        int effectiveStep = bookingSettings.SlotStepMinutes > 0
+                            ? bookingSettings.SlotStepMinutes
+                            : schedSettings.DefaultSlotStepMinutes;
+
+                        IReadOnlyList<AvailableSlotCandidate> candidates = AvailabilityCalculator.ComputeFreeSlots(
+                            effectiveFrom,
+                            effectiveTo,
+                            now,
+                            selectedCategory.DefaultDurationMinutes,
+                            effectiveStep,
+                            effectiveLead,
+                            tz,
+                            doctorProfiles,
+                            workingHours,
+                            daysOff,
+                            busy);
+
+                        Dictionary<Guid, string> docNames = targetDoctors.ToDictionary(d => d.Id, d => d.FullName);
+                        slots = candidates
+                            .Where(c => c.StartUtc <= maxAllowedEnd)
+                            .Select(c =>
+                            {
+                                string ld = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(c.StartUtc, tz).DateTime)
+                                    .ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+                                return new { Candidate = c, LocalDate = ld };
+                            })
+                            .Where(x =>
+                            {
+                                if (clinicDailyPortalCounts.GetValueOrDefault(x.LocalDate) >= bookingSettings.MaxBookingsPerDay)
+                                {
+                                    return false;
+                                }
+
+                                if (docSettingMap.TryGetValue(x.Candidate.DoctorId, out DoctorBookingSetting? ds)
+                                    && ds.MaxDailyOnlineBookings.HasValue
+                                    && doctorDailyPortalCounts.GetValueOrDefault((x.LocalDate, x.Candidate.DoctorId)) >= ds.MaxDailyOnlineBookings.Value)
+                                {
+                                    return false;
+                                }
+
+                                return true;
+                            })
+                            .Select(x => new PortalAvailableSlotItemResult(
+                                x.Candidate.DoctorId,
+                                portalSettings.ShowDoctorNames && docNames.TryGetValue(x.Candidate.DoctorId, out string? dn) ? dn : null,
+                                x.Candidate.RoomId,
+                                x.LocalDate,
+                                x.Candidate.StartUtc,
+                                x.Candidate.EndUtc,
+                                selectedCategory.DefaultDurationMinutes))
+                            .Take(200)
+                            .ToList();
+                    }
+                }
+            }
+
+            return Result<PortalAvailabilityResult>.Success(new PortalAvailabilityResult(
+                ClinicId: clinicId,
+                ClinicTimeZone: clinic.TimeZone,
+                BookingMode: bookingSettings.Mode.ToString(),
+                CancellationCutoffHours: bookingSettings.CancellationCutoffHours,
+                MaxActiveFutureBookingsPerPatient: bookingSettings.MaxActiveFutureBookingsPerPatient,
+                ActiveFutureBookingsCount: activeFutureCount,
+                IsPatientOnlineBookingBlocked: account.IsOnlineBookingBlocked,
+                OnlineBookingBlockReason: account.OnlineBookingBlockReason,
+                Categories: categoryDtos,
+                Doctors: doctorDtos,
+                Slots: slots));
+        });
+    }
+
+    public async Task<Result<PortalUpcomingAppointmentItemResult>> BookAppointmentFromPortalAsync(
+        Guid accountId,
+        Guid clinicId,
+        Guid patientId,
+        string slug,
+        PortalBookAppointmentInput input,
+        string? ipAddress,
+        string? requestId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+
+        var access = await EnsureActivePortalSessionForSlugAsync(accountId, clinicId, patientId, slug, cancellationToken);
+        if (access.IsFailure)
+        {
+            return Result<PortalUpcomingAppointmentItemResult>.Failure(access.Error);
+        }
+
+        HashSet<string> enabled = access.Value.ClinicResolution.EnabledModules;
+        if (!enabled.Contains("portal-booking") || !enabled.Contains("scheduling"))
+        {
+            return Result<PortalUpcomingAppointmentItemResult>.Failure(Error.Forbidden(
+                "MODULE_DISABLED",
+                "Portal booking is disabled for this clinic."));
+        }
+
+        if (access.Value.Account.IsOnlineBookingBlocked)
+        {
+            return Result<PortalUpcomingAppointmentItemResult>.Failure(Error.Forbidden(
+                "PATIENT_ONLINE_BOOKING_BLOCKED",
+                "Online booking is currently blocked for this patient."));
+        }
+
+        Result<AppointmentItemResult> booked = await _portalBooking.BookPortalAppointmentAsync(
+            clinicId,
+            patientId,
+            input.DoctorId,
+            input.CategoryId,
+            input.StartAtUtc,
+            input.Notes,
+            input.OperationId,
+            cancellationToken);
+
+        if (booked.IsFailure)
+        {
+            return Result<PortalUpcomingAppointmentItemResult>.Failure(booked.Error);
+        }
+
+        ClinicPortalSetting portalSettings = await ExecuteForClinicAsync(
+            clinicId,
+            () => GetOrBuildDefaultSettingsAsync(clinicId, cancellationToken));
+
+        await WritePatientAccessLogAsync(
+            clinicId,
+            patientId,
+            "PortalBookAppointment",
+            $"Appointment:{booked.Value.Id};Status:{booked.Value.Status}",
+            cancellationToken);
+
+        return Result<PortalUpcomingAppointmentItemResult>.Success(new PortalUpcomingAppointmentItemResult(
+            booked.Value.Id,
+            booked.Value.StartUtc,
+            booked.Value.EndUtc,
+            portalSettings.ShowDoctorNames ? booked.Value.DoctorNameAr : null,
+            booked.Value.SpecialtyCode,
+            booked.Value.CategoryNameAr,
+            booked.Value.CategoryNameEn,
+            booked.Value.Status));
+    }
+
+    public async Task<Result<PortalUpcomingAppointmentItemResult>> CancelAppointmentFromPortalAsync(
+        Guid accountId,
+        Guid clinicId,
+        Guid patientId,
+        string slug,
+        Guid appointmentId,
+        string? reason,
+        string? ipAddress,
+        string? requestId,
+        CancellationToken cancellationToken = default)
+    {
+        var access = await EnsureActivePortalSessionForSlugAsync(accountId, clinicId, patientId, slug, cancellationToken);
+        if (access.IsFailure)
+        {
+            return Result<PortalUpcomingAppointmentItemResult>.Failure(access.Error);
+        }
+
+        HashSet<string> enabled = access.Value.ClinicResolution.EnabledModules;
+        if (!enabled.Contains("portal-booking") || !enabled.Contains("scheduling"))
+        {
+            return Result<PortalUpcomingAppointmentItemResult>.Failure(Error.Forbidden(
+                "MODULE_DISABLED",
+                "Portal booking is disabled for this clinic."));
+        }
+
+        Result<AppointmentItemResult> cancelled = await _portalBooking.CancelPortalAppointmentAsync(
+            clinicId,
+            patientId,
+            appointmentId,
+            reason,
+            cancellationToken);
+
+        if (cancelled.IsFailure)
+        {
+            return Result<PortalUpcomingAppointmentItemResult>.Failure(cancelled.Error);
+        }
+
+        ClinicPortalSetting portalSettings = await ExecuteForClinicAsync(
+            clinicId,
+            () => GetOrBuildDefaultSettingsAsync(clinicId, cancellationToken));
+
+        await WritePatientAccessLogAsync(
+            clinicId,
+            patientId,
+            "PortalCancelAppointment",
+            $"Appointment:{cancelled.Value.Id}",
+            cancellationToken);
+
+        return Result<PortalUpcomingAppointmentItemResult>.Success(new PortalUpcomingAppointmentItemResult(
+            cancelled.Value.Id,
+            cancelled.Value.StartUtc,
+            cancelled.Value.EndUtc,
+            portalSettings.ShowDoctorNames ? cancelled.Value.DoctorNameAr : null,
+            cancelled.Value.SpecialtyCode,
+            cancelled.Value.CategoryNameAr,
+            cancelled.Value.CategoryNameEn,
+            cancelled.Value.Status));
+    }
+
+    public async Task<Result<ClinicPortalBookingSettingResult>> GetClinicPortalBookingSettingsAsync(
+        Guid staffUserId,
+        Guid clinicId,
+        string? deviceId,
+        CancellationToken cancellationToken = default)
+    {
+        var gate = await _authorizationService.EnsureClinicAccessAsync(
+            staffUserId, clinicId, "portal.booking.manage", "portal-booking", deviceId, cancellationToken);
+        if (gate.IsFailure)
+        {
+            return Result<ClinicPortalBookingSettingResult>.Failure(gate.Error);
+        }
+
+        return await ExecuteForClinicAsync(clinicId, async () =>
+        {
+            ClinicPortalBookingSetting setting = await PortalBookingHelper.GetOrBuildDefaultBookingSettingsAsync(
+                _dbContext, clinicId, _clock.UtcNow, cancellationToken);
+            return Result<ClinicPortalBookingSettingResult>.Success(PortalBookingHelper.MapBookingSettings(setting));
+        });
+    }
+
+    public async Task<Result<ClinicPortalBookingSettingResult>> UpdateClinicPortalBookingSettingsAsync(
+        Guid staffUserId,
+        Guid clinicId,
+        UpdateClinicPortalBookingSettingInput input,
+        string? deviceId,
+        string? ipAddress,
+        string? requestId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+
+        var gate = await _authorizationService.EnsureClinicAccessAsync(
+            staffUserId, clinicId, "clinic.settings.edit", "portal-booking", deviceId, cancellationToken);
+        if (gate.IsFailure)
+        {
+            return Result<ClinicPortalBookingSettingResult>.Failure(gate.Error);
+        }
+
+        if (!Enum.TryParse<PortalBookingMode>(input.Mode, true, out PortalBookingMode mode))
+        {
+            return Result<ClinicPortalBookingSettingResult>.Failure(Error.Validation(
+                "INVALID_BOOKING_MODE",
+                "Mode must be AutoConfirm or RequiresApproval."));
+        }
+
+        DateTimeOffset now = _clock.UtcNow;
+        return await ExecuteForClinicAsync(clinicId, async () =>
+        {
+            ClinicPortalBookingSetting? setting = await _dbContext.ClinicPortalBookingSettings
+                .FirstOrDefaultAsync(s => s.ClinicId == clinicId && !s.IsVoided, cancellationToken);
+            if (setting == null)
+            {
+                setting = new ClinicPortalBookingSetting(GuidV7.NewGuid(), clinicId, now);
+                _dbContext.ClinicPortalBookingSettings.Add(setting);
+            }
+
+            try
+            {
+                setting.Update(
+                    mode,
+                    input.MinLeadTimeMinutes,
+                    input.MaxDaysAhead,
+                    input.SlotStepMinutes,
+                    input.MaxActiveFutureBookingsPerPatient,
+                    input.MaxBookingsPerDay,
+                    input.CancellationCutoffHours,
+                    input.AutoBlockAfterNoShows,
+                    input.ApprovalHoldHours,
+                    input.ShowPricesWhenAvailable,
+                    now);
+            }
+            catch (ArgumentOutOfRangeException ex)
+            {
+                return Result<ClinicPortalBookingSettingResult>.Failure(Error.Validation("INVALID_BOOKING_SETTINGS", ex.Message));
+            }
+
+            await _dbContext.SaveChangesAsync(cancellationToken);
+
+            await _auditService.LogAsync(
+                "portal.booking.settings.update",
+                nameof(ClinicPortalBookingSetting),
+                setting.Id.ToString(),
+                null,
+                JsonSerializer.Serialize(new
+                {
+                    Mode = setting.Mode.ToString(),
+                    setting.MinLeadTimeMinutes,
+                    setting.MaxDaysAhead,
+                    setting.MaxActiveFutureBookingsPerPatient,
+                    setting.MaxBookingsPerDay,
+                    setting.CancellationCutoffHours,
+                    setting.AutoBlockAfterNoShows,
+                    setting.ApprovalHoldHours
+                }),
+                staffUserId,
+                clinicId,
+                ipAddress,
+                requestId,
+                cancellationToken);
+
+            return Result<ClinicPortalBookingSettingResult>.Success(PortalBookingHelper.MapBookingSettings(setting));
+        });
+    }
+
+    public async Task<Result<IReadOnlyList<PortalBookingRequestItemResult>>> ListPortalBookingRequestsAsync(
+        Guid staffUserId,
+        Guid clinicId,
+        string? statusFilter,
+        string? deviceId,
+        CancellationToken cancellationToken = default)
+    {
+        var gate = await _authorizationService.EnsureClinicAccessAsync(
+            staffUserId, clinicId, "portal.booking.requests.review", "portal-booking", deviceId, cancellationToken);
+        if (gate.IsFailure)
+        {
+            return Result<IReadOnlyList<PortalBookingRequestItemResult>>.Failure(gate.Error);
+        }
+
+        return await ExecuteForClinicAsync(clinicId, async () =>
+        {
+            List<PortalBookingRequestItemResult> items = await QueryPortalBookingRequestsInternalAsync(
+                clinicId, statusFilter, cancellationToken);
+            return Result<IReadOnlyList<PortalBookingRequestItemResult>>.Success(items);
+        });
+    }
+
+    public async Task<Result<PortalBookingRequestItemResult>> ApprovePortalBookingRequestAsync(
+        Guid staffUserId,
+        Guid clinicId,
+        Guid appointmentId,
+        string? reviewNotes,
+        string? deviceId,
+        string? ipAddress,
+        string? requestId,
+        CancellationToken cancellationToken = default)
+    {
+        var gate = await _authorizationService.EnsureClinicAccessAsync(
+            staffUserId, clinicId, "portal.booking.requests.review", "portal-booking", deviceId, cancellationToken);
+        if (gate.IsFailure)
+        {
+            return Result<PortalBookingRequestItemResult>.Failure(gate.Error);
+        }
+
+        Result<AppointmentItemResult> res = await _portalBooking.ApprovePortalBookingRequestAsync(
+            staffUserId, clinicId, appointmentId, reviewNotes, ipAddress, requestId, cancellationToken);
+        if (res.IsFailure)
+        {
+            return Result<PortalBookingRequestItemResult>.Failure(res.Error);
+        }
+
+        return await ExecuteForClinicAsync(clinicId, async () =>
+        {
+            List<PortalBookingRequestItemResult> hydrated = await QueryPortalBookingRequestsInternalAsync(
+                clinicId, null, cancellationToken, appointmentId);
+            return Result<PortalBookingRequestItemResult>.Success(hydrated[0]);
+        });
+    }
+
+    public async Task<Result<PortalBookingRequestItemResult>> DeclinePortalBookingRequestAsync(
+        Guid staffUserId,
+        Guid clinicId,
+        Guid appointmentId,
+        string? reviewNotes,
+        string? deviceId,
+        string? ipAddress,
+        string? requestId,
+        CancellationToken cancellationToken = default)
+    {
+        var gate = await _authorizationService.EnsureClinicAccessAsync(
+            staffUserId, clinicId, "portal.booking.requests.review", "portal-booking", deviceId, cancellationToken);
+        if (gate.IsFailure)
+        {
+            return Result<PortalBookingRequestItemResult>.Failure(gate.Error);
+        }
+
+        Result<AppointmentItemResult> res = await _portalBooking.DeclinePortalBookingRequestAsync(
+            staffUserId, clinicId, appointmentId, reviewNotes, ipAddress, requestId, cancellationToken);
+        if (res.IsFailure)
+        {
+            return Result<PortalBookingRequestItemResult>.Failure(res.Error);
+        }
+
+        return await ExecuteForClinicAsync(clinicId, async () =>
+        {
+            List<PortalBookingRequestItemResult> hydrated = await QueryPortalBookingRequestsInternalAsync(
+                clinicId, null, cancellationToken, appointmentId);
+            return Result<PortalBookingRequestItemResult>.Success(hydrated[0]);
+        });
+    }
+
+    public async Task<Result<int>> ExpireStalePortalBookingRequestsAsync(
+        Guid staffUserId,
+        Guid clinicId,
+        string? deviceId,
+        CancellationToken cancellationToken = default)
+    {
+        var gate = await _authorizationService.EnsureClinicAccessAsync(
+            staffUserId, clinicId, "portal.booking.requests.review", "portal-booking", deviceId, cancellationToken);
+        if (gate.IsFailure)
+        {
+            return Result<int>.Failure(gate.Error);
+        }
+
+        return await _portalBooking.ExpireStalePortalBookingRequestsAsync(clinicId, staffUserId, cancellationToken);
+    }
+
+    public async Task<Result<PatientPortalAdminStatusResult>> SetPatientOnlineBookingBlockAsync(
+        Guid staffUserId,
+        Guid clinicId,
+        Guid patientId,
+        bool blocked,
+        string? reason,
+        string? deviceId,
+        string? ipAddress,
+        string? requestId,
+        CancellationToken cancellationToken = default)
+    {
+        var gate = await _authorizationService.EnsureClinicAccessAsync(
+            staffUserId, clinicId, "portal.booking.manage", "portal-booking", deviceId, cancellationToken);
+        if (gate.IsFailure)
+        {
+            return Result<PatientPortalAdminStatusResult>.Failure(gate.Error);
+        }
+
+        return await ExecuteForClinicAsync(clinicId, async () =>
+        {
+            PatientAccount? account = await _dbContext.PatientAccounts
+                .FirstOrDefaultAsync(a => a.ClinicId == clinicId && a.PatientId == patientId && !a.IsVoided, cancellationToken);
+            if (account == null)
+            {
+                return Result<PatientPortalAdminStatusResult>.Failure(Error.NotFound(
+                    "PORTAL_ACCOUNT_NOT_FOUND",
+                    "Patient portal account was not found."));
+            }
+
+            DateTimeOffset now = _clock.UtcNow;
+            if (blocked)
+            {
+                account.BlockOnlineBooking(staffUserId, reason, now);
+            }
+            else
+            {
+                account.UnblockOnlineBooking(now);
+            }
+
+            await _dbContext.SaveChangesAsync(cancellationToken);
+
+            await _auditService.LogAsync(
+                blocked ? "portal.booking.patient_blocked" : "portal.booking.patient_unblocked",
+                nameof(PatientAccount),
+                account.Id.ToString(),
+                null,
+                JsonSerializer.Serialize(new { patientId, blocked, reason }),
+                staffUserId,
+                clinicId,
+                ipAddress,
+                requestId,
+                cancellationToken);
+
+            PortalConsent? consent = await _dbContext.PortalConsents
+                .AsNoTracking()
+                .Where(c => c.ClinicId == clinicId && !c.IsVoided && c.PatientId == patientId)
+                .OrderByDescending(c => c.AcceptedAtUtc)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            return Result<PatientPortalAdminStatusResult>.Success(new PatientPortalAdminStatusResult(
+                PatientId: patientId,
+                HasAccount: true,
+                Status: account.Status,
+                Email: account.Email,
+                IsEmailConfirmed: account.IsEmailConfirmed,
+                IsGuardianAccount: account.IsGuardianAccount,
+                GuardianName: account.GuardianName,
+                ConsentAcceptedAtUtc: consent?.AcceptedAtUtc,
+                ConsentTermsVersion: consent?.TermsVersion,
+                LastLoginAtUtc: account.LastLoginAtUtc,
+                GeneratedPrintedPin: null,
+                PrintedPinExpiresAtUtc: account.PrintedCodeExpiresAtUtc,
+                NoShowCount: account.NoShowCount,
+                IsOnlineBookingBlocked: account.IsOnlineBookingBlocked,
+                OnlineBookingBlockReason: account.OnlineBookingBlockReason));
+        });
+    }
+
+    public async Task<Result<ClinicPortalBookingInspectResult>> InspectClinicPortalBookingAsync(
+        string adminId,
+        Guid clinicId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(adminId);
+
+        return await ExecuteForClinicAsync(clinicId, async () =>
+        {
+            DateTimeOffset now = _clock.UtcNow;
+            Clinic? clinic = await _dbContext.Clinics.AsNoTracking().FirstOrDefaultAsync(c => c.Id == clinicId, cancellationToken);
+            if (clinic == null)
+            {
+                return Result<ClinicPortalBookingInspectResult>.Failure(Error.NotFound("CLINIC_NOT_FOUND", "Clinic was not found."));
+            }
+
+            ClinicPortalBookingSetting bookingSettings = await PortalBookingHelper.GetOrBuildDefaultBookingSettingsAsync(
+                _dbContext, clinicId, now, cancellationToken);
+
+            TimeZoneInfo tz = ClinicTimeZoneResolver.Resolve(clinic.TimeZone);
+            DateTimeOffset localNow = TimeZoneInfo.ConvertTime(now, tz);
+            DateTime localDayStartUnspecified = new(localNow.Year, localNow.Month, localNow.Day, 0, 0, 0, DateTimeKind.Unspecified);
+            DateTimeOffset dayStartUtc = new DateTimeOffset(localDayStartUnspecified, tz.GetUtcOffset(localDayStartUnspecified)).ToUniversalTime();
+            DateTimeOffset dayEndUtc = new DateTimeOffset(localDayStartUnspecified.AddDays(1), tz.GetUtcOffset(localDayStartUnspecified.AddDays(1))).ToUniversalTime();
+
+            List<PortalBookingRequestItemResult> pending = await QueryPortalBookingRequestsInternalAsync(
+                clinicId, AppointmentStatus.Requested.ToString(), cancellationToken);
+
+            int todayPortalCount = await _dbContext.Appointments
+                .AsNoTracking()
+                .CountAsync(
+                    a => a.ClinicId == clinicId
+                         && !a.IsVoided
+                         && a.Source == AppointmentSource.Portal
+                         && a.StartUtc >= dayStartUtc
+                         && a.StartUtc < dayEndUtc,
+                    cancellationToken);
+
+            int blockedCount = await _dbContext.PatientAccounts
+                .AsNoTracking()
+                .CountAsync(a => a.ClinicId == clinicId && !a.IsVoided && a.IsOnlineBookingBlocked, cancellationToken);
+
+            _dbContext.PatientAccessLogs.Add(new PatientAccessLog(
+                GuidV7.NewGuid(),
+                adminId,
+                "InspectPortalBooking",
+                now,
+                clinicId,
+                null,
+                "SuperAdmin"));
+            await _dbContext.SaveChangesAsync(cancellationToken);
+
+            return Result<ClinicPortalBookingInspectResult>.Success(new ClinicPortalBookingInspectResult(
+                ClinicId: clinicId,
+                Settings: PortalBookingHelper.MapBookingSettings(bookingSettings),
+                PendingRequestsCount: pending.Count(r => !r.IsExpired),
+                TodayPortalBookingsCount: todayPortalCount,
+                BlockedPatientsCount: blockedCount,
+                PendingRequests: pending));
+        });
+    }
+
+    private async Task<List<PortalBookingRequestItemResult>> QueryPortalBookingRequestsInternalAsync(
+        Guid clinicId,
+        string? statusFilter,
+        CancellationToken cancellationToken,
+        Guid? onlyAppointmentId = null)
+    {
+        IQueryable<Appointment> query = _dbContext.Appointments
+            .AsNoTracking()
+            .Where(a => a.ClinicId == clinicId && !a.IsVoided && a.Source == AppointmentSource.Portal);
+
+        if (onlyAppointmentId.HasValue)
+        {
+            query = query.Where(a => a.Id == onlyAppointmentId.Value);
+        }
+        else if (!string.IsNullOrWhiteSpace(statusFilter)
+                 && Enum.TryParse<AppointmentStatus>(statusFilter.Trim(), true, out AppointmentStatus parsed))
+        {
+            query = query.Where(a => a.Status == parsed);
+        }
+
+        List<Appointment> appts = await query
+            .OrderByDescending(a => a.CreatedAtUtc)
+            .Take(100)
+            .ToListAsync(cancellationToken);
+
+        if (appts.Count == 0)
+        {
+            return new List<PortalBookingRequestItemResult>();
+        }
+
+        HashSet<Guid> patientIds = appts.Select(a => a.PatientId).ToHashSet();
+        HashSet<Guid> doctorIds = appts.Select(a => a.DoctorId).ToHashSet();
+        HashSet<Guid> categoryIds = appts.Select(a => a.CategoryId).ToHashSet();
+
+        Dictionary<Guid, (string FileNumber, string FullName)> patients = await _dbContext.Patients
+            .AsNoTracking()
+            .Where(p => p.ClinicId == clinicId && patientIds.Contains(p.Id))
+            .ToDictionaryAsync(p => p.Id, p => ValueTuple.Create(p.FileNumber, p.FullName), cancellationToken);
+
+        Dictionary<Guid, string> doctors = await _dbContext.ClinicDoctors
+            .AsNoTracking()
+            .Where(d => d.ClinicId == clinicId && doctorIds.Contains(d.Id))
+            .ToDictionaryAsync(d => d.Id, d => d.FullName, cancellationToken);
+
+        Dictionary<Guid, AppointmentCategory> categories = await _dbContext.AppointmentCategories
+            .AsNoTracking()
+            .Where(c => c.ClinicId == clinicId && categoryIds.Contains(c.Id))
+            .ToDictionaryAsync(c => c.Id, cancellationToken);
+
+        DateTimeOffset now = _clock.UtcNow;
+        return appts.Select(a =>
+        {
+            patients.TryGetValue(a.PatientId, out (string FileNumber, string FullName) pat);
+            doctors.TryGetValue(a.DoctorId, out string? docName);
+            categories.TryGetValue(a.CategoryId, out AppointmentCategory? cat);
+
+            return new PortalBookingRequestItemResult(
+                AppointmentId: a.Id,
+                ClinicId: a.ClinicId,
+                PatientId: a.PatientId,
+                PatientFileNumber: pat.FileNumber ?? string.Empty,
+                PatientName: pat.FullName ?? string.Empty,
+                DoctorId: a.DoctorId,
+                DoctorName: docName ?? string.Empty,
+                CategoryId: a.CategoryId,
+                CategoryNameAr: cat?.NameAr ?? string.Empty,
+                CategoryNameEn: cat?.NameEn ?? string.Empty,
+                StartAtUtc: a.StartUtc,
+                EndAtUtc: a.EndUtc,
+                Status: a.Status.ToString(),
+                ApprovalExpiresAtUtc: a.ApprovalExpiresAtUtc,
+                IsExpired: a.IsPortalRequestExpired(now),
+                Notes: a.Notes,
+                ReviewNotes: a.ReviewNotes,
+                CreatedAtUtc: a.CreatedAtUtc);
+        }).ToList();
+    }
+
     private async Task<Result<PortalSessionContext>> EnsureActivePortalSessionForSlugAsync(
         Guid accountId,
         Guid clinicId,
@@ -1939,6 +2748,10 @@ public sealed class PatientPortalService : IPatientPortalService
         if (enabledModules.Contains("treatment-plans"))
         {
             sections.Add("treatment-plans");
+        }
+        if (enabledModules.Contains("portal-booking") && enabledModules.Contains("scheduling"))
+        {
+            sections.Add("portal-booking");
         }
 
         return sections;

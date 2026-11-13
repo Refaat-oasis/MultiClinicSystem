@@ -104,5 +104,120 @@ describe('PortalApp', () => {
     fireEvent.click(screen.getByText('تفعيل برمز البريد'));
     expect(screen.getByTestId('portal-code-ltr').getAttribute('dir')).toBe('ltr');
   });
+
+  it('supports portal-booking slot selection, self-booking, cancellation, and offline ONLINE_REQUIRED guard', async () => {
+    const onBookAppointment = vi.fn().mockResolvedValue({
+      appointmentId: 'appt-new-1',
+      startAtUtc: '2026-08-12T09:00:00Z',
+      endAtUtc: '2026-08-12T09:30:00Z',
+      doctorName: 'د. عمر سالم',
+      specialtyCode: 'dental',
+      categoryNameAr: 'كشف أسنان',
+      categoryNameEn: 'Dental Exam',
+      status: 'Requested',
+    });
+    const onCancelAppointment = vi.fn().mockResolvedValue({
+      appointmentId: 'appt-new-1',
+      startAtUtc: '2026-08-12T09:00:00Z',
+      endAtUtc: '2026-08-12T09:30:00Z',
+      doctorName: 'د. عمر سالم',
+      specialtyCode: 'dental',
+      categoryNameAr: 'كشف أسنان',
+      categoryNameEn: 'Dental Exam',
+      status: 'Cancelled',
+    });
+
+    render(
+      <PortalApp
+        slug="smile-dental"
+        initialOverview={{
+          clinicId: 'clinic-1',
+          clinicName: 'عيادة بسمة',
+          clinicSlug: 'smile-dental',
+          welcomeMessageAr: 'أهلاً بكم',
+          welcomeMessageEn: 'Welcome',
+          availableSections: ['overview', 'portal-booking'],
+          summary: {
+            patientId: 'pat-1',
+            fileNumber: 'SM-0001',
+            fullName: 'نادية حسن',
+          },
+          upcomingAppointments: [],
+        }}
+        initialAvailability={{
+          clinicId: 'clinic-1',
+          clinicTimeZone: 'UTC',
+          bookingMode: 'RequiresApproval',
+          cancellationCutoffHours: 12,
+          maxActiveFutureBookingsPerPatient: 2,
+          activeFutureBookingsCount: 0,
+          isPatientOnlineBookingBlocked: false,
+          categories: [
+            {
+              categoryId: 'cat-1',
+              specialtyCode: 'dental',
+              nameAr: 'كشف أسنان',
+              nameEn: 'Dental Exam',
+              durationMinutes: 30,
+              priceAmount: 450,
+              priceCurrency: 'EGP',
+            },
+          ],
+          doctors: [{ doctorId: 'doc-1', displayName: 'د. عمر سالم', specialtyCode: 'dental' }],
+          slots: [
+            {
+              doctorId: 'doc-1',
+              doctorName: 'د. عمر سالم',
+              roomId: 'room-1',
+              localDate: '2026-08-12',
+              startAtUtc: '2026-08-12T09:00:00Z',
+              endAtUtc: '2026-08-12T09:30:00Z',
+              durationMinutes: 30,
+            },
+          ],
+        }}
+        onBookAppointment={onBookAppointment}
+        onCancelAppointment={onCancelAppointment}
+      />,
+    );
+
+    fireEvent.click(screen.getByText('حجز موعد أونلاين'));
+    expect(screen.getByTestId('portal-booking-mode').textContent).toContain('RequiresApproval');
+    fireEvent.click(screen.getByTestId('portal-slot-2026-08-12T09:00:00Z'));
+    fireEvent.change(screen.getByLabelText('ملاحظات الحجز (اختياري)'), {
+      target: { value: 'ألم بسيط' },
+    });
+    fireEvent.click(screen.getByText('إرسال طلب الحجز'));
+
+    await vi.waitFor(() => {
+      expect(onBookAppointment).toHaveBeenCalledWith(
+        expect.objectContaining({
+          slug: 'smile-dental',
+          doctorId: 'doc-1',
+          categoryId: 'cat-1',
+          startAtUtc: '2026-08-12T09:00:00Z',
+          notes: 'ألم بسيط',
+        }),
+      );
+    });
+
+    // Offline guard blocks portal booking writes with ONLINE_REQUIRED
+    Object.defineProperty(window.navigator, 'onLine', { value: false, configurable: true });
+    fireEvent.click(screen.getByText('إرسال طلب الحجز'));
+    expect(screen.getByRole('alert').textContent).toContain('ONLINE_REQUIRED');
+    Object.defineProperty(window.navigator, 'onLine', { value: true, configurable: true });
+
+    // Cancel upcoming appointment from overview tab
+    fireEvent.click(screen.getByText('الرئيسية'));
+    expect(screen.getByTestId('portal-appt-status-appt-new-1').textContent).toBe('Requested');
+    fireEvent.click(screen.getByText('إلغاء الموعد'));
+    await vi.waitFor(() => {
+      expect(onCancelAppointment).toHaveBeenCalledWith({
+        slug: 'smile-dental',
+        appointmentId: 'appt-new-1',
+        reason: 'Cancelled by patient from portal',
+      });
+    });
+  });
 });
 

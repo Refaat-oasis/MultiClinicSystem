@@ -11,6 +11,8 @@ public enum AppointmentStatus
     Completed = 3,
     NoShow = 4,
     Cancelled = 5,
-    Late = 6
+    Late = 6,
+    Requested = 7,
+    Declined = 8
 }
 

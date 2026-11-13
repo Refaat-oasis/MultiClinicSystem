@@ -14,5 +14,8 @@ public sealed record PatientPortalAdminStatusResult(
     string? ConsentTermsVersion,
     DateTimeOffset? LastLoginAtUtc,
     string? GeneratedPrintedPin,
-    DateTimeOffset? PrintedPinExpiresAtUtc);
+    DateTimeOffset? PrintedPinExpiresAtUtc,
+    int NoShowCount = 0,
+    bool IsOnlineBookingBlocked = false,
+    string? OnlineBookingBlockReason = null);
 
