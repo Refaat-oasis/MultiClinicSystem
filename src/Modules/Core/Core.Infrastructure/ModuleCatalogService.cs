@@ -183,7 +183,8 @@ public sealed class ModuleCatalogService : IModuleCatalogService
                     new("numberblocks.manage", "core", "Clinic Structure", "حجز نطاقات الترقيم", "Reserve Number Blocks", false),
                     new("audit.read", "core", "Security & Roles", "عرض سجل التدقيق", "View Clinic Audit Log", false),
                     new("dashboard.view", "core", "Dashboards", "عرض لوحة التحكم", "View Clinic Dashboard", false),
-                    new("portfolio.view", "core", "Dashboards", "عرض محفظة العيادات", "View Owner Portfolio", false)
+                    new("portfolio.view", "core", "Dashboards", "عرض محفظة العيادات", "View Owner Portfolio", false),
+                    new("clinic.export", "core", "Clinic Structure", "تصدير بيانات العيادة", "Export Full Clinic Archive", true)
                 ],
                 MenuItems:
                 [

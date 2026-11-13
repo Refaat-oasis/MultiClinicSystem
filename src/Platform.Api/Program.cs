@@ -273,6 +273,7 @@ builder.Services.AddScoped<IFinanceExtendedService, FinanceExtendedService>();
 builder.Services.AddScoped<IReportsService, ReportsService>();
 builder.Services.AddScoped<IExcelImportService, ExcelImportService>();
 builder.Services.AddScoped<ISyncService, SyncService>();
+builder.Services.AddScoped<IClinicExportService, ClinicExportService>();
 builder.Services.AddScoped<IScheduleRealtimeNotifier, Platform.Api.Hubs.SignalRScheduleRealtimeNotifier>();
 builder.Services.AddSignalR();
 
@@ -311,6 +312,7 @@ if (args.Length >= 2 &&
 
 // Pipeline Middlewares
 app.UseMiddleware<RequestIdMiddleware>();
+app.UseMiddleware<SecurityHeadersMiddleware>();
 app.UseMiddleware<HostRoutingMiddleware>();
 
 app.UseHttpsRedirection();

@@ -11,7 +11,8 @@ public static class EffectivePermissionsEvaluator
     public static readonly IReadOnlySet<string> ReservedOwnerPermissions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     {
         "clinic.settings.edit",
-        "roles.manage"
+        "roles.manage",
+        "clinic.export"
     };
 
     public static EffectivePermissionsEvaluation Evaluate(
