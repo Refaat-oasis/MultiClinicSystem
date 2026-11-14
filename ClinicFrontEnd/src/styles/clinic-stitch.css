@@ -1,0 +1,237 @@
+:root {
+  /* Clinical Calm Design System Tokens (Stitch Spec) */
+  --clinic-bg-canvas: #f8fafc;
+  --clinic-bg-surface: #ffffff;
+  --clinic-bg-subtle: #f1f5f9;
+  --clinic-bg-hover: #e2e8f0;
+
+  --clinic-border-subtle: #e2e8f0;
+  --clinic-border-strong: #cbd5e1;
+  --clinic-border-focus: #0f766e;
+
+  --clinic-text-primary: #0f172a;
+  --clinic-text-secondary: #475569;
+  --clinic-text-muted: #94a3b8;
+
+  --clinic-accent-primary: #0f766e;
+  --clinic-accent-hover: #115e59;
+  --clinic-accent-soft: #ccfbf1;
+  --clinic-accent-soft-text: #0f766e;
+
+  --clinic-status-success: #16a34a;
+  --clinic-status-success-bg: #dcfce7;
+  --clinic-status-warning: #d97706;
+  --clinic-status-warning-bg: #fef3c7;
+  --clinic-status-danger: #dc2626;
+  --clinic-status-danger-bg: #fee2e2;
+  --clinic-status-info: #2563eb;
+  --clinic-status-info-bg: #dbeafe;
+
+  --clinic-radius-card: 12px;
+  --clinic-radius-input: 8px;
+  --clinic-radius-pill: 9999px;
+
+  --clinic-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --clinic-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+  --clinic-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'IBM Plex Sans Arabic', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background-color: var(--clinic-bg-canvas);
+  color: var(--clinic-text-primary);
+  line-height: 1.5;
+  direction: rtl;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Clinical Card */
+.clinic-card {
+  background-color: var(--clinic-bg-surface);
+  border: 1px solid var(--clinic-border-subtle);
+  border-radius: var(--clinic-radius-card);
+  box-shadow: var(--clinic-shadow-sm);
+  padding: 1.5rem;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.clinic-card:hover {
+  border-color: var(--clinic-border-strong);
+  box-shadow: var(--clinic-shadow-md);
+}
+
+/* Action Buttons (44px min touch target) */
+.clinic-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-family: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  min-height: 44px;
+  padding: 0.625rem 1.25rem;
+  border-radius: var(--clinic-radius-input);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: 1px solid transparent;
+  outline: none;
+}
+
+.clinic-btn:focus-visible {
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.25);
+}
+
+.clinic-btn-primary {
+  background-color: var(--clinic-accent-primary);
+  color: #ffffff;
+}
+
+.clinic-btn-primary:hover {
+  background-color: var(--clinic-accent-hover);
+}
+
+.clinic-btn-secondary {
+  background-color: var(--clinic-bg-surface);
+  border-color: var(--clinic-border-strong);
+  color: var(--clinic-text-primary);
+}
+
+.clinic-btn-secondary:hover {
+  background-color: var(--clinic-bg-subtle);
+}
+
+.clinic-btn-soft {
+  background-color: var(--clinic-accent-soft);
+  color: var(--clinic-accent-soft-text);
+}
+
+.clinic-btn-soft:hover {
+  background-color: #99f6e4;
+}
+
+.clinic-btn-danger {
+  background-color: #fee2e2;
+  color: #dc2626;
+  border-color: #fca5a5;
+}
+
+.clinic-btn-danger:hover {
+  background-color: #fecaca;
+}
+
+/* Clinical Inputs */
+.clinic-input {
+  width: 100%;
+  font-family: inherit;
+  font-size: 1rem;
+  min-height: 44px;
+  padding: 0.625rem 0.875rem;
+  border-radius: var(--clinic-radius-input);
+  border: 1px solid var(--clinic-border-strong);
+  background-color: var(--clinic-bg-surface);
+  color: var(--clinic-text-primary);
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.clinic-input:focus {
+  border-color: var(--clinic-border-focus);
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.15);
+}
+
+/* Mandatory Red Allergy Banner */
+.clinic-allergy-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.875rem 1.25rem;
+  border-radius: var(--clinic-radius-card);
+  background-color: #fef2f2;
+  border: 2px solid #dc2626;
+  color: #991b1b;
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+
+/* Status Chip */
+.clinic-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.25rem 0.625rem;
+  border-radius: var(--clinic-radius-pill);
+}
+
+.clinic-chip-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.clinic-chip-success {
+  background-color: var(--clinic-status-success-bg);
+  color: var(--clinic-status-success);
+}
+.clinic-chip-success .clinic-chip-dot { background-color: var(--clinic-status-success); }
+
+.clinic-chip-warning {
+  background-color: var(--clinic-status-warning-bg);
+  color: var(--clinic-status-warning);
+}
+.clinic-chip-warning .clinic-chip-dot { background-color: var(--clinic-status-warning); }
+
+.clinic-chip-danger {
+  background-color: var(--clinic-status-danger-bg);
+  color: var(--clinic-status-danger);
+}
+.clinic-chip-danger .clinic-chip-dot { background-color: var(--clinic-status-danger); }
+
+.clinic-chip-info {
+  background-color: var(--clinic-status-info-bg);
+  color: var(--clinic-status-info);
+}
+.clinic-chip-info .clinic-chip-dot { background-color: var(--clinic-status-info); }
+
+/* Table Styles */
+.clinic-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.875rem;
+}
+
+.clinic-table th {
+  background-color: var(--clinic-bg-subtle);
+  color: var(--clinic-text-secondary);
+  font-weight: 600;
+  text-align: right;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--clinic-border-subtle);
+}
+
+.clinic-table td {
+  padding: 0.875rem 1rem;
+  border-bottom: 1px solid var(--clinic-border-subtle);
+  color: var(--clinic-text-primary);
+  vertical-align: middle;
+}
+
+.clinic-table tr:hover td {
+  background-color: var(--clinic-bg-subtle);
+}
+
+/* Tabular figures for numbers */
+.num-tabular {
+  font-family: 'Inter', monospace;
+  font-variant-numeric: tabular-nums;
+}
