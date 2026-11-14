@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertCircle, CheckCircle2, Info, AlertTriangle } from 'lucide-react';
+import { CheckCircle2, Info, AlertTriangle, X } from 'lucide-react';
 
 export type AlertBannerVariant = 'error' | 'success' | 'warning' | 'info';
 
@@ -7,88 +7,100 @@ export interface AlertBannerProps {
   variant?: AlertBannerVariant;
   message: string;
   title?: string;
+  isAllergy?: boolean;
   onDismiss?: () => void;
+  className?: string;
 }
 
 export const AlertBanner: React.FC<AlertBannerProps> = ({
   variant = 'info',
   message,
   title,
+  isAllergy = false,
   onDismiss,
+  className = '',
 }) => {
+  const isDanger = variant === 'error' || isAllergy;
+
   const variantConfig = {
     error: {
-      bg: 'rgba(239, 68, 68, 0.1)',
-      border: 'rgba(239, 68, 68, 0.25)',
-      color: '#ef4444',
-      icon: <AlertCircle size={20} color="#ef4444" />,
+      bg: 'var(--color-status-danger-soft)',
+      border: 'var(--color-status-danger)',
+      color: 'var(--color-status-danger)',
+      icon: <AlertTriangle size={20} color="var(--color-status-danger)" />,
     },
     success: {
-      bg: 'rgba(16, 185, 129, 0.1)',
-      border: 'rgba(16, 185, 129, 0.25)',
-      color: '#10b981',
-      icon: <CheckCircle2 size={20} color="#10b981" />,
+      bg: 'var(--color-status-success-soft)',
+      border: 'var(--color-status-success)',
+      color: 'var(--color-status-success)',
+      icon: <CheckCircle2 size={20} color="var(--color-status-success)" />,
     },
     warning: {
-      bg: 'rgba(245, 158, 11, 0.1)',
-      border: 'rgba(245, 158, 11, 0.25)',
-      color: '#f59e0b',
-      icon: <AlertTriangle size={20} color="#f59e0b" />,
+      bg: 'var(--color-status-warning-soft)',
+      border: 'var(--color-status-warning)',
+      color: 'var(--color-status-warning)',
+      icon: <AlertTriangle size={20} color="var(--color-status-warning)" />,
     },
     info: {
-      bg: 'rgba(13, 148, 136, 0.1)',
-      border: 'rgba(13, 148, 136, 0.25)',
-      color: 'var(--color-accent-teal)',
-      icon: <Info size={20} color="var(--color-accent-teal)" />,
+      bg: 'var(--color-status-info-soft)',
+      border: 'var(--color-status-info)',
+      color: 'var(--color-status-info)',
+      icon: <Info size={20} color="var(--color-status-info)" />,
     },
   }[variant];
 
   return (
     <div
       role="alert"
+      className={`${isAllergy ? 'allergy-alert-banner' : ''} ${className}`.trim()}
       style={{
         display: 'flex',
         alignItems: 'flex-start',
         gap: '0.75rem',
-        padding: '0.875rem 1rem',
-        borderRadius: '0.75rem',
+        padding: '0.875rem 1.25rem',
+        borderRadius: 'var(--radius-card)',
         backgroundColor: variantConfig.bg,
         border: `1px solid ${variantConfig.border}`,
-        backdropFilter: 'var(--glass-blur)',
-        WebkitBackdropFilter: 'var(--glass-blur)',
-        color: 'var(--color-text-primary)',
+        color: variantConfig.color,
         width: '100%',
-        textAlign: 'start',
+        boxShadow: isDanger ? '0 1px 4px rgba(220, 38, 38, 0.15)' : 'none',
       }}
     >
-      <div style={{ flexShrink: 0, marginTop: '2px' }}>{variantConfig.icon}</div>
-      <div style={{ flexGrow: 1 }}>
+      <div style={{ flexShrink: 0, marginTop: '0.125rem' }}>
+        {variantConfig.icon}
+      </div>
+
+      <div style={{ flex: 1, minWidth: 0 }}>
         {title && (
-          <div style={{ fontWeight: 600, fontSize: '0.9375rem', marginBottom: '0.25rem', color: variantConfig.color }}>
+          <div style={{ fontWeight: 700, fontSize: '0.9375rem', marginBottom: '0.25rem', color: variantConfig.color }}>
             {title}
           </div>
         )}
-        <div style={{ fontSize: '0.875rem', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
+        <div style={{ fontSize: '0.875rem', lineHeight: 1.5, color: 'var(--color-text-primary)' }}>
           {message}
         </div>
       </div>
-      {onDismiss && (
+
+      {!isAllergy && onDismiss && (
         <button
-          type="button"
           onClick={onDismiss}
-          aria-label="إغلاق التنبيه"
+          aria-label="Dismiss alert"
           style={{
-            background: 'none',
+            background: 'transparent',
             border: 'none',
+            color: 'inherit',
+            opacity: 0.7,
             cursor: 'pointer',
-            color: 'var(--color-text-muted)',
-            padding: '2px',
+            padding: '0.25rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: '4px',
           }}
         >
-          ✕
+          <X size={16} />
         </button>
       )}
     </div>
   );
 };
-

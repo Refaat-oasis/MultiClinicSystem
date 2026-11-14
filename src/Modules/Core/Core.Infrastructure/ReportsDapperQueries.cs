@@ -1,5 +1,4 @@
 using System.Text.Json;
-using BuildingBlocks.Domain;
 using Core.Application;
 using Core.Domain;
 using Dapper;
@@ -23,7 +22,7 @@ internal static class ReportsDapperQueries
             .AsNoTracking()
             .FirstOrDefaultAsync(c => c.Id == clinicId, cancellationToken);
 
-        (DateTimeOffset startUtc, DateTimeOffset endUtc) = ToUtcRange(clinic?.TimeZone, fromDate, toDate);
+        (DateTimeOffset startUtc, DateTimeOffset endUtc) = ToUtcRange(clinic?.TimeZoneId, fromDate, toDate);
         bool billingEnabled = await IsModuleEnabledAsync(dbContext, clinicId, "billing", cancellationToken);
         bool financeEnabled = await IsModuleEnabledAsync(dbContext, clinicId, "finance", cancellationToken);
 
@@ -103,7 +102,7 @@ internal static class ReportsDapperQueries
         Clinic? clinic = await dbContext.Clinics
             .AsNoTracking()
             .FirstOrDefaultAsync(c => c.Id == clinicId, cancellationToken);
-        (DateTimeOffset startUtc, DateTimeOffset endUtc) = ToUtcRange(clinic?.TimeZone, fromDate, toDate);
+        (DateTimeOffset startUtc, DateTimeOffset endUtc) = ToUtcRange(clinic?.TimeZoneId, fromDate, toDate);
         int startYm = (fromDate.Year * 12) + fromDate.Month;
         int endYm = (toDate.Year * 12) + toDate.Month;
 
@@ -181,7 +180,7 @@ internal static class ReportsDapperQueries
         Clinic? clinic = await dbContext.Clinics
             .AsNoTracking()
             .FirstOrDefaultAsync(c => c.Id == clinicId, cancellationToken);
-        (DateTimeOffset startUtc, DateTimeOffset endUtc) = ToUtcRange(clinic?.TimeZone, fromDate, toDate);
+        (DateTimeOffset startUtc, DateTimeOffset endUtc) = ToUtcRange(clinic?.TimeZoneId, fromDate, toDate);
 
         var rows = await ClinicTenantScopeHelper.WithDapperConnectionAsync(
             dbContext,
@@ -236,7 +235,7 @@ internal static class ReportsDapperQueries
         Clinic? clinic = await dbContext.Clinics
             .AsNoTracking()
             .FirstOrDefaultAsync(c => c.Id == clinicId, cancellationToken);
-        (DateTimeOffset startUtc, DateTimeOffset endUtc) = ToUtcRange(clinic?.TimeZone, fromDate, toDate);
+        (DateTimeOffset startUtc, DateTimeOffset endUtc) = ToUtcRange(clinic?.TimeZoneId, fromDate, toDate);
 
         var dict = new Dictionary<PaymentMethod, (decimal In, decimal Ref, decimal Exp, decimal Sup)>();
         foreach (PaymentMethod m in Enum.GetValues<PaymentMethod>())
@@ -331,7 +330,7 @@ internal static class ReportsDapperQueries
                     SELECT
                         c.Id AS ClinicId,
                         c.Name AS ClinicName,
-                        COALESCE(c.Slug, '') AS Slug,
+                        COALESCE((SELECT TOP 1 cs.Slug FROM core.ClinicSlugs cs WHERE cs.ClinicId = c.Id ORDER BY cs.IsPrimary DESC), '') AS Slug,
                         c.Currency AS Currency,
                         COALESCE((SELECT COUNT(1) FROM clinical.Visits v WHERE v.ClinicId = c.Id AND v.IsVoided = 0 AND v.StartedAtUtc >= @StartUtc AND v.StartedAtUtc <= @EndUtc), 0) AS VisitsCount,
                         COALESCE((SELECT SUM(-SignedAmount) FROM billing.LedgerEntries l WHERE l.ClinicId = c.Id AND l.EntryType = 'Payment' AND l.OccurredAtUtc >= @StartUtc AND l.OccurredAtUtc <= @EndUtc), 0)
@@ -485,4 +484,3 @@ internal static class ReportsDapperQueries
         public decimal PayrollTotal { get; init; }
     }
 }
-

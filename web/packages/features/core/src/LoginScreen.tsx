@@ -66,20 +66,36 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   };
 
   return (
-    <div style={{ maxWidth: '440px', marginInline: 'auto', width: '100%' }}>
-      <GlassCard>
-        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+    <div style={{ maxWidth: '460px', marginInline: 'auto', width: '100%' }}>
+      <GlassCard style={{ padding: '2rem' }}>
+        <div style={{ textAlign: 'center', marginBottom: '1.75rem' }}>
           <div
             style={{
               display: 'inline-flex',
               padding: '0.875rem',
-              borderRadius: '1rem',
-              backgroundColor: 'rgba(13, 148, 136, 0.12)',
+              borderRadius: 'var(--radius-card)',
+              backgroundColor: 'var(--color-accent-teal-soft)',
               color: 'var(--color-accent-teal)',
               marginBottom: '1rem',
+              boxShadow: 'var(--glass-shadow)',
             }}
           >
             <Stethoscope size={36} />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginBottom: '0.375rem' }}>
+            <span
+              style={{
+                fontSize: '0.6875rem',
+                fontWeight: 600,
+                paddingInline: '0.5rem',
+                paddingBlock: '0.125rem',
+                borderRadius: 'var(--radius-pill)',
+                backgroundColor: 'var(--color-accent-teal-soft)',
+                color: 'var(--color-accent-teal-text)',
+              }}
+            >
+              بوابة الكادر الطبي الموحدة
+            </span>
           </div>
           <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>
             تسجيل الدخول إلى العيادة
@@ -136,7 +152,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                   color: 'var(--color-accent-teal)',
                   cursor: 'pointer',
                   padding: 0,
-                  fontWeight: 500,
+                  fontWeight: 600,
                 }}
               >
                 نسيت كلمة المرور؟
@@ -162,14 +178,34 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
           <GlassButton
             type="submit"
-            variant="prominent"
+            variant="primary"
             disabled={isLoading}
             style={{ width: '100%', marginTop: '0.5rem', minHeight: '2.875rem' }}
           >
             <LogIn size={18} />
-            {isLoading ? 'جاري التحقق...' : 'تسجيل الدخول'}
+            <span>{isLoading ? 'جاري التحقق...' : 'تسجيل الدخول'}</span>
           </GlassButton>
         </form>
+
+        {/* Stitch Compliance Footnote */}
+        <div
+          style={{
+            marginTop: '1.25rem',
+            paddingTop: '0.75rem',
+            borderTop: '1px solid var(--color-border)',
+            textAlign: 'center',
+            fontSize: '0.6875rem',
+            color: 'var(--color-text-muted)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.5rem',
+          }}
+        >
+          <span>تشفير طبي فائق (TLS 1.3)</span>
+          <span>•</span>
+          <span>متوافق مع HIPAA و NCA</span>
+        </div>
       </GlassCard>
     </div>
   );

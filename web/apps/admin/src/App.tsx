@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { GlassCard, GlassButton, ThemeToggle, LanguageSwitcher } from '@clinic/ui';
+import { GlassCard, GlassButton, ThemeToggle, LanguageSwitcher, StatusChip } from '@clinic/ui';
 import { ShieldAlert, Server, KeyRound, LayoutDashboard, Users, Building2, Eye, FileSearch, LogOut } from 'lucide-react';
 import { AdminLoginScreen, PlatformLoginResponse } from './AdminLoginScreen';
 import { AdminEnrollmentScreen, TotpEnrollmentCompletedResponse } from './AdminEnrollmentScreen';
@@ -62,7 +62,33 @@ export const App: React.FC = () => {
 
   return (
     <QueryClientProvider client={adminQueryClient}>
-      <div style={{ maxWidth: '1200px', marginInline: 'auto', padding: '2rem 1rem' }}>
+      <div style={{ maxWidth: '1200px', marginInline: 'auto', padding: '1.5rem 1rem' }}>
+        {/* Stitch Top Sovereign Node Bar */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '0.5rem 1rem',
+            borderRadius: 'var(--radius-input)',
+            backgroundColor: 'var(--color-surface)',
+            border: '1px solid var(--color-border)',
+            marginBottom: '1rem',
+            fontSize: '0.75rem',
+            color: 'var(--color-text-secondary)',
+            flexWrap: 'wrap',
+            gap: '0.5rem',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--color-accent-teal)', display: 'inline-block' }} />
+            <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>Sovereign Cloud Node // KSA-SEC-01</span>
+            <span>•</span>
+            <span>ISO-27001 & SOC2 Type II Certified</span>
+          </div>
+          <StatusChip status="info" label="نطاق المشرفين المعزول [Platform Host]" showDot={true} />
+        </div>
+
         <header
           className="glass-card"
           style={{
@@ -75,19 +101,51 @@ export const App: React.FC = () => {
             gap: '1rem',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <ShieldAlert size={32} color="var(--color-accent-teal)" />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem' }}>
+            <div
+              style={{
+                width: '2.75rem',
+                height: '2.75rem',
+                borderRadius: 'var(--radius-card)',
+                backgroundColor: 'var(--color-accent-teal-soft)',
+                color: 'var(--color-accent-teal)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              <ShieldAlert size={28} />
+            </div>
             <div>
-              <h1 style={{ fontSize: '1.25rem', fontWeight: 700 }}>إدارة المنصة المركزية (Platform Admin)</h1>
-              <p style={{ fontSize: '0.875rem', color: 'var(--color-text-secondary)' }}>
-                {adminEmail ? `متصل: ${adminEmail}` : 'Super Admin Control Plane — المعزولة أمنياً'}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <h1 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0, color: 'var(--color-text-primary)' }}>
+                  إدارة المنصة المركزية (Platform Admin)
+                </h1>
+                <span
+                  style={{
+                    fontSize: '0.6875rem',
+                    fontFamily: 'monospace',
+                    fontWeight: 700,
+                    paddingInline: '0.4rem',
+                    paddingBlock: '0.1rem',
+                    borderRadius: 'var(--radius-pill)',
+                    backgroundColor: 'var(--color-accent-teal)',
+                    color: '#ffffff',
+                  }}
+                >
+                  Super Admin
+                </span>
+              </div>
+              <p style={{ fontSize: '0.8125rem', color: 'var(--color-text-secondary)', margin: '0.25rem 0 0' }}>
+                {adminEmail ? `متصل: ${adminEmail}` : 'Super Admin Control Plane — المعزولة أمنياً عن العيادات والمرضى'}
               </p>
             </div>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
             {adminEmail && (
-              <GlassButton onClick={() => { setAdminEmail(null); setActiveTab('login'); }}>
+              <GlassButton onClick={() => { setAdminEmail(null); setActiveTab('login'); }} variant="danger">
                 <LogOut size={16} />
                 <span>خروج</span>
               </GlassButton>

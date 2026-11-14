@@ -591,22 +591,54 @@ export const PortalApp: React.FC<PortalAppProps> = ({
       }}
     >
       <header
+        className="glass-card"
         style={{
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
           gap: '0.75rem',
           flexWrap: 'wrap',
+          padding: '0.875rem 1.25rem',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
-          <Stethoscope size={24} color="var(--color-accent-teal)" />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <div
+            style={{
+              width: '2.5rem',
+              height: '2.5rem',
+              borderRadius: 'var(--radius-card)',
+              backgroundColor: 'var(--color-accent-teal)',
+              color: '#ffffff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: 'var(--glass-shadow)',
+              flexShrink: 0,
+            }}
+          >
+            <Stethoscope size={22} />
+          </div>
           <div>
-            <h1 style={{ fontSize: '1.125rem', fontWeight: 700 }}>
-              {overview?.clinicName ?? landing?.name ?? slug}
-            </h1>
-            <div style={{ fontSize: '0.8125rem', color: 'var(--color-text-muted)' }}>
-              بوابة المريض الإلكترونية
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <h1 style={{ fontSize: '1.125rem', fontWeight: 700, margin: 0, color: 'var(--color-text-primary)' }}>
+                {overview?.clinicName ?? landing?.name ?? slug}
+              </h1>
+              <span
+                style={{
+                  fontSize: '0.6875rem',
+                  fontWeight: 600,
+                  paddingInline: '0.375rem',
+                  paddingBlock: '0.125rem',
+                  borderRadius: 'var(--radius-pill)',
+                  backgroundColor: 'var(--color-accent-teal-soft)',
+                  color: 'var(--color-accent-teal-text)',
+                }}
+              >
+                بوابة المريض
+              </span>
+            </div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', margin: '0.125rem 0 0' }}>
+              الوصول الطبي الآمن للملف والمواعيد
             </div>
           </div>
         </div>
@@ -614,7 +646,7 @@ export const PortalApp: React.FC<PortalAppProps> = ({
           <ThemeToggle />
           <LanguageSwitcher />
           {overview && (
-            <GlassButton type="button" onClick={handleLogoutClick} aria-label="تسجيل الخروج من بوابة المريض">
+            <GlassButton type="button" onClick={handleLogoutClick} aria-label="تسجيل الخروج من بوابة المريض" variant="danger">
               <LogOut size={16} />
               <span>خروج</span>
             </GlassButton>

@@ -1,8 +1,8 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { GlassCard, GlassButton, AlertBanner } from '@clinic/ui';
+import { GlassCard, GlassButton, AlertBanner, StatCard, StatusChip, ClinicalTable } from '@clinic/ui';
 import { apiClient } from '@clinic/api-client';
-import { Activity, Building2, Users, AlertTriangle, ShieldAlert, MailWarning } from 'lucide-react';
+import { Activity, Building2, Users, AlertTriangle, ShieldAlert, MailWarning, RefreshCw, Server } from 'lucide-react';
 
 export interface AuditLogItem {
   id: string;
@@ -55,21 +55,56 @@ export const PlatformDashboardScreen: React.FC = () => {
 
   const stats = data ?? FALLBACK_DASHBOARD;
 
-  const cards = [
-    { label: 'إجمالي الملاك / Total Owners', value: stats.totalOwners, sub: `${stats.activeOwners} نشط`, icon: <Users size={20} color="var(--color-accent-teal)" /> },
-    { label: 'إجمالي العيادات / Total Clinics', value: stats.totalClinics, sub: `${stats.activeClinics} نشط`, icon: <Building2 size={20} color="var(--color-accent-teal)" /> },
-    { label: 'بانتظار التهيئة / Pending Onboarding', value: stats.pendingOnboardingClinics, sub: `${stats.clinicsAwaitingModuleSetup} بانتظار الوحدات`, icon: <Activity size={20} color="#f59e0b" /> },
-    { label: 'قراءة فقط / Read-Only & Suspended', value: `${stats.readOnlyClinics} / ${stats.suspendedClinics}`, sub: `${stats.expiringSubscriptionsCount} اشتراكات تنتهي قريباً`, icon: <AlertTriangle size={20} color="#ef4444" /> },
-    { label: 'محاولات دخول فاشلة (24 س) / Failed Logins', value: stats.failedLoginsLast24Hours, sub: 'مراقبة الأمان الفورية', icon: <ShieldAlert size={20} color="#ef4444" /> },
-    { label: 'رسائل البريد الصادرة / Outbox Queue', value: stats.pendingOutboxMessages, sub: 'في قائمة المعالجة', icon: <MailWarning size={20} color="#0ea5e9" /> },
+  const auditColumns = [
+    {
+      key: 'timestampUtc',
+      header: 'الوقت (UTC)',
+      render: (item: AuditLogItem) => (
+        <span className="force-ltr" style={{ fontFamily: 'monospace', fontSize: '0.8125rem' }}>
+          {new Date(item.timestampUtc).toLocaleTimeString()}
+        </span>
+      ),
+      width: '120px',
+    },
+    {
+      key: 'action',
+      header: 'الإجراء',
+      render: (item: AuditLogItem) => <StatusChip status="info" label={item.action} showDot={false} />,
+    },
+    {
+      key: 'entityName',
+      header: 'الكيان المتأثر',
+      render: (item: AuditLogItem) => (
+        <span>
+          <strong>{item.entityName}</strong> {item.entityId && <span style={{ opacity: 0.7 }}>({item.entityId.slice(0, 8)}...)</span>}
+        </span>
+      ),
+    },
+    {
+      key: 'ipAddress',
+      header: 'عنوان IP',
+      render: (item: AuditLogItem) => (
+        <span className="force-ltr" style={{ fontFamily: 'monospace', fontSize: '0.8125rem' }}>
+          {item.ipAddress || 'Internal/Node'}
+        </span>
+      ),
+    },
   ];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
-        <h2 style={{ fontSize: '1.25rem', fontWeight: 700 }}>لوحة مراقبة المنصة (Platform Dashboard)</h2>
-        <GlassButton onClick={() => refetch()} disabled={isLoading}>
-          تحديث المؤشرات (Refresh)
+        <div>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0, color: 'var(--color-text-primary)' }}>
+            لوحة مراقبة المنصة (Platform Super Admin Dashboard)
+          </h2>
+          <p style={{ fontSize: '0.8125rem', color: 'var(--color-text-secondary)', margin: '0.25rem 0 0' }}>
+            رصد حي لكافة العيادات، التراخيص، الحسابات وسجلات التدقيق السيبرانية
+          </p>
+        </div>
+        <GlassButton onClick={() => refetch()} disabled={isLoading} variant="secondary">
+          <RefreshCw size={16} />
+          <span>تحديث المؤشرات (Refresh)</span>
         </GlassButton>
       </div>
 
@@ -80,51 +115,71 @@ export const PlatformDashboardScreen: React.FC = () => {
         />
       )}
 
+      {/* Stitch Stat Cards Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
-        {cards.map((card) => (
-          <GlassCard key={card.label} style={{ padding: '1.25rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-              <span style={{ fontSize: '0.8125rem', color: 'var(--color-text-secondary)' }}>{card.label}</span>
-              {card.icon}
-            </div>
-            <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>{card.value}</div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: '0.25rem' }}>{card.sub}</div>
-          </GlassCard>
-        ))}
+        <StatCard
+          title="إجمالي الملاك / Owners"
+          value={stats.totalOwners}
+          subtitle={`${stats.activeOwners} نشط في النظام`}
+          icon={<Users size={20} />}
+        />
+        <StatCard
+          title="إجمالي العيادات / Clinics"
+          value={stats.totalClinics}
+          subtitle={`${stats.activeClinics} نشطة معتمدة`}
+          icon={<Building2 size={20} />}
+        />
+        <StatCard
+          title="بانتظار التهيئة / Onboarding"
+          value={stats.pendingOnboardingClinics}
+          subtitle={`${stats.clinicsAwaitingModuleSetup} بانتظار تفعيل الوحدات`}
+          icon={<Activity size={20} />}
+          iconBg="var(--color-status-warning-soft)"
+        />
+        <StatCard
+          title="قراءة فقط وموقوفة / Suspended"
+          value={`${stats.readOnlyClinics} / ${stats.suspendedClinics}`}
+          subtitle={`${stats.expiringSubscriptionsCount} اشتراكات تنتهي قريباً`}
+          icon={<AlertTriangle size={20} />}
+          iconBg="var(--color-status-danger-soft)"
+        />
+        <StatCard
+          title="محاولات دخول فاشلة (24س)"
+          value={stats.failedLoginsLast24Hours}
+          subtitle="مراقبة الأمان الفورية"
+          icon={<ShieldAlert size={20} />}
+          iconBg="var(--color-status-danger-soft)"
+        />
+        <StatCard
+          title="رسائل البريد الصادرة / Outbox"
+          value={stats.pendingOutboxMessages}
+          subtitle="في قائمة المعالجة الفورية"
+          icon={<MailWarning size={20} />}
+          iconBg="var(--color-status-info-soft)"
+        />
       </div>
 
-      <GlassCard style={{ padding: '1.25rem' }}>
-        <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.75rem' }}>
-          أحدث سجلات الأمان والتدقيق (Recent Audit Activity)
-        </h3>
-        {stats.recentAuditEntries.length === 0 ? (
-          <p style={{ color: 'var(--color-text-muted)', fontSize: '0.875rem' }}>
-            لا توجد سجلات تدقيق حديثة معروضة حالياً.
-          </p>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            {stats.recentAuditEntries.map((entry) => (
-              <div
-                key={entry.id}
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  padding: '0.625rem 0.75rem',
-                  borderRadius: '0.5rem',
-                  background: 'var(--glass-surface)',
-                  fontSize: '0.875rem',
-                }}
-              >
-                <span>
-                  <strong>{entry.action}</strong> — {entry.entityName}
-                </span>
-                <span style={{ color: 'var(--color-text-muted)', direction: 'ltr' }}>{entry.timestampUtc}</span>
-              </div>
-            ))}
+      {/* Audit Log Table */}
+      <GlassCard style={{ padding: '1.5rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Server size={18} color="var(--color-accent-teal)" />
+            <h3 style={{ fontSize: '1rem', fontWeight: 700, margin: 0 }}>
+              أحدث سجلات الأمان والتدقيق (Recent Audit Activity)
+            </h3>
           </div>
-        )}
+          <span style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)' }}>
+            سجل غير قابل للتعديل (Append-Only Audit Stream)
+          </span>
+        </div>
+
+        <ClinicalTable
+          columns={auditColumns}
+          data={stats.recentAuditEntries}
+          keyExtractor={(item) => item.id}
+          emptyMessage="لا توجد عمليات تدقيق مسجلة حالياً / No audit entries loaded"
+        />
       </GlassCard>
     </div>
   );
 };
-

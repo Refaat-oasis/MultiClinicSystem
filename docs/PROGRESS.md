@@ -600,3 +600,20 @@ Status: 0 Errors, Clean Build
 |---|---|---|
 | Full System Documentation (`docs/SYSTEM_DOCUMENTATION.md`) | Done | Documented full solution topology, 16-module DAG, 14 SQL schemas, 3 isolated auth realms, effective-permission formula, security headers, 28 controllers, offline PWA sync, ZIP export, and verification pyramid across Phases 0–16. |
 | Repository Knowledge Graph (`graphify-out/`) | Done | Built full AST + semantic documentation graph (`6,919` nodes, `24,790` edges, `260` labeled communities, `0` import cycles) producing `graphify-out/graph.json`, `graphify-out/GRAPH_REPORT.md`, aggregated `graphify-out/graph.html`, `manifest.json`, and `cost.json`. |
+
+---
+
+## Frontend Redesign — Stitch "Clinical Calm" Design System & UI Components Integration
+
+| Task | Status | Notes |
+|---|---|---|
+| Stitch Design Tokens & Global CSS (`@clinic/ui/src/styles/liquid-glass.css`) | Done | Imported Stitch "Clinical Calm" palette (primary teal `#0F766E`, hover `#115E59`, luminous dark `#2DD4BF`, `#0B1220` dark canvas, `#F8FAFC` light surface). Configured 12px card radii, 44px minimum touch targets, force-LTR 6-box OTP styling, WCAG AA contrast colors, and red allergy strip styling. |
+| Stitch UI Component Library (`@clinic/ui`) | Done | Implemented and exported single-type components: `StatusChip.tsx` (semantic status badges with dot indicator), `StatCard.tsx` (metric statistics card with trend badge and tabular figures), `Stepper.tsx` (RTL-aware multi-step progress bar), `ClinicalTable.tsx` (data table with typed columns and empty state), `ClinicHeader.tsx` (branding header with status indicator), and updated `GlassButton.tsx` and `AlertBanner.tsx` (`isAllergy` non-dismissible banner). |
+| Component Unit Tests (`@clinic/ui/src/StitchComponents.test.tsx`) | Done | Added 7 unit tests verifying rendering of StatusChip, StatCard with trends, Stepper step transitions, ClinicalTable data/empty states, ClinicHeader badge, and GlassButton/AlertBanner variants. All 10 tests in `@clinic/ui` pass. |
+| Super Admin UI Integration (`web/apps/admin`) | Done | Updated `AdminLoginScreen.tsx` with Stitch 3FA Gateway layout, SOC2 / ISO-27001 trust footer, hourly 3600s OTP code input, and break-glass emergency recovery modal. Upgraded `PlatformDashboardScreen.tsx` with `StatCard`, `StatusChip`, and `ClinicalTable`. Upgraded `App.tsx` with Sovereign Cloud Node status banner. |
+| Clinic App & Patient Portal Integration (`web/apps/clinic`) | Done | Updated `App.tsx` and `PortalApp.tsx` with Stitch brand header, v1.0 badge, status indicators, and responsive card layouts. |
+| Core Feature Screens Integration (`web/packages/features/core`) | Done | Updated `LoginScreen.tsx` with Stitch Staff Sign In branding, 16px touch-friendly inputs (preventing mobile iOS auto-zoom), and regulatory compliance footer. |
+
+### Verification Output (`feat/stitch-clinical-ui-redesign`)
+- `npm --prefix web test`: `72 passed` across all 5 workspaces (`admin-app`: 7, `clinic-app`: 5, `api-client`: 7, `ui`: 10, `feature-core`: 43)
+- `npm --prefix web run build`: `admin-app` and `clinic-app` built cleanly with zero TypeScript or bundler errors.

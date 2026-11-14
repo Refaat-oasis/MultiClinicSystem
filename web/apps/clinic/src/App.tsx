@@ -277,30 +277,63 @@ export const App: React.FC = () => {
 
   return (
     <div style={{ maxWidth: '1200px', marginInline: 'auto', padding: '2rem 1rem' }}>
-      {/* Top Navigation Bar */}
+      {/* Top Navigation Bar with Stitch Clinical Design */}
       <header
         className="glass-card"
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          marginBottom: '2rem',
+          marginBottom: '1.5rem',
           padding: '1rem 1.5rem',
           flexWrap: 'wrap',
           gap: '1rem',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <Building2 size={32} color="var(--color-accent-teal)" />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem' }}>
+          <div
+            style={{
+              width: '2.75rem',
+              height: '2.75rem',
+              borderRadius: 'var(--radius-card)',
+              backgroundColor: 'var(--color-accent-teal)',
+              color: '#ffffff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: 'var(--glass-shadow)',
+              flexShrink: 0,
+            }}
+          >
+            <Building2 size={24} />
+          </div>
           <div>
-            <h1 style={{ fontSize: '1.25rem', fontWeight: 700 }}>عيادة الأمل التخصصية</h1>
-            <p style={{ fontSize: '0.8125rem', color: 'var(--color-text-muted)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <h1 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0, color: 'var(--color-text-primary)' }}>
+                عيادة الأمل التخصصية
+              </h1>
+              <span
+                style={{
+                  fontSize: '0.6875rem',
+                  fontFamily: 'monospace',
+                  fontWeight: 700,
+                  paddingInline: '0.4rem',
+                  paddingBlock: '0.1rem',
+                  borderRadius: 'var(--radius-pill)',
+                  backgroundColor: 'var(--color-accent-teal-soft)',
+                  color: 'var(--color-accent-teal-text)',
+                }}
+              >
+                v1.0
+              </span>
+            </div>
+            <p style={{ fontSize: '0.8125rem', color: 'var(--color-text-secondary)', margin: '0.25rem 0 0' }}>
               منظومة الرعاية الصحية المتعددة | المرحلة الأولى: الهوية والأمان
             </p>
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
           {isAuthenticated && clinics.length > 0 && (
             <ClinicSwitcher
               clinics={clinics}
@@ -316,21 +349,23 @@ export const App: React.FC = () => {
                 gap: '0.5rem',
                 paddingInline: '0.75rem',
                 paddingBlock: '0.375rem',
-                borderRadius: '0.5rem',
-                backgroundColor: 'rgba(13, 148, 136, 0.1)',
-                border: '1px solid rgba(13, 148, 136, 0.2)',
+                borderRadius: 'var(--radius-input)',
+                backgroundColor: 'var(--color-accent-teal-soft)',
+                border: '1px solid var(--color-border)',
                 fontSize: '0.875rem',
               }}
             >
               <UserCheck size={16} color="var(--color-accent-teal)" />
-              <span>{user.fullName || user.email}</span>
+              <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{user.fullName || user.email}</span>
               <span
                 style={{
                   fontSize: '0.75rem',
-                  padding: '2px 6px',
-                  borderRadius: '4px',
+                  fontWeight: 600,
+                  paddingInline: '0.375rem',
+                  paddingBlock: '0.125rem',
+                  borderRadius: 'var(--radius-pill)',
                   backgroundColor: 'var(--color-accent-teal)',
-                  color: '#fff',
+                  color: '#ffffff',
                 }}
               >
                 {user.role}
@@ -343,10 +378,11 @@ export const App: React.FC = () => {
                   background: 'none',
                   border: 'none',
                   cursor: 'pointer',
-                  color: '#ef4444',
-                  marginInlineStart: '0.5rem',
+                  color: 'var(--color-status-danger)',
+                  marginInlineStart: '0.25rem',
                   display: 'flex',
                   alignItems: 'center',
+                  padding: '0.25rem',
                 }}
               >
                 <LogOut size={16} />
@@ -360,13 +396,14 @@ export const App: React.FC = () => {
               display: 'flex',
               alignItems: 'center',
               gap: '0.45rem',
-              paddingInline: '0.65rem',
-              paddingBlock: '0.35rem',
-              borderRadius: '0.5rem',
+              paddingInline: '0.75rem',
+              paddingBlock: '0.375rem',
+              borderRadius: 'var(--radius-pill)',
               fontSize: '0.8125rem',
-              backgroundColor: isOnline ? 'rgba(16, 185, 129, 0.12)' : 'rgba(245, 158, 11, 0.15)',
-              border: isOnline ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(245, 158, 11, 0.35)',
-              color: isOnline ? '#047857' : '#b45309',
+              fontWeight: 600,
+              backgroundColor: isOnline ? 'var(--color-status-success-soft)' : 'var(--color-status-warning-soft)',
+              border: `1px solid ${isOnline ? 'rgba(22, 163, 74, 0.3)' : 'rgba(217, 119, 6, 0.35)'}`,
+              color: isOnline ? 'var(--color-status-success)' : 'var(--color-status-warning)',
             }}
           >
             {isOnline ? <Wifi size={15} /> : <WifiOff size={15} />}
@@ -375,13 +412,13 @@ export const App: React.FC = () => {
               <span
                 data-testid="pending-sync-badge"
                 style={{
-                  paddingInline: '0.4rem',
+                  paddingInline: '0.45rem',
                   paddingBlock: '1px',
-                  borderRadius: '9999px',
+                  borderRadius: 'var(--radius-pill)',
                   backgroundColor: 'var(--color-accent-teal)',
-                  color: '#fff',
-                  fontSize: '0.75rem',
-                  fontWeight: 600,
+                  color: '#ffffff',
+                  fontSize: '0.6875rem',
+                  fontWeight: 700,
                 }}
               >
                 {pendingCount} معلق{provisionalReceiptsCount > 0 ? ` (${provisionalReceiptsCount} مؤقت)` : ''}
