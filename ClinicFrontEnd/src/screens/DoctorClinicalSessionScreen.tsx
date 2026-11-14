@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Stethoscope, Clock, ShieldAlert, Check, Plus, Trash2 } from 'lucide-react';
 import { AlertBanner } from '../components/AlertBanner';
 import { StatusChip } from '../components/StatusChip';
+import { DentalJawOdontogram3D, ToothData } from '../components/DentalJawOdontogram3D';
 
 interface PrescriptionLine {
   drugName: string;
@@ -22,8 +23,6 @@ export const DoctorClinicalSessionScreen: React.FC = () => {
   ]);
   const [allergyOverrideReason, setAllergyOverrideReason] = useState('');
   const [savedFeedback, setSavedFeedback] = useState(false);
-
-  const teethNumbers = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28];
 
   const handleSaveSession = (e: React.FormEvent) => {
     e.preventDefault();
@@ -95,6 +94,22 @@ export const DoctorClinicalSessionScreen: React.FC = () => {
             <span>مدة الجلسة: <span className="num-tabular">{sessionMinutes} دقيقة</span></span>
           </div>
 
+          {selectedTooth && (
+            <span
+              style={{
+                fontSize: '0.75rem',
+                fontWeight: 700,
+                color: 'var(--clinic-accent-primary)',
+                backgroundColor: 'var(--clinic-bg-surface)',
+                padding: '0.25rem 0.5rem',
+                borderRadius: 'var(--clinic-radius-pill)',
+                border: '1px solid var(--clinic-border-strong)',
+              }}
+            >
+              السن المستهدف: #{selectedTooth}
+            </span>
+          )}
+
           <StatusChip status="info" label="جلسة نشطة" />
         </div>
       </div>
@@ -125,48 +140,15 @@ export const DoctorClinicalSessionScreen: React.FC = () => {
         </div>
       )}
 
-      {/* Dental Odontogram (Specialty Module View) */}
-      <div className="clinic-card">
-        <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '0.5rem' }}>
-          مخطط الأسنان الرقمي (Dental Odontogram)
-        </h3>
-        <p style={{ fontSize: '0.75rem', color: 'var(--clinic-text-muted)', marginBottom: '1rem' }}>
-          حدد السن لتسجيل التشخيص والإجراء المتبع
-        </p>
-
-        <div style={{ display: 'flex', gap: '0.375rem', overflowX: 'auto', paddingBottom: '0.5rem' }}>
-          {teethNumbers.map((num) => {
-            const isSelected = selectedTooth === num;
-            return (
-              <button
-                key={num}
-                type="button"
-                onClick={() => setSelectedTooth(num)}
-                style={{
-                  width: '42px',
-                  height: '48px',
-                  borderRadius: 'var(--clinic-radius-input)',
-                  border: isSelected ? '2px solid var(--clinic-accent-primary)' : '1px solid var(--clinic-border-strong)',
-                  backgroundColor: isSelected ? 'var(--clinic-accent-soft)' : 'var(--clinic-bg-surface)',
-                  color: isSelected ? 'var(--clinic-accent-primary)' : 'var(--clinic-text-primary)',
-                  fontWeight: 700,
-                  fontSize: '0.875rem',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <span>{num}</span>
-                <span style={{ fontSize: '0.625rem', color: isSelected ? 'inherit' : 'var(--clinic-text-muted)' }}>
-                  {num === 36 ? 'عصب' : 'سليم'}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
+      {/* 3D Dual-Arch Dental Odontogram (Specialty Module View) */}
+      <DentalJawOdontogram3D
+        onSelectTooth={(tooth: ToothData) => {
+          setSelectedTooth(tooth.number);
+          if (tooth.notes) {
+            setDoctorNotes(`السن #${tooth.number} (${tooth.nameAr}): ${tooth.notes}`);
+          }
+        }}
+      />
 
       {/* Clinical Notes & Diagnosis Form */}
       <form onSubmit={handleSaveSession} style={{ display: 'grid', gap: '1.25rem' }}>

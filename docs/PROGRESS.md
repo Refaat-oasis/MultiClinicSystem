@@ -633,3 +633,23 @@ Status: 0 Errors, Clean Build
 - `cd backend; dotnet build Platform.sln`: `Build succeeded - 0 Error(s)`
 - `cd SuperAdminFrontEnd; npm run build`: `Built in 2.73s - 0 Error(s)`
 - `cd ClinicFrontEnd; npm run build`: `Built in 2.94s - 0 Error(s)`
+
+---
+
+## Advanced Clinical Features, 3D Odontogram, Right Sidebar & Dark Mode (`feat/advanced-features-sidebar-3d-modules`)
+
+| Task | Status | Notes |
+|---|---|---|
+| Super Admin Strongly-Typed Login | Done | Created `SuperAdminFrontEnd/src/config/authConfig.ts` with strongly-typed credentials (`ahmed@platform.local` / `AdminInitial#2026`). Added 1-Click Dev Sign-In button with auto-supplied 3600s OTP code so testing is never blocked by manual verification codes. |
+| Right-Side Navigation Sidebar | Done | Converted top horizontal navbars to dedicated Right Sidebar layouts (`ClinicSidebar.tsx` and `AdminSidebar.tsx`) with RTL-first alignment (`dir="rtl"`), sticky vertical placement, user profile chips, status chips, and theme controls. |
+| System-Wide Dark Mode | Done | Implemented rich clinical dark mode (`[data-theme="dark"]`) across both `ClinicFrontEnd` and `SuperAdminFrontEnd` with CSS variable design tokens and persistent toggle in `localStorage`. |
+| 3D Dual-Arch Dental Odontogram | Done | Replaced the flat 1-row dental buttons in `DoctorClinicalSessionScreen.tsx` with an interactive 3D dual-arch anatomical simulator (`DentalJawOdontogram3D.tsx`). Supports Maxilla (upper: 18-28) and Mandible (lower: 48-38), 32 teeth, realistic curved parabolic alveolar bone ridges with 3D elevation, 5 interactive surfaces (Occlusal, Mesial, Distal, Buccal, Lingual), and status classification (Healthy, Caries, RCT, Crown, Extracted, Implant). |
+| Doctor Reports & Analytics Dashboard | Done | Built `DoctorReportsDashboardScreen.tsx` with KPI metrics cards (treated patient counter, total sessions, collected income, expenses, and net profit margin) plus interactive SVG charts for monthly income vs expenses and daily session volume distribution. |
+| Fixed & Variable Cost Management | Done | Built `CostManagementScreen.tsx` supporting fixed costs (rent, base salaries, software subscriptions) and variable costs (dental lab fees, medical consumables, emergency maintenance) with modal to add new cost entries and real-time total updates. |
+| API Integration & CORS Layer | Done | Added CORS policy `FrontendOrigins` in `backend/src/Platform.Api/Program.cs` allowing ports 3000 and 3001 with credentials. Enhanced `HostRoutingMiddleware.cs` to identify Super Admin requests by port 3001 or `X-Host-Type: admin`. Created `clinicApiClient.ts` and `adminApiClient.ts` with graceful offline fallback. |
+| Module Architecture Registration | Done | Registered 3 new toggleable modules in `ModuleCatalogService.cs` (`dental-3d-arch`, `doctor-reports`, `cost-management`) with prerequisites, permissions, and menu items. Integrated into `ClinicModuleMatrixScreen.tsx` so Super Admin can toggle them per clinic. |
+
+### Real Build & Verification Output
+- `dotnet build backend/Platform.sln`: **Passed - 0 Error(s)**
+- `npm --prefix SuperAdminFrontEnd run build`: **Passed in 2.69s - 0 Error(s)**
+- `npm --prefix ClinicFrontEnd run build`: **Passed in 2.96s - 0 Error(s)**

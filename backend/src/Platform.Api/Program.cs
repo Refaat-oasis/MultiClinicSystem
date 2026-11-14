@@ -281,6 +281,22 @@ builder.Services.AddSignalR();
 builder.Services.AddProblemDetails();
 builder.Services.AddControllers();
 
+// Configure CORS for ClinicFrontEnd (port 3000) and SuperAdminFrontEnd (port 3001)
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("FrontendOrigins", policy =>
+    {
+        policy.WithOrigins(
+                  "http://localhost:3000",
+                  "http://localhost:3001",
+                  "https://localhost:3000",
+                  "https://localhost:3001")
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials();
+    });
+});
+
 var app = builder.Build();
 
 // Support server-side break-glass CLI command: platform-admin reset-2fa --email <email> --secret <secret>
@@ -314,6 +330,8 @@ if (args.Length >= 2 &&
 app.UseMiddleware<RequestIdMiddleware>();
 app.UseMiddleware<SecurityHeadersMiddleware>();
 app.UseMiddleware<HostRoutingMiddleware>();
+
+app.UseCors("FrontendOrigins");
 
 app.UseHttpsRedirection();
 app.UseAuthentication();

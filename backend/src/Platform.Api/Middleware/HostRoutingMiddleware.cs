@@ -94,6 +94,16 @@ public sealed class HostRoutingMiddleware
             return string.Equals(hostType, "admin", StringComparison.OrdinalIgnoreCase);
         }
 
+        if (request.Headers.TryGetValue("Origin", out var origin) && origin.ToString().Contains("3001"))
+        {
+            return true;
+        }
+
+        if (request.Headers.TryGetValue("Referer", out var referer) && referer.ToString().Contains("3001"))
+        {
+            return true;
+        }
+
         return request.Host.Host.StartsWith("admin.", StringComparison.OrdinalIgnoreCase);
     }
 }

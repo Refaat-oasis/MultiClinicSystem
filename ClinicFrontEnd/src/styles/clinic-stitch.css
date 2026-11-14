@@ -36,6 +36,40 @@
   --clinic-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
 }
 
+[data-theme="dark"] {
+  /* Clinical Calm Dark Mode Spec */
+  --clinic-bg-canvas: #090e17;
+  --clinic-bg-surface: #121a28;
+  --clinic-bg-subtle: #1b263b;
+  --clinic-bg-hover: #27354f;
+
+  --clinic-border-subtle: #1e2d42;
+  --clinic-border-strong: #2e415d;
+  --clinic-border-focus: #14b8a6;
+
+  --clinic-text-primary: #f8fafc;
+  --clinic-text-secondary: #cbd5e1;
+  --clinic-text-muted: #64748b;
+
+  --clinic-accent-primary: #14b8a6;
+  --clinic-accent-hover: #0d9488;
+  --clinic-accent-soft: rgba(20, 184, 166, 0.15);
+  --clinic-accent-soft-text: #2dd4bf;
+
+  --clinic-status-success: #22c55e;
+  --clinic-status-success-bg: rgba(34, 197, 94, 0.15);
+  --clinic-status-warning: #f59e0b;
+  --clinic-status-warning-bg: rgba(245, 158, 11, 0.15);
+  --clinic-status-danger: #ef4444;
+  --clinic-status-danger-bg: rgba(239, 68, 68, 0.15);
+  --clinic-status-info: #3b82f6;
+  --clinic-status-info-bg: rgba(59, 130, 246, 0.15);
+
+  --clinic-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.5);
+  --clinic-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.6);
+  --clinic-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.7);
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -235,3 +269,94 @@ body {
   font-family: 'Inter', monospace;
   font-variant-numeric: tabular-nums;
 }
+
+/* Right Sidebar Layout (Arabic RTL First) */
+.clinic-shell {
+  display: flex;
+  min-height: 100vh;
+  direction: rtl;
+}
+
+.clinic-sidebar {
+  width: 270px;
+  flex-shrink: 0;
+  background-color: var(--clinic-bg-surface);
+  border-inline-end: 1px solid var(--clinic-border-subtle);
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  z-index: 40;
+}
+
+.clinic-content-area {
+  flex: 1;
+  padding: 1.5rem 2rem;
+  overflow-y: auto;
+  min-width: 0;
+}
+
+.sidebar-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.625rem 0.875rem;
+  border-radius: var(--clinic-radius-input);
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--clinic-text-secondary);
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  width: 100%;
+  text-align: right;
+  text-decoration: none;
+}
+
+.sidebar-nav-item:hover {
+  background-color: var(--clinic-bg-hover);
+  color: var(--clinic-text-primary);
+}
+
+.sidebar-nav-item.active {
+  background-color: var(--clinic-accent-soft);
+  color: var(--clinic-accent-primary);
+  border-color: rgba(15, 118, 110, 0.2);
+}
+
+/* 3D Dental Jaw Styling */
+.dental-arch-canvas {
+  background: radial-gradient(circle at center, var(--clinic-bg-subtle) 0%, var(--clinic-bg-surface) 100%);
+  border-radius: var(--clinic-radius-card);
+  padding: 1.5rem;
+  border: 1px solid var(--clinic-border-subtle);
+  position: relative;
+  overflow: hidden;
+}
+
+.gum-ridge-upper {
+  border-radius: 180px 180px 20px 20px;
+  background: linear-gradient(180deg, rgba(225, 29, 72, 0.08) 0%, rgba(244, 63, 94, 0.03) 100%);
+  border-top: 3px solid rgba(244, 63, 94, 0.35);
+}
+
+.gum-ridge-lower {
+  border-radius: 20px 20px 180px 180px;
+  background: linear-gradient(0deg, rgba(225, 29, 72, 0.08) 0%, rgba(244, 63, 94, 0.03) 100%);
+  border-bottom: 3px solid rgba(244, 63, 94, 0.35);
+}
+
+.tooth-3d-card {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-origin: center bottom;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.04);
+}
+
+.tooth-3d-card:hover {
+  transform: translateY(-4px) scale(1.08);
+  box-shadow: 0 10px 15px -3px rgba(15, 118, 110, 0.25);
+  z-index: 10;
+}
+

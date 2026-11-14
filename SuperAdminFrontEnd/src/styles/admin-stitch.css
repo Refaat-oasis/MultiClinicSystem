@@ -36,6 +36,40 @@
   --admin-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
 }
 
+[data-theme="dark"] {
+  /* Crisp Obsidian Dark Theme */
+  --admin-bg-canvas: #090d16;
+  --admin-bg-surface: #111827;
+  --admin-bg-subtle: #1e293b;
+  --admin-bg-hover: #334155;
+  
+  --admin-border-subtle: #1e293b;
+  --admin-border-strong: #334155;
+  --admin-border-focus: #14b8a6;
+  
+  --admin-text-primary: #f8fafc;
+  --admin-text-secondary: #cbd5e1;
+  --admin-text-muted: #64748b;
+  
+  --admin-accent-primary: #14b8a6;
+  --admin-accent-hover: #0d9488;
+  --admin-accent-soft: rgba(20, 184, 166, 0.15);
+  --admin-accent-soft-text: #2dd4bf;
+  
+  --admin-status-success: #22c55e;
+  --admin-status-success-bg: rgba(34, 197, 94, 0.15);
+  --admin-status-warning: #f59e0b;
+  --admin-status-warning-bg: rgba(245, 158, 11, 0.15);
+  --admin-status-danger: #ef4444;
+  --admin-status-danger-bg: rgba(239, 68, 68, 0.15);
+  --admin-status-info: #3b82f6;
+  --admin-status-info-bg: rgba(59, 130, 246, 0.15);
+
+  --admin-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.5);
+  --admin-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.6);
+  --admin-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.7);
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -249,3 +283,60 @@ body {
   font-family: 'Inter', monospace;
   font-variant-numeric: tabular-nums;
 }
+
+/* Right Sidebar Layout */
+.admin-shell {
+  display: flex;
+  min-height: 100vh;
+  direction: rtl;
+}
+
+.admin-sidebar {
+  width: 280px;
+  flex-shrink: 0;
+  background-color: var(--admin-bg-surface);
+  border-inline-end: 1px solid var(--admin-border-subtle);
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  z-index: 40;
+}
+
+.admin-content-area {
+  flex: 1;
+  padding: 1.5rem 2rem;
+  overflow-y: auto;
+  min-width: 0;
+}
+
+.sidebar-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--admin-radius-input);
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--admin-text-secondary);
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  width: 100%;
+  text-align: right;
+  text-decoration: none;
+}
+
+.sidebar-nav-item:hover {
+  background-color: var(--admin-bg-hover);
+  color: var(--admin-text-primary);
+}
+
+.sidebar-nav-item.active {
+  background-color: var(--admin-accent-soft);
+  color: var(--admin-accent-primary);
+  border-color: rgba(15, 118, 110, 0.2);
+}
+

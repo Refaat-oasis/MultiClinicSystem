@@ -636,6 +636,75 @@ public sealed class ModuleCatalogService : IModuleCatalogService
                     new("offline-sync.last-sync", "offline-sync", "offline_sync.use", "Clinic", "آخر مزامنة", "Last Successful Sync"),
                     new("offline-sync.pending-operations", "offline-sync", "offline_sync.use", "Clinic", "العمليات المعلقة", "Pending Offline Operations"),
                     new("offline-sync.open-conflicts", "offline-sync", "offline_sync.use", "Clinic", "تعارضات المزامنة المفتوحة", "Open Sync Conflicts")
+                ]),
+
+            new ModuleManifestEntry(
+                ModuleKey: "dental-3d-arch",
+                TitleAr: "مخطط الفك والأسنان ثلاثي الأبعاد",
+                TitleEn: "3D Dental Dual-Arch Odontogram",
+                DescriptionAr: "محاكي تفاعلي مجسم ثلاثي الأبعاد للفكين العلوي والسفلي مع أسطح الأسنان وتشخيصها.",
+                DescriptionEn: "Interactive 3D dual-arch dental simulator for upper and lower jaws with anatomical tooth surface diagnostics.",
+                Prerequisites: ["clinical"],
+                Permissions:
+                [
+                    new("dental.3d.view", "dental-3d-arch", "Dental 3D", "عرض مخطط الأسنان 3D", "View 3D Dental Chart", false),
+                    new("dental.3d.edit", "dental-3d-arch", "Dental 3D", "تعديل أسطح وتشخيصات الأسنان 3D", "Edit 3D Dental Surfaces & Procedures", false)
+                ],
+                MenuItems:
+                [
+                    new("dental-3d.view", "dental-3d-arch", "مخطط الفك 3D", "Dental 3D", "/clinical/3d-jaw", "dental.3d.view", 165)
+                ],
+                SettingsSections: Array.Empty<SettingsSectionResult>(),
+                DashboardWidgets:
+                [
+                    new("dental-3d.treated-teeth-count", "dental-3d-arch", "dental.3d.view", "Doctor", "إجمالي الأسنان المعالجة", "Treated Teeth Count"),
+                    new("dental-3d.procedures-summary", "dental-3d-arch", "dental.3d.view", "Doctor", "ملخص إجراءات الأسنان", "Dental Procedures Summary")
+                ]),
+
+            new ModuleManifestEntry(
+                ModuleKey: "doctor-reports",
+                TitleAr: "لوحة تحليلات وتقارير الطبيب",
+                TitleEn: "Doctor Analytics & Reports",
+                DescriptionAr: "مؤشرات أداء الطبيب وعدد المرضى المعاينين والرسوم البيانية للإيرادات والمصروفات.",
+                DescriptionEn: "Doctor KPIs, treated patient counts, and interactive income vs expense charts.",
+                Prerequisites: ["clinical", "finance"],
+                Permissions:
+                [
+                    new("doctor.reports.view", "doctor-reports", "Doctor Reports", "عرض تقارير الطبيب", "View Doctor Reports", false),
+                    new("doctor.reports.export", "doctor-reports", "Doctor Reports", "تصدير تقارير الطبيب", "Export Doctor Reports", false)
+                ],
+                MenuItems:
+                [
+                    new("doctor-reports.dashboard", "doctor-reports", "تقارير الطبيب", "Doctor Reports", "/doctor/reports", "doctor.reports.view", 185)
+                ],
+                SettingsSections: Array.Empty<SettingsSectionResult>(),
+                DashboardWidgets:
+                [
+                    new("doctor-reports.patients-treated-count", "doctor-reports", "doctor.reports.view", "Doctor", "المرضى المعاينون", "Treated Patients Count"),
+                    new("doctor-reports.income-vs-expenses", "doctor-reports", "doctor.reports.view", "Doctor", "رسم بياني للإيرادات والمصروفات", "Income vs Expenses Chart")
+                ]),
+
+            new ModuleManifestEntry(
+                ModuleKey: "cost-management",
+                TitleAr: "إدارة التكاليف الثابتة والمتغيرة",
+                TitleEn: "Fixed & Variable Cost Management",
+                DescriptionAr: "تسجيل وتصنيف التكاليف التشغيلية الثابتة والمتغيرة ومتابعة ربحية العيادة.",
+                DescriptionEn: "Track and manage fixed and variable operational costs, laboratory fees, and clinic margins.",
+                Prerequisites: ["finance"],
+                Permissions:
+                [
+                    new("costs.manage", "cost-management", "Cost Management", "إدارة التكاليف والمصروفات", "Manage Fixed & Variable Costs", false),
+                    new("costs.view", "cost-management", "Cost Management", "عرض سجل التكاليف والمصروفات", "View Fixed & Variable Costs", false)
+                ],
+                MenuItems:
+                [
+                    new("costs.management", "cost-management", "إدارة التكاليف", "Cost Management", "/finance/costs", "costs.view", 187)
+                ],
+                SettingsSections: Array.Empty<SettingsSectionResult>(),
+                DashboardWidgets:
+                [
+                    new("costs.fixed-vs-variable-ratio", "cost-management", "costs.view", "Clinic", "نسبة التكاليف الثابتة إلى المتغيرة", "Fixed vs Variable Cost Ratio"),
+                    new("costs.monthly-burn-rate", "cost-management", "costs.view", "Clinic", "معدل الصرف الشهري", "Monthly Operational Burn Rate")
                 ])
         ];
     }
